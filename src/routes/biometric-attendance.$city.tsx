@@ -173,7 +173,7 @@ function CityLanding() {
               <MapPin className="h-3 w-3" /> {city.name}, {city.state}
             </Badge>
             <h1 className="text-3xl font-bold leading-tight tracking-tight md:text-5xl">
-              Biometric Attendance System in {city.name}
+              {h1}
             </h1>
             <p className="mt-4 max-w-2xl text-lg text-muted-foreground">{city.intro}</p>
             <div className="mt-6 flex flex-wrap gap-3">
