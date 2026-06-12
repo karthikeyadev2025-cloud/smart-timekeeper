@@ -76,6 +76,8 @@ function CheckInFlow() {
     lastKind === "break_in" ? "check_out" :
     lastKind === "check_out" ? "check_in" : "check_in";
 
+  const isFieldStaff = (user?.profile as any)?.is_field_staff === true;
+
   const getLocation = () => {
     setGpsError(null);
     if (!navigator.geolocation) { setGpsError("Geolocation not supported in this browser."); return; }
@@ -84,6 +86,10 @@ function CheckInFlow() {
         setCoords(pos.coords);
         const match = (locations ?? []).find((l) => haversine(pos.coords.latitude, pos.coords.longitude, l.latitude, l.longitude) <= l.radius_meters);
         if (match) { setMatchedLocation(match); }
+        else if (isFieldStaff) {
+          // Field staff: allow but no office match
+          setMatchedLocation(null);
+        }
         else { setMatchedLocation(null); setGpsError("You're not inside any office geofence."); }
       },
       (err) => setGpsError(err.message),
@@ -128,7 +134,8 @@ function CheckInFlow() {
   useEffect(() => () => stopCamera(), []);
 
   const submitAttendance = async () => {
-    if (!coords || !matchedLocation || !selfieBlob || !user?.userId || !user.tenant?.id) return;
+    if (!coords || !selfieBlob || !user?.userId || !user.tenant?.id) return;
+    if (!isFieldStaff && !matchedLocation) return;
     setSubmitting(true);
     try {
       const path = `${user.userId}/${Date.now()}.jpg`;
@@ -138,13 +145,22 @@ function CheckInFlow() {
       });
       if (upErr) throw upErr;
 
+      const distance = matchedLocation
+        ? haversine(coords.latitude, coords.longitude, matchedLocation.latitude, matchedLocation.longitude)
+        : null;
+      const enforcement: "inside" | "outside_allowed" | "outside_blocked" =
+        matchedLocation ? "inside" : isFieldStaff ? "outside_allowed" : "outside_blocked";
+
       const { error: insErr } = await supabase.from("attendance_records").insert({
         tenant_id: user.tenant.id,
         user_id: user.userId,
-        office_location_id: matchedLocation.id,
+        office_location_id: matchedLocation?.id ?? null,
         kind: nextKind,
         latitude: coords.latitude,
         longitude: coords.longitude,
+        accuracy_meters: coords.accuracy ?? null,
+        distance_from_office_m: distance,
+        enforcement_status: enforcement,
         selfie_url: path,
       });
       if (insErr) throw insErr;
