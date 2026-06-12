@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       attendance_records: {
         Row: {
           accuracy_meters: number | null
@@ -230,6 +251,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      content_revisions: {
+        Row: {
+          content: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          key: string
+          scope: string
+        }
+        Insert: {
+          content: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key: string
+          scope: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key?: string
+          scope?: string
+        }
+        Relationships: []
       }
       impersonation_audit: {
         Row: {
@@ -838,6 +886,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      site_content: {
+        Row: {
+          content: Json
+          id: string
+          key: string
+          scope: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          content?: Json
+          id?: string
+          key: string
+          scope: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          content?: Json
+          id?: string
+          key?: string
+          scope?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       staff_shifts: {
         Row: {

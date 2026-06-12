@@ -1,54 +1,89 @@
-# Plan: Three major feature packs
+## What you'll get
 
-You asked for all three. Big scope — I'll ship in 3 phases, each independently usable. Confirm and I'll start with Phase 1.
+A new **Super Admin → Site Editor** area (at `/_authenticated/admin/*`) visible only to users with the `super_admin` role. From there you can edit every public page (home, city landing pages, pricing/SEO text) and manage integration keys for Razorpay, Firebase, and Google OAuth — without touching code.
 
-## Phase 1 — Geofence enforcement + field staff + map view
+## Pages in the admin
 
-**DB migration**
-- `profiles`: add `is_field_staff boolean default false`, `home_latitude`, `home_longitude`
-- `shifts`: add `location_mode` enum (`office_only` | `field` | `hybrid`)
-- `attendance_records`: add `accuracy_meters`, `is_mock_location`, `address_text`, `distance_from_office_m`, `enforcement_status` (`inside` | `outside_allowed` | `outside_blocked`)
+```
+/admin                         Overview (counts + quick links)
+/admin/site/home               Edit Home: hero, features, stats, CTA, SEO meta
+/admin/site/cities             List all city pages (Hyderabad, Vijayawada, Vizag, ...)
+/admin/site/cities/$slug       Edit a city page: H1, intro, sections, FAQs, SEO
+/admin/site/pricing            Edit pricing plans text + SEO
+/admin/site/seo                Global SEO defaults (title template, OG image, robots)
+/admin/site/branding           Logo, brand name, contact phone/email, social links
+/admin/integrations            Razorpay / Firebase / Google OAuth keys
+/admin/users                   List users, change roles (already partly built)
+```
 
-**Server (`createServerFn`)**
-- `submitAttendance` — server-side haversine check vs assigned office; blocks office-only staff outside geofence; allows field staff anywhere but tags `outside_allowed` and stores GPS+address.
-- Reverse geocode via Google Maps connector (need to connect it).
+All admin routes live under `_authenticated/admin/` and are double-gated: the existing auth gate + a `super_admin` role check that redirects non-admins.
 
-**UI**
-- `check-in.tsx`: detect `mock_location` (best-effort), show "Field punch" badge for field staff, skip geofence block.
-- `team.tsx`: toggle "Field staff" per person.
-- New `/live-map` route (admin): Google Map with today's punches as pins, selfie thumbnail on click, filter by staff.
+## How content editing works
 
-## Phase 2 — School mode
+1. New `site_content` table stores everything editable as JSON keyed by `(scope, key)` — e.g. `('home','hero')`, `('city','hyderabad')`, `('pricing','plans')`, `('seo','defaults')`, `('branding','site')`.
+2. Public routes (`index.tsx`, `biometric-attendance.$city.tsx`, etc.) read content from this table via a server function in their loader. If a row is missing they fall back to the current hard-coded defaults (so nothing breaks).
+3. The admin pages use proper forms (with Zod validation) and write back through a `super_admin`-gated server function.
+4. Edits are live the moment you click Save (router invalidation).
 
-**DB migration**
-- `tenants`: add `tenant_type` enum (`business` | `school`)
-- New `classes` (name, grade, section, teacher_id)
-- New `students` (class_id, roll_no, name, parent_phone) — no auth user
-- New `student_attendance` (student_id, date, status: present/absent/late, marked_by)
+## How integration keys work — important
 
-**UI (conditional on `tenant_type='school'`)**
-- Sidebar swaps: hide Payroll/Salary, show "Classes", "Students", "Mark attendance"
-- `/classes` — CRUD
-- `/mark-attendance` — teacher picks class → grid of students with Present/Absent toggle, bulk "All present", one-tap submit
-- `/student-report` — per-student monthly attendance %
-- Admin onboarding: choose Business or School at tenant create
+There are two kinds of keys, and they MUST be handled differently for security:
 
-## Phase 3 — Super admin revenue + impersonate
+**Public / publishable keys** (safe in DB, safe in browser)
+- Razorpay `key_id`
+- Firebase web config (`apiKey`, `authDomain`, `projectId`, `appId`, `messagingSenderId`, `storageBucket`)
+- Google OAuth `client_id`
 
-**DB**
-- `impersonation_audit` (super_admin_id, target_user_id, started_at, ended_at, reason)
+→ Editable directly from `/admin/integrations` and stored in `app_settings`. The frontend reads them at runtime, so changing them in the admin updates the live site immediately, no redeploy.
 
-**Server**
-- `impersonateTenant` — super admin only, issues a short-lived magic link via admin API to a tenant admin user; logs audit row.
-- `getRevenueStats` — monthly revenue chart data, per-plan breakdown, MRR, churn.
+**Server secrets** (NEVER stored in DB, NEVER sent to browser)
+- Razorpay `key_secret`, webhook secret
+- Firebase service account JSON / Admin SDK key
+- Google OAuth `client_secret`
 
-**UI**
-- `/revenue` route — KPI cards (MRR, total revenue, active subs, churn), revenue chart (recharts), per-tenant table sortable by revenue.
-- `clients.tsx`: add "Impersonate admin" button per tenant (super admin only); banner across app while impersonating + "Exit impersonation" button.
+→ Stored in Lovable Cloud Secrets (already how `SUPABASE_SERVICE_ROLE_KEY` etc. work). The `/admin/integrations` page shows which secrets are set (✅ / ❌), explains what each is for, and triggers Lovable's secure secret-entry flow when you click "Add / Update". The actual values never pass through your code or your database.
 
-## Order & deps
-- Phase 1 needs Google Maps connector (I'll prompt to connect when we start).
-- Phases are independent — can ship in this order.
+This split is non-negotiable — putting a `key_secret` in a database table would mean anyone with read access (or any SQL injection) gets your live payment credentials.
 
-## Confirm to proceed
-Reply "go" and I'll start with **Phase 1** (DB migration first, then connector, then UI). Or say "start with phase 2" / "phase 3" to reorder.
+## Technical changes
+
+### Database (one migration)
+- `site_content (id, scope text, key text, content jsonb, updated_at, updated_by, unique(scope,key))`
+  - `GRANT SELECT` to `anon, authenticated` (public read), `ALL` to `service_role`.
+  - RLS: SELECT public; INSERT/UPDATE/DELETE only when `has_role(auth.uid(),'super_admin')`.
+- `app_settings (key text primary key, value jsonb, updated_at, updated_by)` — same policy shape (public read for branding / publishable keys).
+- `content_revisions (id, scope, key, content jsonb, created_at, created_by)` — keeps last N edits so you can roll back.
+
+### Server functions (`src/lib/admin-content.functions.ts`)
+- `getSiteContent({ scope, key })` — public, no auth.
+- `listSiteContent({ scope })` — super_admin only.
+- `upsertSiteContent({ scope, key, content })` — super_admin only, writes a revision row.
+- `revertSiteContent({ revisionId })` — super_admin only.
+- `getAppSettings({ keys })` — public for whitelisted keys (branding, publishable keys); rejects sensitive keys.
+- `upsertAppSettings({ key, value })` — super_admin only.
+- `listConfiguredSecrets()` — super_admin only; returns names + "set/not set" status of `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `FIREBASE_SERVICE_ACCOUNT`, `GOOGLE_OAUTH_CLIENT_SECRET` (never the values).
+
+### Components
+- `src/components/admin/AdminLayout.tsx` — sidebar nav for the admin area.
+- `src/components/admin/JsonForm.tsx` — generic form driven by a Zod schema per content scope.
+- Per-scope schemas in `src/lib/content-schemas.ts` (so each editor knows its fields: hero title, FAQs array, etc.).
+
+### Public route changes
+- `index.tsx`, `biometric-attendance.$city.tsx`, and the pricing section call `getSiteContent` in their loader (via TanStack Query) and merge with built-in defaults.
+
+### Role gate
+- `src/routes/_authenticated/admin/route.tsx` — `beforeLoad` calls a `requireSuperAdmin` server fn; redirects to `/app` if not super admin.
+
+## What I'll need from you after the build
+
+1. Click "Add" on each row in `/admin/integrations` for the secrets you actually want to use (Razorpay secret, Firebase service account, Google OAuth client secret). Lovable will pop a secure form — values go straight to encrypted storage.
+2. For Google sign-in with your own branding (optional), follow the Google OAuth instructions on that page.
+
+## What this plan does NOT include (ask if you want any of these next)
+
+- WYSIWYG / rich-text editing inside the home page itself (the editor here is form-based — safer and faster).
+- Multi-language editing.
+- Image upload UI (logos / OG images will use URL fields for now; we can wire Lovable Cloud Storage uploads in a follow-up).
+- Payment flow implementation with Razorpay (this plan only stores the keys; wiring checkout/webhooks is a separate task).
+
+Approve and I'll build it end-to-end in one pass.
