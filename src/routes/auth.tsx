@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Phone, Mail, Eye, EyeOff } from "lucide-react";
+import { Phone, Mail } from "lucide-react";
 import { phoneToStaffEmail, isValidPhone } from "@/lib/phone-auth";
 
 export const Route = createFileRoute("/auth")({
@@ -129,50 +129,89 @@ function AuthPage() {
 
 function StaffPhoneForm({ loading, onSubmit }: { loading: boolean; onSubmit: (phone: string, password: string) => void }) {
   const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [show, setShow] = useState(false);
+  const [pin, setPin] = useState("");
+  const [step, setStep] = useState<"phone" | "pin">("phone");
+
+  const pressKey = (k: string) => {
+    if (k === "back") { setPin((p) => p.slice(0, -1)); return; }
+    if (pin.length >= 4) return;
+    const next = pin + k;
+    setPin(next);
+    if (next.length === 4 && !loading) {
+      setTimeout(() => onSubmit(phone, next), 100);
+    }
+  };
+
+  if (step === "phone") {
+    return (
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!isValidPhone(phone)) { toast.error("Enter a valid phone number"); return; }
+          setStep("pin");
+        }}
+      >
+        <div className="space-y-2">
+          <Label htmlFor="ph" className="text-base">Phone number</Label>
+          <div className="relative">
+            <Phone className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="ph"
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              placeholder="98765 43210"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
+              className="h-14 pl-11 text-lg tracking-wider"
+              required
+              autoFocus
+            />
+          </div>
+        </div>
+        <Button type="submit" size="lg" className="w-full h-14 text-base">Next →</Button>
+      </form>
+    );
+  }
+
+  const keys = ["1","2","3","4","5","6","7","8","9","","0","back"];
   return (
-    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); onSubmit(phone, password); }}>
-      <div className="space-y-2">
-        <Label htmlFor="ph" className="text-base">Phone number</Label>
-        <div className="relative">
-          <Phone className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            id="ph"
-            type="tel"
-            inputMode="numeric"
-            autoComplete="tel"
-            placeholder="98765 43210"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
-            className="h-14 pl-11 text-lg tracking-wider"
-            required
-          />
+    <div className="space-y-5">
+      <div className="text-center">
+        <p className="text-sm text-muted-foreground">Phone</p>
+        <button type="button" onClick={() => { setStep("phone"); setPin(""); }} className="text-lg font-semibold underline-offset-2 hover:underline">
+          {phone} <span className="text-xs text-muted-foreground">(change)</span>
+        </button>
+      </div>
+      <div>
+        <Label className="text-base">Enter your 4-digit PIN</Label>
+        <div className="mt-3 flex justify-center gap-3">
+          {[0,1,2,3].map((i) => (
+            <div key={i} className={`flex h-14 w-14 items-center justify-center rounded-xl border-2 text-2xl font-bold ${pin.length > i ? "border-primary bg-primary/10" : "border-border"}`}>
+              {pin.length > i ? "●" : ""}
+            </div>
+          ))}
         </div>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="pw" className="text-base">Password</Label>
-        <div className="relative">
-          <Input
-            id="pw"
-            type={show ? "text" : "password"}
-            autoComplete="current-password"
-            placeholder="Your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="h-14 pr-12 text-lg"
-            required
-            minLength={4}
-          />
-          <button type="button" onClick={() => setShow(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Show password">
-            {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-          </button>
-        </div>
+      <div className="grid grid-cols-3 gap-2">
+        {keys.map((k, i) => k === "" ? (
+          <div key={i} />
+        ) : (
+          <Button
+            key={i}
+            type="button"
+            variant={k === "back" ? "outline" : "secondary"}
+            className="h-16 text-2xl font-semibold"
+            disabled={loading}
+            onClick={() => pressKey(k)}
+          >
+            {k === "back" ? "⌫" : k}
+          </Button>
+        ))}
       </div>
-      <Button type="submit" size="lg" className="w-full h-14 text-base" disabled={loading}>
-        {loading ? "Signing in…" : "Sign in"}
-      </Button>
-    </form>
+      {loading && <p className="text-center text-sm text-muted-foreground">Signing in…</p>}
+    </div>
   );
 }
 
