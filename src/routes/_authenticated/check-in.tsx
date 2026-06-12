@@ -76,6 +76,8 @@ function CheckInFlow() {
     lastKind === "break_in" ? "check_out" :
     lastKind === "check_out" ? "check_in" : "check_in";
 
+  const isFieldStaff = (user?.profile as any)?.is_field_staff === true;
+
   const getLocation = () => {
     setGpsError(null);
     if (!navigator.geolocation) { setGpsError("Geolocation not supported in this browser."); return; }
@@ -84,6 +86,10 @@ function CheckInFlow() {
         setCoords(pos.coords);
         const match = (locations ?? []).find((l) => haversine(pos.coords.latitude, pos.coords.longitude, l.latitude, l.longitude) <= l.radius_meters);
         if (match) { setMatchedLocation(match); }
+        else if (isFieldStaff) {
+          // Field staff: allow but no office match
+          setMatchedLocation(null);
+        }
         else { setMatchedLocation(null); setGpsError("You're not inside any office geofence."); }
       },
       (err) => setGpsError(err.message),
@@ -128,7 +134,8 @@ function CheckInFlow() {
   useEffect(() => () => stopCamera(), []);
 
   const submitAttendance = async () => {
-    if (!coords || !matchedLocation || !selfieBlob || !user?.userId || !user.tenant?.id) return;
+    if (!coords || !selfieBlob || !user?.userId || !user.tenant?.id) return;
+    if (!isFieldStaff && !matchedLocation) return;
     setSubmitting(true);
     try {
       const path = `${user.userId}/${Date.now()}.jpg`;
@@ -138,13 +145,22 @@ function CheckInFlow() {
       });
       if (upErr) throw upErr;
 
+      const distance = matchedLocation
+        ? haversine(coords.latitude, coords.longitude, matchedLocation.latitude, matchedLocation.longitude)
+        : null;
+      const enforcement: "inside" | "outside_allowed" | "outside_blocked" =
+        matchedLocation ? "inside" : isFieldStaff ? "outside_allowed" : "outside_blocked";
+
       const { error: insErr } = await supabase.from("attendance_records").insert({
         tenant_id: user.tenant.id,
         user_id: user.userId,
-        office_location_id: matchedLocation.id,
+        office_location_id: matchedLocation?.id ?? null,
         kind: nextKind,
         latitude: coords.latitude,
         longitude: coords.longitude,
+        accuracy_meters: coords.accuracy ?? null,
+        distance_from_office_m: distance,
+        enforcement_status: enforcement,
         selfie_url: path,
       });
       if (insErr) throw insErr;
@@ -204,14 +220,18 @@ function CheckInFlow() {
               </p>
             )}
 
-            {!coords && <Button onClick={getLocation} className="w-full" disabled={!locations?.length}>Use my location</Button>}
+            {!coords && <Button onClick={getLocation} className="w-full" disabled={!locations?.length && !isFieldStaff}>Use my location</Button>}
 
             {coords && (
               <div className="space-y-2 rounded-lg bg-muted/50 p-3 text-sm">
-                <p>Lat: {coords.latitude.toFixed(5)}, Lng: {coords.longitude.toFixed(5)}</p>
+                <p>Lat: {coords.latitude.toFixed(5)}, Lng: {coords.longitude.toFixed(5)} {coords.accuracy ? `(±${Math.round(coords.accuracy)}m)` : ""}</p>
                 {matchedLocation ? (
                   <p className="flex items-center gap-1 font-medium text-success">
                     <CheckCircle2 className="h-4 w-4" /> Inside: {matchedLocation.name}
+                  </p>
+                ) : isFieldStaff ? (
+                  <p className="flex items-center gap-1 font-medium text-primary">
+                    <MapPin className="h-4 w-4" /> Field punch — location recorded
                   </p>
                 ) : (
                   <p className="flex items-center gap-1 font-medium text-destructive">
@@ -221,13 +241,13 @@ function CheckInFlow() {
               </div>
             )}
 
-            {gpsError && <p className="text-sm text-destructive">{gpsError}</p>}
+            {gpsError && !isFieldStaff && <p className="text-sm text-destructive">{gpsError}</p>}
 
             <div className="flex gap-2">
               {coords && <Button variant="outline" onClick={getLocation} className="gap-1"><RefreshCw className="h-4 w-4" /> Retry</Button>}
               <Button
                 className="flex-1"
-                disabled={!matchedLocation}
+                disabled={!coords || (!matchedLocation && !isFieldStaff)}
                 onClick={() => { setStep(2); startCamera(); }}
               >
                 Continue →
