@@ -409,6 +409,53 @@ export type Database = {
           },
         ]
       }
+      pin_reset_requests: {
+        Row: {
+          created_at: string
+          id: string
+          new_pin_preview: string | null
+          phone: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          tenant_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          new_pin_preview?: string | null
+          phone: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          new_pin_preview?: string | null
+          phone?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pin_reset_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           billing: Database["public"]["Enums"]["plan_billing"]
