@@ -13,6 +13,10 @@ import {
   KeyRound,
   LogOut,
   Menu,
+  Map,
+  GraduationCap,
+  ClipboardCheck,
+  TrendingUp,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -24,29 +28,53 @@ import { cn } from "@/lib/utils";
 
 type NavItem = { to: string; label: string; icon: typeof MapPin };
 
-const NAV: Record<AppRole, NavItem[]> = {
-  super_admin: [
-    { to: "/app", label: "Overview", icon: LayoutDashboard },
-    { to: "/clients", label: "Client companies", icon: Building2 },
-    { to: "/plans", label: "Plans", icon: Package },
-    { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
-  ],
-  client_admin: [
-    { to: "/app", label: "Dashboard", icon: LayoutDashboard },
-    { to: "/team", label: "Staff", icon: Users },
-    { to: "/shifts", label: "Shifts & locations", icon: Clock },
-    { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
-    { to: "/payroll", label: "Payroll", icon: Wallet },
-    { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
-  ],
-  staff: [
+function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavItem[] {
+  if (role === "super_admin") {
+    return [
+      { to: "/app", label: "Overview", icon: LayoutDashboard },
+      { to: "/revenue", label: "Revenue", icon: TrendingUp },
+      { to: "/clients", label: "Client companies", icon: Building2 },
+      { to: "/plans", label: "Plans", icon: Package },
+      { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
+    ];
+  }
+  if (role === "client_admin") {
+    if (tenantType === "school") {
+      return [
+        { to: "/app", label: "Dashboard", icon: LayoutDashboard },
+        { to: "/team", label: "Teachers & staff", icon: Users },
+        { to: "/classes", label: "Classes & students", icon: GraduationCap },
+        { to: "/mark-attendance", label: "Mark attendance", icon: ClipboardCheck },
+        { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
+        { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
+      ];
+    }
+    return [
+      { to: "/app", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/team", label: "Staff", icon: Users },
+      { to: "/shifts", label: "Shifts & locations", icon: Clock },
+      { to: "/live-map", label: "Live map", icon: Map },
+      { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
+      { to: "/payroll", label: "Payroll", icon: Wallet },
+      { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
+    ];
+  }
+  // staff
+  if (tenantType === "school") {
+    return [
+      { to: "/app", label: "Today", icon: LayoutDashboard },
+      { to: "/mark-attendance", label: "Mark class", icon: ClipboardCheck },
+      { to: "/my-leaves", label: "Leaves", icon: Calendar },
+    ];
+  }
+  return [
     { to: "/app", label: "Today", icon: LayoutDashboard },
     { to: "/check-in", label: "Check in / out", icon: MapPin },
     { to: "/my-attendance", label: "My attendance", icon: Calendar },
     { to: "/my-leaves", label: "Leaves", icon: Calendar },
     { to: "/my-salary", label: "Salary", icon: Wallet },
-  ],
-};
+  ];
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { data: user, isLoading } = useCurrentUser();
@@ -55,7 +83,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { location } = useRouterState();
 
   const role = primaryRole(user?.roles ?? []);
-  const items = role ? NAV[role] : [];
+  const tenantType = (user?.tenant as any)?.tenant_type ?? "business";
+  const items = role ? buildNav(role, tenantType) : [];
 
   const handleSignOut = async () => {
     await queryClient.cancelQueries();
@@ -73,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         {role && (
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            {role.replace("_", " ")}
+            {role.replace("_", " ")}{tenantType === "school" ? " · school" : ""}
           </p>
         )}
       </div>
@@ -124,12 +153,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 border-r border-border bg-sidebar md:block">
         <SidebarContent />
       </aside>
 
-      {/* Mobile */}
       <div className="flex w-full flex-col md:hidden">
         <header className="flex items-center justify-between border-b border-border bg-background px-4 py-3">
           <Logo />
@@ -145,7 +172,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="flex-1 overflow-y-auto p-4 pb-20">{children}</main>
       </div>
 
-      {/* Desktop main */}
       <main className="hidden flex-1 overflow-y-auto p-8 md:block">{children}</main>
     </div>
   );
