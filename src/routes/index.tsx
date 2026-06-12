@@ -434,3 +434,157 @@ function ModesSection() {
   );
 }
 
+type Plan = {
+  id: string;
+  name: string;
+  description?: string | null;
+  billing: string;
+  employee_limit: number;
+  price_inr: number | string;
+  features: unknown;
+};
+
+function PricingSection({ plans }: { plans: Plan[] }) {
+  const [billing, setBilling] = useState<"lifetime" | "monthly">("lifetime");
+  const core = plans
+    .filter((p) => p.billing === billing && p.employee_limit <= 50)
+    .sort((a, b) => Number(a.price_inr) - Number(b.price_inr));
+  const school = plans.find((p) => /school/i.test(p.name));
+  const enterprise = plans.find((p) => /enterprise/i.test(p.name));
+
+  return (
+    <section id="pricing" className="border-t border-border/60 bg-card/40 py-20">
+      <div className="mx-auto max-w-6xl px-4">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.6 }} className="text-center">
+          <Badge variant="secondary" className="mb-3">Pricing</Badge>
+          <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Pay once. Use forever.</h2>
+          <p className="mt-2 text-muted-foreground">Or pick a low monthly plan. Switch anytime.</p>
+        </motion.div>
+
+        <div className="mt-8 flex justify-center">
+          <div className="inline-flex rounded-full border border-border/60 bg-background p-1 shadow-sm">
+            {(["lifetime", "monthly"] as const).map((k) => (
+              <button
+                key={k}
+                onClick={() => setBilling(k)}
+                className={`relative rounded-full px-5 py-2 text-sm font-medium capitalize transition-colors ${billing === k ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {billing === k && (
+                  <motion.span layoutId="bill-pill" className="absolute inset-0 rounded-full bg-primary" transition={{ type: "spring", stiffness: 400, damping: 30 }} />
+                )}
+                <span className="relative flex items-center gap-2">
+                  {k === "lifetime" ? "Lifetime" : "Monthly"}
+                  {k === "lifetime" && (
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${billing === k ? "bg-primary-foreground/20" : "bg-success/15 text-success"}`}>Save 80%</span>
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <motion.div key={billing} variants={stagger} initial="hidden" animate="show" className="mt-10 grid gap-6 md:grid-cols-3">
+          {core.map((p, i) => {
+            const popular = i === 1;
+            const featuresArr = Array.isArray(p.features) ? (p.features as string[]) : [];
+            return (
+              <motion.div key={p.id} variants={fadeUp} whileHover={{ y: -8 }} transition={{ type: "spring", stiffness: 300 }}>
+                <Card className={`relative p-6 h-full transition-all ${popular ? "border-primary/70 shadow-xl md:scale-[1.04] bg-gradient-to-b from-primary/5 to-transparent" : "border-border/60 hover:border-primary/40 hover:shadow-lg"}`}>
+                  {popular && (
+                    <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 shadow">Most popular</Badge>
+                  )}
+                  <h3 className="text-xl font-semibold">{p.name.replace(/ (Lifetime|Monthly)$/i, "")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">Up to {p.employee_limit} employees</p>
+                  <div className="mt-4 flex items-baseline gap-1">
+                    <span className="text-4xl font-bold tracking-tight">₹{Number(p.price_inr).toLocaleString("en-IN")}</span>
+                    <span className="text-sm text-muted-foreground">{billing === "lifetime" ? "one-time" : "/mo"}</span>
+                  </div>
+                  <Link to="/auth" className="mt-5 block">
+                    <Button className="w-full" variant={popular ? "default" : "outline"}>
+                      Get started <ArrowRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <ul className="mt-6 space-y-2 text-sm">
+                    {featuresArr.map((f) => (
+                      <li key={f} className="flex gap-2">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-success mt-0.5" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          {school && (
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
+              <Card className="relative h-full overflow-hidden border-border/60 p-6 bg-gradient-to-br from-accent/15 via-card to-transparent">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/20 text-accent-foreground">
+                      <GraduationCap className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">School Edition</h3>
+                      <p className="text-xs text-muted-foreground">For schools, colleges & coaching centres</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold">₹{Number(school.price_inr).toLocaleString("en-IN")}</div>
+                    <div className="text-[11px] text-muted-foreground">lifetime</div>
+                  </div>
+                </div>
+                <ul className="mt-4 grid gap-1.5 text-sm sm:grid-cols-2">
+                  {(Array.isArray(school.features) ? (school.features as string[]) : []).slice(0, 6).map((f) => (
+                    <li key={f} className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-success mt-0.5" /><span>{f}</span></li>
+                  ))}
+                </ul>
+                <Link to="/auth" className="mt-5 inline-block">
+                  <Button variant="outline" size="sm">Choose School Edition <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button>
+                </Link>
+              </Card>
+            </motion.div>
+          )}
+          {enterprise && (
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: 0.1 }}>
+              <Card className="relative h-full overflow-hidden border-foreground/30 p-6 bg-gradient-to-br from-foreground to-foreground/90 text-background">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-background/15">
+                      <Building2 className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">Enterprise</h3>
+                      <p className="text-xs opacity-70">500+ employees, SLA, custom domain</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold">₹{Number(enterprise.price_inr).toLocaleString("en-IN")}</div>
+                    <div className="text-[11px] opacity-70">lifetime</div>
+                  </div>
+                </div>
+                <ul className="mt-4 grid gap-1.5 text-sm sm:grid-cols-2">
+                  {(Array.isArray(enterprise.features) ? (enterprise.features as string[]) : []).slice(0, 6).map((f) => (
+                    <li key={f} className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-success mt-0.5" /><span className="opacity-90">{f}</span></li>
+                  ))}
+                </ul>
+                <Link to="/auth" className="mt-5 inline-block">
+                  <Button size="sm" variant="secondary">Talk to sales <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button>
+                </Link>
+              </Card>
+            </motion.div>
+          )}
+        </div>
+
+        <p className="mt-8 text-center text-sm text-muted-foreground">
+          All plans include GPS + selfie check-in, payroll, leaves, and the mobile PWA. No credit card to start.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+
