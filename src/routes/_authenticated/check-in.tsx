@@ -5,10 +5,11 @@ import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Camera, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
+import { MapPin, Camera, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
+import { detectMockLocation, type AntiCheatResult } from "@/lib/anti-cheat";
 
 export const Route = createFileRoute("/_authenticated/check-in")({
   component: CheckInFlow,
@@ -38,6 +39,8 @@ function CheckInFlow() {
   const [selfieBlob, setSelfieBlob] = useState<Blob | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [antiCheat, setAntiCheat] = useState<AntiCheatResult | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -78,23 +81,35 @@ function CheckInFlow() {
 
   const isFieldStaff = (user?.profile as any)?.is_field_staff === true;
 
-  const getLocation = () => {
+  const getLocation = async () => {
     setGpsError(null);
+    setAntiCheat(null);
     if (!navigator.geolocation) { setGpsError("Geolocation not supported in this browser."); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords(pos.coords);
-        const match = (locations ?? []).find((l) => haversine(pos.coords.latitude, pos.coords.longitude, l.latitude, l.longitude) <= l.radius_meters);
-        if (match) { setMatchedLocation(match); }
-        else if (isFieldStaff) {
-          // Field staff: allow but no office match
-          setMatchedLocation(null);
-        }
-        else { setMatchedLocation(null); setGpsError("You're not inside any office geofence."); }
-      },
-      (err) => setGpsError(err.message),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    setVerifying(true);
+    try {
+      // Anti-cheat: take two readings ~3s apart and run heuristics
+      const result = await detectMockLocation();
+      setAntiCheat(result);
+      const pseudoCoords = {
+        latitude: result.reading.latitude,
+        longitude: result.reading.longitude,
+        accuracy: result.reading.accuracy ?? 0,
+        altitude: result.reading.altitude ?? null,
+        altitudeAccuracy: result.reading.altitudeAccuracy ?? null,
+        heading: result.reading.heading ?? null,
+        speed: result.reading.speed ?? null,
+        toJSON() { return this; },
+      } as unknown as GeolocationCoordinates;
+      setCoords(pseudoCoords);
+      const match = (locations ?? []).find((l) => haversine(pseudoCoords.latitude, pseudoCoords.longitude, l.latitude, l.longitude) <= l.radius_meters);
+      if (match) setMatchedLocation(match);
+      else if (isFieldStaff) setMatchedLocation(null);
+      else { setMatchedLocation(null); setGpsError("You're not inside any office geofence."); }
+    } catch (err: any) {
+      setGpsError(err?.message ?? "Could not read location");
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const startCamera = async () => {
@@ -162,6 +177,8 @@ function CheckInFlow() {
         distance_from_office_m: distance,
         enforcement_status: enforcement,
         selfie_url: path,
+        is_mock_location: antiCheat?.suspicious ?? false,
+        notes: antiCheat?.suspicious ? `anti-cheat: ${antiCheat.reasons.join("; ")}` : null,
       });
       if (insErr) throw insErr;
 
@@ -220,7 +237,11 @@ function CheckInFlow() {
               </p>
             )}
 
-            {!coords && <Button onClick={getLocation} className="w-full" disabled={!locations?.length && !isFieldStaff}>Use my location</Button>}
+            {!coords && (
+              <Button onClick={getLocation} className="w-full" disabled={(!locations?.length && !isFieldStaff) || verifying}>
+                {verifying ? "Verifying location…" : "Use my location"}
+              </Button>
+            )}
 
             {coords && (
               <div className="space-y-2 rounded-lg bg-muted/50 p-3 text-sm">
@@ -241,13 +262,25 @@ function CheckInFlow() {
               </div>
             )}
 
+            {antiCheat?.suspicious && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive space-y-1">
+                <p className="flex items-center gap-1.5 font-semibold">
+                  <ShieldAlert className="h-4 w-4" /> Suspicious location signals detected
+                </p>
+                <ul className="list-disc pl-5 text-xs">
+                  {antiCheat.reasons.map((r) => <li key={r}>{r}</li>)}
+                </ul>
+                <p className="text-xs">Disable mock-location apps and try again from a real device.</p>
+              </div>
+            )}
+
             {gpsError && !isFieldStaff && <p className="text-sm text-destructive">{gpsError}</p>}
 
             <div className="flex gap-2">
-              {coords && <Button variant="outline" onClick={getLocation} className="gap-1"><RefreshCw className="h-4 w-4" /> Retry</Button>}
+              {coords && <Button variant="outline" onClick={getLocation} className="gap-1" disabled={verifying}><RefreshCw className="h-4 w-4" /> Retry</Button>}
               <Button
                 className="flex-1"
-                disabled={!coords || (!matchedLocation && !isFieldStaff)}
+                disabled={!coords || (!matchedLocation && !isFieldStaff) || antiCheat?.suspicious === true}
                 onClick={() => { setStep(2); startCamera(); }}
               >
                 Continue →

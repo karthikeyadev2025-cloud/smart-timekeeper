@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Phone, Shield } from "lucide-react";
+import { UserPlus, Phone, Shield, MessageCircle } from "lucide-react";
+import { openWhatsapp } from "@/lib/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useBranchFilter } from "@/hooks/useBranchFilter";
@@ -109,6 +110,7 @@ function TeamPage() {
                 <TableHead>Salary</TableHead>
                 <TableHead>Field</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Alert</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -148,10 +150,22 @@ function TeamPage() {
                     />
                   </TableCell>
                   <TableCell><Badge variant={s.is_active ? "default" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge></TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!s.phone}
+                      onClick={() => openWhatsapp(s.phone, `Hi ${s.full_name ?? "there"}, this is a notification from ${user?.tenant?.name ?? "your team"}.`)}
+                      title={s.phone ? "Send WhatsApp message" : "No phone on file"}
+                      className="gap-1"
+                    >
+                      <MessageCircle className="h-4 w-4 text-success" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               {staff?.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
