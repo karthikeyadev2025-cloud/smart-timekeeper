@@ -239,14 +239,11 @@ function Landing() {
               { icon: Wallet, title: "Auto payroll", desc: "Salary calculated from attendance, OT, leaves — payslip PDF ready." },
               { icon: GraduationCap, title: "School mode", desc: "Teachers mark whole classes Present/Absent in one tap. No GPS needed." },
               { icon: Smartphone, title: "Installable PWA", desc: "Works on any phone or desktop. Install to home screen, use offline-friendly." },
-              { icon: ShieldCheck, title: "Anti-cheat (mock GPS)", desc: "Mock-location and fake-GPS detection.", soon: true },
-              { icon: BellRing, title: "Parent / WhatsApp alerts", desc: "Notify parents on absence, or staff on shift changes.", soon: true },
+              { icon: ShieldAlert, title: "Anti-cheat (mock GPS)", desc: "Detects fake-GPS apps using browser heuristics — flagged check-ins are marked for review." },
+              { icon: BellRing, title: "Parent / WhatsApp alerts", desc: "One tap to ping all absent students' parents — or message any staff — via WhatsApp." },
             ].map((f) => (
               <motion.div key={f.title} variants={fadeUp} whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 300 }}>
                 <Card className="relative p-6 h-full border-border/60 hover:border-primary/40 hover:shadow-md transition-all">
-                  {f.soon && (
-                    <Badge variant="secondary" className="absolute top-3 right-3 text-[10px]">Coming soon</Badge>
-                  )}
                   <f.icon className="h-6 w-6 text-primary" />
                   <h3 className="mt-4 font-semibold">{f.title}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
