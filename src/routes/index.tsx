@@ -235,15 +235,18 @@ function Landing() {
               { icon: Briefcase, title: "Field staff mode", desc: "Reps & delivery staff punch from anywhere — distance & accuracy logged." },
               { icon: MapPin, title: "Per-branch geofence", desc: "Set the office radius per location. Outside attempts are flagged automatically." },
               { icon: Camera, title: "Selfie + GPS proof", desc: "Tamper-proof check-ins, encrypted & stored privately." },
-              { icon: ShieldCheck, title: "Anti-cheat", desc: "Mock-location and fake-GPS detection built in." },
               { icon: Clock, title: "Multi-shift scheduling", desc: "Morning, night, rotational — assign shifts per staff." },
               { icon: Wallet, title: "Auto payroll", desc: "Salary calculated from attendance, OT, leaves — payslip PDF ready." },
               { icon: GraduationCap, title: "School mode", desc: "Teachers mark whole classes Present/Absent in one tap. No GPS needed." },
-              { icon: BellRing, title: "Parent / WhatsApp alerts", desc: "Notify parents on absence, or staff on shift changes." },
-              { icon: Smartphone, title: "PWA + white-label", desc: "Installs like an app. Brand it with your logo and colors." },
+              { icon: Smartphone, title: "Installable PWA", desc: "Works on any phone or desktop. Install to home screen, use offline-friendly." },
+              { icon: ShieldCheck, title: "Anti-cheat (mock GPS)", desc: "Mock-location and fake-GPS detection.", soon: true },
+              { icon: BellRing, title: "Parent / WhatsApp alerts", desc: "Notify parents on absence, or staff on shift changes.", soon: true },
             ].map((f) => (
               <motion.div key={f.title} variants={fadeUp} whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 300 }}>
-                <Card className="p-6 h-full border-border/60 hover:border-primary/40 hover:shadow-md transition-all">
+                <Card className="relative p-6 h-full border-border/60 hover:border-primary/40 hover:shadow-md transition-all">
+                  {f.soon && (
+                    <Badge variant="secondary" className="absolute top-3 right-3 text-[10px]">Coming soon</Badge>
+                  )}
                   <f.icon className="h-6 w-6 text-primary" />
                   <h3 className="mt-4 font-semibold">{f.title}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
@@ -251,6 +254,7 @@ function Landing() {
               </motion.div>
             ))}
           </motion.div>
+
         </div>
       </section>
 
