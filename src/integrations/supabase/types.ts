@@ -112,10 +112,15 @@ export type Database = {
       branches: {
         Row: {
           address: string | null
+          checkin_window_end: string | null
+          checkin_window_start: string | null
+          checkout_window_end: string | null
+          checkout_window_start: string | null
           city: string | null
           code: string | null
           country: string | null
           created_at: string
+          default_radius_meters: number
           id: string
           is_active: boolean
           manager_id: string | null
@@ -127,10 +132,15 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          checkin_window_end?: string | null
+          checkin_window_start?: string | null
+          checkout_window_end?: string | null
+          checkout_window_start?: string | null
           city?: string | null
           code?: string | null
           country?: string | null
           created_at?: string
+          default_radius_meters?: number
           id?: string
           is_active?: boolean
           manager_id?: string | null
@@ -142,10 +152,15 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          checkin_window_end?: string | null
+          checkin_window_start?: string | null
+          checkout_window_end?: string | null
+          checkout_window_start?: string | null
           city?: string | null
           code?: string | null
           country?: string | null
           created_at?: string
+          default_radius_meters?: number
           id?: string
           is_active?: boolean
           manager_id?: string | null

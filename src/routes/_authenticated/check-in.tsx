@@ -5,7 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Camera, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, ShieldAlert } from "lucide-react";
+import { MapPin, Camera, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, ShieldAlert, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
@@ -15,7 +15,14 @@ export const Route = createFileRoute("/_authenticated/check-in")({
   component: CheckInFlow,
 });
 
-type Location = { id: string; name: string; latitude: number; longitude: number; radius_meters: number };
+type Location = { id: string; name: string; latitude: number; longitude: number; radius_meters: number; branch_id: string | null };
+type BranchWindow = {
+  id: string;
+  checkin_window_start: string | null;
+  checkin_window_end: string | null;
+  checkout_window_start: string | null;
+  checkout_window_end: string | null;
+};
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371000;
@@ -25,6 +32,38 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+
+// Parse "HH:MM[:SS]" into total minutes since 00:00
+function timeToMinutes(t: string | null | undefined): number | null {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+type Kind = "check_in" | "check_out" | "break_in" | "break_out";
+
+function checkWindow(
+  kind: Kind,
+  branch: { checkin_window_start: string | null; checkin_window_end: string | null; checkout_window_start: string | null; checkout_window_end: string | null } | null,
+): { outsideWindow: boolean; label: string | null } {
+  if (!branch) return { outsideWindow: false, label: null };
+  const pair =
+    kind === "check_in" ? [branch.checkin_window_start, branch.checkin_window_end] as const :
+    kind === "check_out" ? [branch.checkout_window_start, branch.checkout_window_end] as const :
+    null;
+  if (!pair) return { outsideWindow: false, label: null };
+  const start = timeToMinutes(pair[0]);
+  const end = timeToMinutes(pair[1]);
+  if (start == null || end == null) return { outsideWindow: false, label: null };
+  const now = new Date();
+  const cur = now.getHours() * 60 + now.getMinutes();
+  // Support overnight windows (e.g. 22:00 → 06:00)
+  const inside = start <= end ? cur >= start && cur <= end : cur >= start || cur <= end;
+  const label = `${pair[0]!.slice(0, 5)}–${pair[1]!.slice(0, 5)}`;
+  return { outsideWindow: !inside, label };
+}
+
 
 function CheckInFlow() {
   const { data: user } = useCurrentUser();
@@ -51,10 +90,22 @@ function CheckInFlow() {
     queryFn: async () => {
       const { data } = await supabase
         .from("office_locations")
-        .select("*")
+        .select("id,name,latitude,longitude,radius_meters,branch_id")
         .eq("tenant_id", user!.tenant!.id)
         .eq("is_active", true);
       return (data ?? []) as Location[];
+    },
+  });
+
+  const { data: branchWindows } = useQuery({
+    queryKey: ["branch-windows", user?.tenant?.id],
+    enabled: !!user?.tenant?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("branches")
+        .select("id,checkin_window_start,checkin_window_end,checkout_window_start,checkout_window_end")
+        .eq("tenant_id", user!.tenant!.id);
+      return (data ?? []) as BranchWindow[];
     },
   });
 
@@ -80,6 +131,13 @@ function CheckInFlow() {
     lastKind === "check_out" ? "check_in" : "check_in";
 
   const isFieldStaff = (user?.profile as any)?.is_field_staff === true;
+
+  // Resolve the active branch window from the matched location (or first branch as fallback)
+  const activeBranchId = matchedLocation?.branch_id ?? (user?.profile as any)?.branch_id ?? null;
+  const branchWindow = (branchWindows ?? []).find((b) => b.id === activeBranchId) ?? null;
+  const windowCheck = checkWindow(nextKind, branchWindow);
+  const windowBlocked = !isFieldStaff && windowCheck.outsideWindow;
+
 
   const getLocation = async () => {
     setGpsError(null);
@@ -274,13 +332,24 @@ function CheckInFlow() {
               </div>
             )}
 
+            {windowBlocked && (
+              <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm space-y-1">
+                <p className="flex items-center gap-1.5 font-semibold text-warning-foreground">
+                  <Clock className="h-4 w-4" /> Outside allowed {nextKind.replace("_", "-")} window
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  This {matchedLocation ? "branch" : "branch"} only allows {nextKind.replace("_", "-")} between <strong>{windowCheck.label}</strong>.
+                </p>
+              </div>
+            )}
+
             {gpsError && !isFieldStaff && <p className="text-sm text-destructive">{gpsError}</p>}
 
             <div className="flex gap-2">
               {coords && <Button variant="outline" onClick={getLocation} className="gap-1" disabled={verifying}><RefreshCw className="h-4 w-4" /> Retry</Button>}
               <Button
                 className="flex-1"
-                disabled={!coords || (!matchedLocation && !isFieldStaff) || antiCheat?.suspicious === true}
+                disabled={!coords || (!matchedLocation && !isFieldStaff) || antiCheat?.suspicious === true || windowBlocked}
                 onClick={() => { setStep(2); startCamera(); }}
               >
                 Continue →
