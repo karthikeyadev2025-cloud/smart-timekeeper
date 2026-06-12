@@ -155,7 +155,7 @@ function TeamPage() {
                       size="sm"
                       variant="ghost"
                       disabled={!s.phone}
-                      onClick={() => openWhatsapp(s.phone, `Hi ${s.full_name ?? "there"}, this is a notification from ${tenantName}.`)}
+                      onClick={() => openWhatsapp(s.phone, `Hi ${s.full_name ?? "there"}, this is a notification from ${user?.tenant?.name ?? "your team"}.`)}
                       title={s.phone ? "Send WhatsApp message" : "No phone on file"}
                       className="gap-1"
                     >
