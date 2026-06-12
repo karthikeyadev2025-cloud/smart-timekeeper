@@ -140,3 +140,80 @@ export const getAuditLog = createServerFn({ method: "GET" })
       .limit(100);
     return data ?? [];
   });
+
+export const PERMISSION_KEYS = [
+  "manage_staff",
+  "manage_branches",
+  "manage_payroll",
+  "manage_approvals",
+] as const;
+export type PermissionKey = (typeof PERMISSION_KEYS)[number];
+
+export const listTenantAdmins = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { tenant_id: string }) => data)
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: roles, error } = await supabaseAdmin
+      .from("user_roles")
+      .select("id, user_id, role, permissions, created_at, profiles!inner(full_name, email)")
+      .eq("tenant_id", data.tenant_id)
+      .in("role", ["client_admin", "branch_manager"])
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return roles ?? [];
+  });
+
+export const setAdminPermissions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { role_id: string; permissions: Record<string, boolean> }) => data)
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const clean: Record<string, boolean> = {};
+    for (const k of PERMISSION_KEYS) clean[k] = !!data.permissions[k];
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .update({ permissions: clean })
+      .eq("id", data.role_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const grantClientAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { tenant_id: string; email: string; permissions?: Record<string, boolean> }) => data)
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const email = data.email.trim().toLowerCase();
+    const { data: profile } = await supabaseAdmin
+      .from("profiles").select("id, tenant_id").eq("email", email).maybeSingle();
+    if (!profile) throw new Error("No user with that email. Ask them to sign up first.");
+    if (profile.tenant_id && profile.tenant_id !== data.tenant_id) {
+      throw new Error("User already belongs to another tenant.");
+    }
+    if (!profile.tenant_id) {
+      await supabaseAdmin.from("profiles").update({ tenant_id: data.tenant_id }).eq("id", profile.id);
+    }
+    const clean: Record<string, boolean> = {};
+    for (const k of PERMISSION_KEYS) clean[k] = !!data.permissions?.[k];
+    const { error } = await supabaseAdmin.from("user_roles").upsert(
+      { user_id: profile.id, tenant_id: data.tenant_id, role: "client_admin", permissions: clean },
+      { onConflict: "user_id,role,tenant_id" } as any,
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const revokeClientAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { role_id: string }) => data)
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("user_roles").delete().eq("id", data.role_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
