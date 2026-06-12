@@ -28,6 +28,7 @@ import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedClassesRouteImport } from './routes/_authenticated/classes'
 import { Route as AuthenticatedCheckInRouteImport } from './routes/_authenticated/check-in'
 import { Route as AuthenticatedBranchesRouteImport } from './routes/_authenticated/branches'
+import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 
 const AuthRoute = AuthRouteImport.update({
@@ -127,6 +128,11 @@ const AuthenticatedBranchesRoute = AuthenticatedBranchesRouteImport.update({
   path: '/branches',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
+  '/audit': typeof AuthenticatedAuditRoute
   '/branches': typeof AuthenticatedBranchesRoute
   '/check-in': typeof AuthenticatedCheckInRoute
   '/classes': typeof AuthenticatedClassesRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
+  '/audit': typeof AuthenticatedAuditRoute
   '/branches': typeof AuthenticatedBranchesRoute
   '/check-in': typeof AuthenticatedCheckInRoute
   '/classes': typeof AuthenticatedClassesRoute
@@ -181,6 +189,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
+  '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/branches': typeof AuthenticatedBranchesRoute
   '/_authenticated/check-in': typeof AuthenticatedCheckInRoute
   '/_authenticated/classes': typeof AuthenticatedClassesRoute
@@ -204,6 +213,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/app'
+    | '/audit'
     | '/branches'
     | '/check-in'
     | '/classes'
@@ -225,6 +235,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/app'
+    | '/audit'
     | '/branches'
     | '/check-in'
     | '/classes'
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/app'
+    | '/_authenticated/audit'
     | '/_authenticated/branches'
     | '/_authenticated/check-in'
     | '/_authenticated/classes'
@@ -406,6 +418,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBranchesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/audit': {
+      id: '/_authenticated/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuthenticatedAuditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/app': {
       id: '/_authenticated/app'
       path: '/app'
@@ -418,6 +437,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppRoute: typeof AuthenticatedAppRoute
+  AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedBranchesRoute: typeof AuthenticatedBranchesRoute
   AuthenticatedCheckInRoute: typeof AuthenticatedCheckInRoute
   AuthenticatedClassesRoute: typeof AuthenticatedClassesRoute
@@ -438,6 +458,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppRoute: AuthenticatedAppRoute,
+  AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedBranchesRoute: AuthenticatedBranchesRoute,
   AuthenticatedCheckInRoute: AuthenticatedCheckInRoute,
   AuthenticatedClassesRoute: AuthenticatedClassesRoute,
