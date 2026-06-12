@@ -106,7 +106,7 @@ export function LogoScene3D() {
     img.onerror = (e) => {
       console.warn("[LogoScene3D] logo texture failed to load", e);
     };
-    img.src = resolveAssetUrl(logoAsset.url);
+    img.src = LOGO_URL;
 
     return () => window.removeEventListener("pointermove", onMove);
   }, []);
