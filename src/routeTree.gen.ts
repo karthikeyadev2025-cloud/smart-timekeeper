@@ -14,14 +14,18 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
 import { Route as AuthenticatedShiftsRouteImport } from './routes/_authenticated/shifts'
+import { Route as AuthenticatedRevenueRouteImport } from './routes/_authenticated/revenue'
 import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/plans'
 import { Route as AuthenticatedPinResetsRouteImport } from './routes/_authenticated/pin-resets'
 import { Route as AuthenticatedPayrollRouteImport } from './routes/_authenticated/payroll'
 import { Route as AuthenticatedMySalaryRouteImport } from './routes/_authenticated/my-salary'
 import { Route as AuthenticatedMyLeavesRouteImport } from './routes/_authenticated/my-leaves'
 import { Route as AuthenticatedMyAttendanceRouteImport } from './routes/_authenticated/my-attendance'
+import { Route as AuthenticatedMarkAttendanceRouteImport } from './routes/_authenticated/mark-attendance'
+import { Route as AuthenticatedLiveMapRouteImport } from './routes/_authenticated/live-map'
 import { Route as AuthenticatedLeavesAdminRouteImport } from './routes/_authenticated/leaves-admin'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
+import { Route as AuthenticatedClassesRouteImport } from './routes/_authenticated/classes'
 import { Route as AuthenticatedCheckInRouteImport } from './routes/_authenticated/check-in'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 
@@ -47,6 +51,11 @@ const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
 const AuthenticatedShiftsRoute = AuthenticatedShiftsRouteImport.update({
   id: '/shifts',
   path: '/shifts',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedRevenueRoute = AuthenticatedRevenueRouteImport.update({
+  id: '/revenue',
+  path: '/revenue',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPlansRoute = AuthenticatedPlansRouteImport.update({
@@ -80,6 +89,17 @@ const AuthenticatedMyAttendanceRoute =
     path: '/my-attendance',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMarkAttendanceRoute =
+  AuthenticatedMarkAttendanceRouteImport.update({
+    id: '/mark-attendance',
+    path: '/mark-attendance',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedLiveMapRoute = AuthenticatedLiveMapRouteImport.update({
+  id: '/live-map',
+  path: '/live-map',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedLeavesAdminRoute =
   AuthenticatedLeavesAdminRouteImport.update({
     id: '/leaves-admin',
@@ -89,6 +109,11 @@ const AuthenticatedLeavesAdminRoute =
 const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
   id: '/clients',
   path: '/clients',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedClassesRoute = AuthenticatedClassesRouteImport.update({
+  id: '/classes',
+  path: '/classes',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedCheckInRoute = AuthenticatedCheckInRouteImport.update({
@@ -107,14 +132,18 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
   '/check-in': typeof AuthenticatedCheckInRoute
+  '/classes': typeof AuthenticatedClassesRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/leaves-admin': typeof AuthenticatedLeavesAdminRoute
+  '/live-map': typeof AuthenticatedLiveMapRoute
+  '/mark-attendance': typeof AuthenticatedMarkAttendanceRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/my-leaves': typeof AuthenticatedMyLeavesRoute
   '/my-salary': typeof AuthenticatedMySalaryRoute
   '/payroll': typeof AuthenticatedPayrollRoute
   '/pin-resets': typeof AuthenticatedPinResetsRoute
   '/plans': typeof AuthenticatedPlansRoute
+  '/revenue': typeof AuthenticatedRevenueRoute
   '/shifts': typeof AuthenticatedShiftsRoute
   '/team': typeof AuthenticatedTeamRoute
 }
@@ -123,14 +152,18 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
   '/check-in': typeof AuthenticatedCheckInRoute
+  '/classes': typeof AuthenticatedClassesRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/leaves-admin': typeof AuthenticatedLeavesAdminRoute
+  '/live-map': typeof AuthenticatedLiveMapRoute
+  '/mark-attendance': typeof AuthenticatedMarkAttendanceRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/my-leaves': typeof AuthenticatedMyLeavesRoute
   '/my-salary': typeof AuthenticatedMySalaryRoute
   '/payroll': typeof AuthenticatedPayrollRoute
   '/pin-resets': typeof AuthenticatedPinResetsRoute
   '/plans': typeof AuthenticatedPlansRoute
+  '/revenue': typeof AuthenticatedRevenueRoute
   '/shifts': typeof AuthenticatedShiftsRoute
   '/team': typeof AuthenticatedTeamRoute
 }
@@ -141,14 +174,18 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/_authenticated/check-in': typeof AuthenticatedCheckInRoute
+  '/_authenticated/classes': typeof AuthenticatedClassesRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/leaves-admin': typeof AuthenticatedLeavesAdminRoute
+  '/_authenticated/live-map': typeof AuthenticatedLiveMapRoute
+  '/_authenticated/mark-attendance': typeof AuthenticatedMarkAttendanceRoute
   '/_authenticated/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/_authenticated/my-leaves': typeof AuthenticatedMyLeavesRoute
   '/_authenticated/my-salary': typeof AuthenticatedMySalaryRoute
   '/_authenticated/payroll': typeof AuthenticatedPayrollRoute
   '/_authenticated/pin-resets': typeof AuthenticatedPinResetsRoute
   '/_authenticated/plans': typeof AuthenticatedPlansRoute
+  '/_authenticated/revenue': typeof AuthenticatedRevenueRoute
   '/_authenticated/shifts': typeof AuthenticatedShiftsRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
 }
@@ -159,14 +196,18 @@ export interface FileRouteTypes {
     | '/auth'
     | '/app'
     | '/check-in'
+    | '/classes'
     | '/clients'
     | '/leaves-admin'
+    | '/live-map'
+    | '/mark-attendance'
     | '/my-attendance'
     | '/my-leaves'
     | '/my-salary'
     | '/payroll'
     | '/pin-resets'
     | '/plans'
+    | '/revenue'
     | '/shifts'
     | '/team'
   fileRoutesByTo: FileRoutesByTo
@@ -175,14 +216,18 @@ export interface FileRouteTypes {
     | '/auth'
     | '/app'
     | '/check-in'
+    | '/classes'
     | '/clients'
     | '/leaves-admin'
+    | '/live-map'
+    | '/mark-attendance'
     | '/my-attendance'
     | '/my-leaves'
     | '/my-salary'
     | '/payroll'
     | '/pin-resets'
     | '/plans'
+    | '/revenue'
     | '/shifts'
     | '/team'
   id:
@@ -192,14 +237,18 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/app'
     | '/_authenticated/check-in'
+    | '/_authenticated/classes'
     | '/_authenticated/clients'
     | '/_authenticated/leaves-admin'
+    | '/_authenticated/live-map'
+    | '/_authenticated/mark-attendance'
     | '/_authenticated/my-attendance'
     | '/_authenticated/my-leaves'
     | '/_authenticated/my-salary'
     | '/_authenticated/payroll'
     | '/_authenticated/pin-resets'
     | '/_authenticated/plans'
+    | '/_authenticated/revenue'
     | '/_authenticated/shifts'
     | '/_authenticated/team'
   fileRoutesById: FileRoutesById
@@ -247,6 +296,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedShiftsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/revenue': {
+      id: '/_authenticated/revenue'
+      path: '/revenue'
+      fullPath: '/revenue'
+      preLoaderRoute: typeof AuthenticatedRevenueRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/plans': {
       id: '/_authenticated/plans'
       path: '/plans'
@@ -289,6 +345,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMyAttendanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/mark-attendance': {
+      id: '/_authenticated/mark-attendance'
+      path: '/mark-attendance'
+      fullPath: '/mark-attendance'
+      preLoaderRoute: typeof AuthenticatedMarkAttendanceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/live-map': {
+      id: '/_authenticated/live-map'
+      path: '/live-map'
+      fullPath: '/live-map'
+      preLoaderRoute: typeof AuthenticatedLiveMapRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/leaves-admin': {
       id: '/_authenticated/leaves-admin'
       path: '/leaves-admin'
@@ -301,6 +371,13 @@ declare module '@tanstack/react-router' {
       path: '/clients'
       fullPath: '/clients'
       preLoaderRoute: typeof AuthenticatedClientsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/classes': {
+      id: '/_authenticated/classes'
+      path: '/classes'
+      fullPath: '/classes'
+      preLoaderRoute: typeof AuthenticatedClassesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/check-in': {
@@ -323,14 +400,18 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppRoute: typeof AuthenticatedAppRoute
   AuthenticatedCheckInRoute: typeof AuthenticatedCheckInRoute
+  AuthenticatedClassesRoute: typeof AuthenticatedClassesRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedLeavesAdminRoute: typeof AuthenticatedLeavesAdminRoute
+  AuthenticatedLiveMapRoute: typeof AuthenticatedLiveMapRoute
+  AuthenticatedMarkAttendanceRoute: typeof AuthenticatedMarkAttendanceRoute
   AuthenticatedMyAttendanceRoute: typeof AuthenticatedMyAttendanceRoute
   AuthenticatedMyLeavesRoute: typeof AuthenticatedMyLeavesRoute
   AuthenticatedMySalaryRoute: typeof AuthenticatedMySalaryRoute
   AuthenticatedPayrollRoute: typeof AuthenticatedPayrollRoute
   AuthenticatedPinResetsRoute: typeof AuthenticatedPinResetsRoute
   AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
+  AuthenticatedRevenueRoute: typeof AuthenticatedRevenueRoute
   AuthenticatedShiftsRoute: typeof AuthenticatedShiftsRoute
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
 }
@@ -338,14 +419,18 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppRoute: AuthenticatedAppRoute,
   AuthenticatedCheckInRoute: AuthenticatedCheckInRoute,
+  AuthenticatedClassesRoute: AuthenticatedClassesRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedLeavesAdminRoute: AuthenticatedLeavesAdminRoute,
+  AuthenticatedLiveMapRoute: AuthenticatedLiveMapRoute,
+  AuthenticatedMarkAttendanceRoute: AuthenticatedMarkAttendanceRoute,
   AuthenticatedMyAttendanceRoute: AuthenticatedMyAttendanceRoute,
   AuthenticatedMyLeavesRoute: AuthenticatedMyLeavesRoute,
   AuthenticatedMySalaryRoute: AuthenticatedMySalaryRoute,
   AuthenticatedPayrollRoute: AuthenticatedPayrollRoute,
   AuthenticatedPinResetsRoute: AuthenticatedPinResetsRoute,
   AuthenticatedPlansRoute: AuthenticatedPlansRoute,
+  AuthenticatedRevenueRoute: AuthenticatedRevenueRoute,
   AuthenticatedShiftsRoute: AuthenticatedShiftsRoute,
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,
 }

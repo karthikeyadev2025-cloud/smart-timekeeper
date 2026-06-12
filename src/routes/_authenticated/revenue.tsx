@@ -58,6 +58,7 @@ function RevenuePage() {
   // Revenue per tenant
   const perTenant = new Map<string, number>();
   payments.forEach((p) => {
+    if (!p.tenant_id) return;
     perTenant.set(p.tenant_id, (perTenant.get(p.tenant_id) ?? 0) + Number(p.amount_inr ?? 0));
   });
   const tenantRows = tenants
