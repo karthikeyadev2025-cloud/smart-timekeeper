@@ -72,7 +72,7 @@ function TeamPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
                 <TableHead>Designation</TableHead>
                 <TableHead>Salary</TableHead>
                 <TableHead>Status</TableHead>
@@ -82,7 +82,7 @@ function TeamPage() {
               {(staff ?? []).map((s) => (
                 <TableRow key={s.id}>
                   <TableCell className="font-medium">{s.full_name ?? "—"}</TableCell>
-                  <TableCell>{s.email ?? "—"}</TableCell>
+                  <TableCell className="font-mono">{s.phone ?? "—"}</TableCell>
                   <TableCell>{s.designation ?? "—"}</TableCell>
                   <TableCell>{s.monthly_salary ? `₹${Number(s.monthly_salary).toLocaleString("en-IN")}` : "—"}</TableCell>
                   <TableCell><Badge variant={s.is_active ? "default" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge></TableCell>
@@ -100,7 +100,8 @@ function TeamPage() {
 }
 
 function AddStaffForm({ tenantId, shifts, onDone }: { tenantId: string; shifts: any[]; onDone: () => void }) {
-  const [email, setEmail] = useState("");
+  const createStaffFn = useServerFn(createStaff);
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [designation, setDesignation] = useState("");
@@ -108,39 +109,29 @@ function AddStaffForm({ tenantId, shifts, onDone }: { tenantId: string; shifts: 
   const [shiftId, setShiftId] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const genPassword = () => setPassword(String(Math.floor(1000 + Math.random() * 9000)));
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!/^[0-9]{6,15}$/.test(phone)) { toast.error("Enter a valid phone (digits only)"); return; }
+    if (password.length < 4) { toast.error("Password must be at least 4 characters"); return; }
     setLoading(true);
     try {
-      // Create auth user via signUp
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: { data: { full_name: name } },
+      await createStaffFn({
+        data: {
+          tenant_id: tenantId,
+          phone,
+          full_name: name,
+          password,
+          designation,
+          monthly_salary: Number(salary) || 0,
+          shift_id: shiftId || null,
+        },
       });
-      if (error) throw error;
-      const newUserId = data.user?.id;
-      if (!newUserId) throw new Error("No user id returned");
-
-      // Update their profile with tenant + details (signup trigger already inserted base profile)
-      await supabase.from("profiles").update({
-        tenant_id: tenantId,
-        full_name: name,
-        designation,
-        monthly_salary: Number(salary) || 0,
-      }).eq("id", newUserId);
-
-      // Assign staff role
-      await supabase.from("user_roles").insert({ user_id: newUserId, role: "staff", tenant_id: tenantId });
-
-      if (shiftId) {
-        await supabase.from("staff_shifts").insert({ tenant_id: tenantId, user_id: newUserId, shift_id: shiftId });
-      }
-
-      toast.success("Staff added. They can sign in with the credentials you set.");
+      toast.success(`Staff added! Share login → ${phone} / ${password}`);
       onDone();
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(e.message ?? "Could not add staff");
     } finally {
       setLoading(false);
     }
@@ -148,13 +139,28 @@ function AddStaffForm({ tenantId, shifts, onDone }: { tenantId: string; shifts: 
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <DialogHeader><DialogTitle>Add staff member</DialogTitle></DialogHeader>
-      <div className="space-y-1"><Label>Full name</Label><Input value={name} onChange={e => setName(e.target.value)} required maxLength={100} /></div>
-      <div className="space-y-1"><Label>Email</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} required /></div>
-      <div className="space-y-1"><Label>Temporary password</Label><Input type="text" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} placeholder="Share with the staff member" /></div>
+      <DialogHeader>
+        <DialogTitle>Add staff member</DialogTitle>
+        <p className="text-sm text-muted-foreground">Staff sign in with phone + password. No email needed.</p>
+      </DialogHeader>
+      <div className="space-y-1"><Label>Full name</Label><Input value={name} onChange={e => setName(e.target.value)} required maxLength={100} placeholder="Aarav Singh" /></div>
+      <div className="space-y-1">
+        <Label>Phone number</Label>
+        <div className="relative">
+          <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input type="tel" inputMode="numeric" value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9]/g, ""))} required placeholder="9876543210" className="pl-9 font-mono tracking-wider" />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <Label>Password / PIN</Label>
+          <button type="button" onClick={genPassword} className="text-xs text-primary hover:underline">Generate 4-digit PIN</button>
+        </div>
+        <Input type="text" value={password} onChange={e => setPassword(e.target.value)} required minLength={4} placeholder="Share with staff" className="font-mono" />
+      </div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1"><Label>Designation</Label><Input value={designation} onChange={e => setDesignation(e.target.value)} /></div>
-        <div className="space-y-1"><Label>Monthly salary (₹)</Label><Input type="number" value={salary} onChange={e => setSalary(e.target.value)} /></div>
+        <div className="space-y-1"><Label>Designation</Label><Input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="Cashier" /></div>
+        <div className="space-y-1"><Label>Monthly salary (₹)</Label><Input type="number" value={salary} onChange={e => setSalary(e.target.value)} placeholder="15000" /></div>
       </div>
       {shifts.length > 0 && (
         <div className="space-y-1">
@@ -166,7 +172,9 @@ function AddStaffForm({ tenantId, shifts, onDone }: { tenantId: string; shifts: 
         </div>
       )}
       <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Adding…" : "Add staff"}</Button></DialogFooter>
-      <p className="text-xs text-muted-foreground">Note: Adding staff signs them up. You'll be temporarily signed in as them — please sign back in afterwards.</p>
+      <p className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
+        ✓ You stay signed in. Share the phone + password with your staff so they can log in.
+      </p>
     </form>
   );
 }
