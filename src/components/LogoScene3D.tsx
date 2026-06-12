@@ -35,8 +35,19 @@ function LogoDisc({ position, scale, rotationSpeed, texture }: {
   );
 }
 
+function resolveAssetUrl(url: string): string {
+  if (typeof window === "undefined") return url;
+  if (/^https?:/i.test(url)) return url;
+  const host = window.location.hostname;
+  // Sandbox dev host doesn't proxy /__l5e/ — point at the lovable.app preview.
+  if (host.endsWith("lovableproject.com") && url.startsWith("/__l5e/")) {
+    return `https://${host.replace(".lovableproject.com", ".lovable.app")}${url}`;
+  }
+  return url;
+}
+
 function Scene({ pointer }: { pointer: React.MutableRefObject<{ x: number; y: number }> }) {
-  const texture = useLoader(THREE.TextureLoader, logoAsset.url);
+  const texture = useLoader(THREE.TextureLoader, resolveAssetUrl(logoAsset.url));
   const groupRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
