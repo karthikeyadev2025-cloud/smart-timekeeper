@@ -33,6 +33,47 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Parse "HH:MM[:SS]" into total minutes since 00:00
+function timeToMinutes(t: string | null | undefined): number | null {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+type Kind = "check_in" | "check_out" | "break_in" | "break_out";
+
+function checkWindow(
+  kind: Kind,
+  branch: { checkin_window_start: string | null; checkin_window_end: string | null; checkout_window_start: string | null; checkout_window_end: string | null } | null,
+): { outsideWindow: boolean; label: string | null } {
+  if (!branch) return { outsideWindow: false, label: null };
+  const pair =
+    kind === "check_in" ? [branch.checkin_window_start, branch.checkin_window_end] as const :
+    kind === "check_out" ? [branch.checkout_window_start, branch.checkout_window_end] as const :
+    null;
+  if (!pair) return { outsideWindow: false, label: null };
+  const start = timeToMinutes(pair[0]);
+  const end = timeToMinutes(pair[1]);
+  if (start == null || end == null) return { outsideWindow: false, label: null };
+  const now = new Date();
+  const cur = now.getHours() * 60 + now.getMinutes();
+  // Support overnight windows (e.g. 22:00 → 06:00)
+  const inside = start <= end ? cur >= start && cur <= end : cur >= start || cur <= end;
+  const label = `${pair[0]!.slice(0, 5)}–${pair[1]!.slice(0, 5)}`;
+  return { outsideWindow: !inside, label };
+}
+
+// (legacy haversine kept above)
+const _haversine_alias = haversine;
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function CheckInFlow() {
   const { data: user } = useCurrentUser();
   const queryClient = useQueryClient();
