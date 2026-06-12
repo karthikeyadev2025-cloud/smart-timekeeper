@@ -94,7 +94,6 @@ function AdminPage() {
 function useEditor<T extends object>(sk: any, fallback: T) {
   const { data } = useSiteContent<T>(sk, fallback);
   const upsert = useUpsertContent();
-  const { toast } = useToast();
   const [draft, setDraft] = useState<T | null>(null);
   const current = draft ?? data ?? fallback;
   const dirty = draft !== null;
@@ -103,9 +102,9 @@ function useEditor<T extends object>(sk: any, fallback: T) {
     try {
       await upsert.mutateAsync({ sk, content: current });
       setDraft(null);
-      toast({ title: "Saved", description: "Live on the public site." });
+      toast.success("Saved — live on the public site.");
     } catch (e: any) {
-      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+      toast.error(`Save failed: ${e.message}`);
     }
   };
 
