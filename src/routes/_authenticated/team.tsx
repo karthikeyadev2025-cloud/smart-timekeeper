@@ -26,17 +26,23 @@ function TeamPage() {
   const { data: user } = useCurrentUser();
   const qc = useQueryClient();
   const tenantId = user?.tenant?.id;
+  const tenantType = (user?.tenant as any)?.tenant_type ?? "business";
+  const branchLabel = tenantType === "school" ? "Campus" : "Branch";
+  const { branchId } = useBranchFilter(tenantId);
   const [open, setOpen] = useState(false);
+  const [inviteMode, setInviteMode] = useState<"staff" | "branch_manager">("staff");
 
   const { data: staff } = useQuery({
-    queryKey: ["staff", tenantId],
+    queryKey: ["staff", tenantId, branchId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("profiles")
         .select("*, user_roles(role)")
         .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
+      if (branchId !== "all") q = q.eq("branch_id", branchId);
+      const { data } = await q;
       return data ?? [];
     },
   });
@@ -64,17 +70,32 @@ function TeamPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <header className="flex items-center justify-between">
+        <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Staff</h1>
-            <p className="text-muted-foreground">{staff?.length ?? 0} members</p>
+            <p className="text-muted-foreground">{staff?.length ?? 0} members{branchId !== "all" ? ` in selected ${branchLabel.toLowerCase()}` : ""}</p>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button className="gap-2"><UserPlus className="h-4 w-4" /> Add staff</Button></DialogTrigger>
-            <DialogContent>
-              <AddStaffForm tenantId={tenantId} shifts={shifts ?? []} onDone={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["staff"] }); }} />
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => { setInviteMode("branch_manager"); setOpen(true); }}>
+              <Shield className="h-4 w-4" /> Invite {branchLabel.toLowerCase()} manager
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2" onClick={() => setInviteMode("staff")}><UserPlus className="h-4 w-4" /> Add staff</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <AddStaffForm
+                  tenantId={tenantId}
+                  shifts={shifts ?? []}
+                  branches={branches ?? []}
+                  branchLabel={branchLabel}
+                  mode={inviteMode}
+                  defaultBranchId={branchId !== "all" ? branchId : null}
+                  onDone={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["staff"] }); qc.invalidateQueries({ queryKey: ["branches"] }); }}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </header>
 
         <Card>
