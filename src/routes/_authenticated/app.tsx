@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, primaryRole } from "@/hooks/useCurrentUser";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles } from "lucide-react";
+import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles, TrendingUp, AlertTriangle, ShieldAlert } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app")({
   component: Dashboard,
@@ -45,15 +45,51 @@ function SuperAdminHome() {
   const { data: stats } = useQuery({
     queryKey: ["super-stats"],
     queryFn: async () => {
-      const [t, s, p] = await Promise.all([
-        supabase.from("tenants").select("id", { count: "exact", head: true }),
+      const now = new Date();
+      const in7 = new Date(now.getTime() + 7 * 86400000).toISOString();
+      const in30 = new Date(now.getTime() + 30 * 86400000).toISOString();
+      const last30 = new Date(now.getTime() - 30 * 86400000).toISOString();
+      const last7 = new Date(now.getTime() - 7 * 86400000).toISOString();
+
+      const [t, activeSubs, payments, expiring7, expiring30, newTenants, recentPayments, recentTenants, mrrSubs] = await Promise.all([
+        supabase.from("tenants").select("id, is_active", { count: "exact" }),
         supabase.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "active"),
-        supabase.from("payments").select("amount_inr").eq("status", "success"),
+        supabase.from("payments").select("amount_inr, created_at").eq("status", "success"),
+        supabase.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "active").gte("expires_at", now.toISOString()).lte("expires_at", in7),
+        supabase.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "active").gte("expires_at", now.toISOString()).lte("expires_at", in30),
+        supabase.from("tenants").select("id", { count: "exact", head: true }).gte("created_at", last30),
+        supabase.from("payments").select("id, amount_inr, payer_name, payer_email, created_at, tenants:tenant_id(name)").eq("status", "success").order("created_at", { ascending: false }).limit(5),
+        supabase.from("tenants").select("id, name, slug, created_at").order("created_at", { ascending: false }).limit(5),
+        supabase.from("subscriptions").select("plans(price_inr, billing)").eq("status", "active"),
       ]);
-      const revenue = (p.data ?? []).reduce((acc, r) => acc + Number(r.amount_inr ?? 0), 0);
-      return { tenants: t.count ?? 0, activeSubs: s.count ?? 0, revenue };
+
+      const revenue = (payments.data ?? []).reduce((acc, r) => acc + Number(r.amount_inr ?? 0), 0);
+      const revenue30 = (payments.data ?? []).filter(p => p.created_at >= last30).reduce((a, r) => a + Number(r.amount_inr ?? 0), 0);
+      const revenue7 = (payments.data ?? []).filter(p => p.created_at >= last7).reduce((a, r) => a + Number(r.amount_inr ?? 0), 0);
+      const mrr = (mrrSubs.data ?? []).reduce((acc, s: any) => {
+        const p = s.plans; if (!p) return acc;
+        const v = Number(p.price_inr ?? 0);
+        if (p.billing === "monthly") return acc + v;
+        if (p.billing === "yearly") return acc + v / 12;
+        return acc; // lifetime contributes 0 to MRR
+      }, 0);
+      const suspended = (t.data ?? []).filter(x => !x.is_active).length;
+
+      return {
+        tenants: t.count ?? 0,
+        suspended,
+        activeSubs: activeSubs.count ?? 0,
+        revenue, revenue30, revenue7, mrr,
+        expiring7: expiring7.count ?? 0,
+        expiring30: expiring30.count ?? 0,
+        newTenants30: newTenants.count ?? 0,
+        recentPayments: recentPayments.data ?? [],
+        recentTenants: recentTenants.data ?? [],
+      };
     },
   });
+
+  const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
   return (
     <div className="space-y-6">
@@ -61,25 +97,86 @@ function SuperAdminHome() {
         <h1 className="text-3xl font-bold tracking-tight">Super Admin</h1>
         <p className="text-muted-foreground">Manage client companies, plans and subscriptions.</p>
       </header>
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard icon={Building2} label="Client companies" value={stats?.tenants ?? 0} />
-        <StatCard icon={CheckCircle2} label="Active subscriptions" value={stats?.activeSubs ?? 0} />
-        <StatCard icon={Wallet} label="Total revenue" value={`₹${(stats?.revenue ?? 0).toLocaleString("en-IN")}`} />
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard icon={Building2} label="Client companies" value={stats?.tenants ?? 0} sub={`${stats?.suspended ?? 0} suspended`} />
+        <StatCard icon={CheckCircle2} label="Active subscriptions" value={stats?.activeSubs ?? 0} sub={`+${stats?.newTenants30 ?? 0} new in 30d`} />
+        <StatCard icon={TrendingUp} label="MRR" value={inr(stats?.mrr ?? 0)} sub={`${inr(stats?.revenue30 ?? 0)} collected (30d)`} />
+        <StatCard icon={Wallet} label="Total revenue" value={inr(stats?.revenue ?? 0)} sub={`${inr(stats?.revenue7 ?? 0)} last 7d`} />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="p-6">
-          <h3 className="font-semibold">Create a new client company</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Onboard a company, assign a plan and invite their admin.</p>
-          <Link to="/clients" className="mt-4 inline-block">
-            <Button>Go to clients →</Button>
-          </Link>
+
+      {(stats?.expiring7 ?? 0) > 0 && (
+        <Card className="flex items-center gap-3 border-amber-500/40 bg-amber-500/5 p-4">
+          <AlertTriangle className="h-5 w-5 text-amber-500" />
+          <div className="flex-1 text-sm">
+            <span className="font-semibold">{stats?.expiring7}</span> subscription(s) expire in the next 7 days
+            {(stats?.expiring30 ?? 0) > (stats?.expiring7 ?? 0) && (
+              <span className="text-muted-foreground"> · {stats?.expiring30} within 30 days</span>
+            )}
+          </div>
+          <Link to="/clients"><Button size="sm" variant="outline">Review</Button></Link>
         </Card>
-        <Card className="p-6">
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-semibold">Recent payments</h3>
+            <Link to="/revenue" className="text-xs text-primary hover:underline">View all →</Link>
+          </div>
+          <div className="divide-y divide-border">
+            {(stats?.recentPayments ?? []).map((p: any) => (
+              <div key={p.id} className="flex items-center justify-between py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{p.tenants?.name ?? p.payer_name ?? p.payer_email ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleString()}</p>
+                </div>
+                <span className="font-semibold">{inr(Number(p.amount_inr))}</span>
+              </div>
+            ))}
+            {(!stats?.recentPayments || stats.recentPayments.length === 0) && (
+              <p className="py-4 text-center text-sm text-muted-foreground">No payments yet.</p>
+            )}
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-semibold">Newest companies</h3>
+            <Link to="/clients" className="text-xs text-primary hover:underline">View all →</Link>
+          </div>
+          <div className="divide-y divide-border">
+            {(stats?.recentTenants ?? []).map((t: any) => (
+              <div key={t.id} className="flex items-center justify-between py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{t.name}</p>
+                  <p className="text-xs text-muted-foreground">{t.slug}</p>
+                </div>
+                <span className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</span>
+              </div>
+            ))}
+            {(!stats?.recentTenants || stats.recentTenants.length === 0) && (
+              <p className="py-4 text-center text-sm text-muted-foreground">No companies yet.</p>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="p-5">
+          <h3 className="font-semibold">New client</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Onboard a company and invite their admin.</p>
+          <Link to="/clients" className="mt-3 inline-block"><Button size="sm">Open clients →</Button></Link>
+        </Card>
+        <Card className="p-5">
           <h3 className="font-semibold">Plans & pricing</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Edit lifetime / monthly plans and employee tiers.</p>
-          <Link to="/plans" className="mt-4 inline-block">
-            <Button variant="outline">Manage plans →</Button>
-          </Link>
+          <p className="mt-1 text-sm text-muted-foreground">Edit lifetime / monthly / yearly plans.</p>
+          <Link to="/plans" className="mt-3 inline-block"><Button size="sm" variant="outline">Manage plans →</Button></Link>
+        </Card>
+        <Card className="p-5">
+          <h3 className="font-semibold">Audit log</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Track every impersonation event.</p>
+          <Link to="/audit" className="mt-3 inline-block"><Button size="sm" variant="outline" className="gap-1"><ShieldAlert className="h-4 w-4" /> View log</Button></Link>
         </Card>
       </div>
     </div>
