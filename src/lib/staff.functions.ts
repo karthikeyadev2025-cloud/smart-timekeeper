@@ -14,6 +14,8 @@ const input = z.object({
   designation: z.string().trim().max(100).optional().default(""),
   monthly_salary: z.number().min(0).default(0),
   shift_id: z.string().uuid().optional().nullable(),
+  branch_id: z.string().uuid().optional().nullable(),
+  role: z.enum(["staff", "branch_manager"]).optional().default("staff"),
 });
 
 export const createStaff = createServerFn({ method: "POST" })
@@ -51,14 +53,20 @@ export const createStaff = createServerFn({ method: "POST" })
         email,
         designation: data.designation || null,
         monthly_salary: data.monthly_salary,
+        branch_id: data.branch_id ?? null,
       })
       .eq("id", newUserId);
     if (profErr) throw new Error(profErr.message);
 
     const { error: roleErr } = await supabaseAdmin
       .from("user_roles")
-      .insert({ user_id: newUserId, role: "staff", tenant_id: data.tenant_id });
+      .insert({ user_id: newUserId, role: data.role, tenant_id: data.tenant_id });
     if (roleErr) throw new Error(roleErr.message);
+
+    // If branch_manager, also mark them as the branch's manager
+    if (data.role === "branch_manager" && data.branch_id) {
+      await supabaseAdmin.from("branches").update({ manager_id: newUserId }).eq("id", data.branch_id);
+    }
 
     if (data.shift_id) {
       await supabaseAdmin.from("staff_shifts").insert({
