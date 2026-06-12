@@ -5,10 +5,11 @@ import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Camera, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
+import { MapPin, Camera, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
+import { detectMockLocation, type AntiCheatResult } from "@/lib/anti-cheat";
 
 export const Route = createFileRoute("/_authenticated/check-in")({
   component: CheckInFlow,
