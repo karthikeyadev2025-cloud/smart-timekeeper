@@ -106,9 +106,10 @@ function AuthPage() {
               <p className="text-sm text-muted-foreground">Sign in with your phone & password</p>
             </div>
             <StaffPhoneForm loading={loading} onSubmit={handleStaffPhoneSignIn} />
-            <p className="text-center text-xs text-muted-foreground">
-              Don't have a password? Ask your manager.
-            </p>
+            <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground">
+              <ForgotPinDialog />
+              <span>Don't have a PIN? Ask your manager.</span>
+            </div>
           </TabsContent>
 
           <TabsContent value="admin" className="space-y-4 pt-4">
