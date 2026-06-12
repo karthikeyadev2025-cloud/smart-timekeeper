@@ -16,12 +16,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle } from "lucide-react";
+import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   impersonateUser, setTenantActive, extendSubscription, changeTenantPlan, getTenantDetails,
 } from "@/lib/admin.functions";
+import { TenantPermissionsDialog } from "@/components/TenantPermissionsDialog";
 
 export const Route = createFileRoute("/_authenticated/clients")({
   component: ClientsPage,
