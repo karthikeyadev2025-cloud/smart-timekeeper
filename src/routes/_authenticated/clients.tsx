@@ -131,6 +131,7 @@ function RowActions({ tenant, onChange }: { tenant: any; onChange: () => void })
   const extend = useServerFn(extendSubscription);
   const [planOpen, setPlanOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [permsOpen, setPermsOpen] = useState(false);
   const [magicLink, setMagicLink] = useState<string | null>(null);
 
   const doImpersonate = async () => {
