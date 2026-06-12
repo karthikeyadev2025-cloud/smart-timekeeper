@@ -186,6 +186,7 @@ function RowActions({ tenant, onChange }: { tenant: any; onChange: () => void })
 
       <ChangePlanDialog open={planOpen} onOpenChange={setPlanOpen} tenant={tenant} onDone={onChange} />
       <TenantDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} tenantId={tenant.id} />
+      <TenantPermissionsDialog open={permsOpen} onOpenChange={setPermsOpen} tenantId={tenant.id} tenantName={tenant.name} />
 
       <Dialog open={!!magicLink} onOpenChange={(o) => !o && setMagicLink(null)}>
         <DialogContent>
