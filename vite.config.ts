@@ -5,6 +5,9 @@ import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import path from "node:path";
 
+// Build for Vercel via Nitro preset.
+process.env.NITRO_PRESET = process.env.NITRO_PRESET ?? "vercel";
+
 export default defineConfig({
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
@@ -14,7 +17,6 @@ export default defineConfig({
     tsConfigPaths(),
     tailwindcss(),
     tanstackStart({
-      target: "vercel",
       tsr: { srcDirectory: "src" },
       server: { entry: "./src/server.ts" },
     }),
