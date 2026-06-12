@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Phone, Mail } from "lucide-react";
 import { phoneToStaffEmail, isValidPhone } from "@/lib/phone-auth";
+import { requestPinReset } from "@/lib/pin-reset.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -104,9 +106,10 @@ function AuthPage() {
               <p className="text-sm text-muted-foreground">Sign in with your phone & password</p>
             </div>
             <StaffPhoneForm loading={loading} onSubmit={handleStaffPhoneSignIn} />
-            <p className="text-center text-xs text-muted-foreground">
-              Don't have a password? Ask your manager.
-            </p>
+            <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground">
+              <ForgotPinDialog />
+              <span>Don't have a PIN? Ask your manager.</span>
+            </div>
           </TabsContent>
 
           <TabsContent value="admin" className="space-y-4 pt-4">
@@ -260,5 +263,57 @@ function SignUpForm({ loading, onSubmit }: { loading: boolean; onSubmit: (name: 
       <div className="space-y-1"><Label htmlFor="su-pass">Password</Label><Input id="su-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={6} /></div>
       <Button type="submit" className="w-full" disabled={loading}>{loading ? "Creating…" : "Create account"}</Button>
     </form>
+  );
+}
+
+function ForgotPinDialog() {
+  const [open, setOpen] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [sending, setSending] = useState(false);
+  const submit = async () => {
+    if (!isValidPhone(phone)) { toast.error("Enter a valid phone number"); return; }
+    setSending(true);
+    try {
+      await requestPinReset({ data: { phone } });
+      toast.success("Request sent. Your admin will set a new PIN soon.");
+      setOpen(false);
+      setPhone("");
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not send request");
+    } finally {
+      setSending(false);
+    }
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <button type="button" onClick={() => setOpen(true)} className="font-medium text-primary underline-offset-2 hover:underline">
+        Forgot PIN?
+      </button>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Forgot your PIN?</DialogTitle>
+          <DialogDescription>
+            Enter your phone number. Your manager will set a new 4-digit PIN and share it with you.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="fp-phone">Phone number</Label>
+          <Input
+            id="fp-phone"
+            type="tel"
+            inputMode="numeric"
+            placeholder="98765 43210"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
+            className="h-12 text-lg"
+            autoFocus
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={submit} disabled={sending}>{sending ? "Sending…" : "Request reset"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

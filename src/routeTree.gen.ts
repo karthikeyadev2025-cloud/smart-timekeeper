@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
 import { Route as AuthenticatedShiftsRouteImport } from './routes/_authenticated/shifts'
 import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/plans'
+import { Route as AuthenticatedPinResetsRouteImport } from './routes/_authenticated/pin-resets'
 import { Route as AuthenticatedPayrollRouteImport } from './routes/_authenticated/payroll'
 import { Route as AuthenticatedMySalaryRouteImport } from './routes/_authenticated/my-salary'
 import { Route as AuthenticatedMyLeavesRouteImport } from './routes/_authenticated/my-leaves'
@@ -51,6 +52,11 @@ const AuthenticatedShiftsRoute = AuthenticatedShiftsRouteImport.update({
 const AuthenticatedPlansRoute = AuthenticatedPlansRouteImport.update({
   id: '/plans',
   path: '/plans',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPinResetsRoute = AuthenticatedPinResetsRouteImport.update({
+  id: '/pin-resets',
+  path: '/pin-resets',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPayrollRoute = AuthenticatedPayrollRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/my-leaves': typeof AuthenticatedMyLeavesRoute
   '/my-salary': typeof AuthenticatedMySalaryRoute
   '/payroll': typeof AuthenticatedPayrollRoute
+  '/pin-resets': typeof AuthenticatedPinResetsRoute
   '/plans': typeof AuthenticatedPlansRoute
   '/shifts': typeof AuthenticatedShiftsRoute
   '/team': typeof AuthenticatedTeamRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/my-leaves': typeof AuthenticatedMyLeavesRoute
   '/my-salary': typeof AuthenticatedMySalaryRoute
   '/payroll': typeof AuthenticatedPayrollRoute
+  '/pin-resets': typeof AuthenticatedPinResetsRoute
   '/plans': typeof AuthenticatedPlansRoute
   '/shifts': typeof AuthenticatedShiftsRoute
   '/team': typeof AuthenticatedTeamRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/_authenticated/my-leaves': typeof AuthenticatedMyLeavesRoute
   '/_authenticated/my-salary': typeof AuthenticatedMySalaryRoute
   '/_authenticated/payroll': typeof AuthenticatedPayrollRoute
+  '/_authenticated/pin-resets': typeof AuthenticatedPinResetsRoute
   '/_authenticated/plans': typeof AuthenticatedPlansRoute
   '/_authenticated/shifts': typeof AuthenticatedShiftsRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/my-leaves'
     | '/my-salary'
     | '/payroll'
+    | '/pin-resets'
     | '/plans'
     | '/shifts'
     | '/team'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/my-leaves'
     | '/my-salary'
     | '/payroll'
+    | '/pin-resets'
     | '/plans'
     | '/shifts'
     | '/team'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/_authenticated/my-leaves'
     | '/_authenticated/my-salary'
     | '/_authenticated/payroll'
+    | '/_authenticated/pin-resets'
     | '/_authenticated/plans'
     | '/_authenticated/shifts'
     | '/_authenticated/team'
@@ -240,6 +252,13 @@ declare module '@tanstack/react-router' {
       path: '/plans'
       fullPath: '/plans'
       preLoaderRoute: typeof AuthenticatedPlansRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/pin-resets': {
+      id: '/_authenticated/pin-resets'
+      path: '/pin-resets'
+      fullPath: '/pin-resets'
+      preLoaderRoute: typeof AuthenticatedPinResetsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/payroll': {
@@ -310,6 +329,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMyLeavesRoute: typeof AuthenticatedMyLeavesRoute
   AuthenticatedMySalaryRoute: typeof AuthenticatedMySalaryRoute
   AuthenticatedPayrollRoute: typeof AuthenticatedPayrollRoute
+  AuthenticatedPinResetsRoute: typeof AuthenticatedPinResetsRoute
   AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
   AuthenticatedShiftsRoute: typeof AuthenticatedShiftsRoute
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
@@ -324,6 +344,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMyLeavesRoute: AuthenticatedMyLeavesRoute,
   AuthenticatedMySalaryRoute: AuthenticatedMySalaryRoute,
   AuthenticatedPayrollRoute: AuthenticatedPayrollRoute,
+  AuthenticatedPinResetsRoute: AuthenticatedPinResetsRoute,
   AuthenticatedPlansRoute: AuthenticatedPlansRoute,
   AuthenticatedShiftsRoute: AuthenticatedShiftsRoute,
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,
