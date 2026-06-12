@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useScroll, useTransform, type Variants } from "framer-motion";
-import { useRef } from "react";
-import { MapPin, Camera, CheckCircle2, Clock, Users, Shield, Sparkles, Building2, ArrowRight } from "lucide-react";
+import { useRef, useState } from "react";
+import { MapPin, Camera, CheckCircle2, Clock, Users, Shield, Sparkles, Building2, ArrowRight, Map as MapIcon, GraduationCap, Briefcase, Smartphone, BellRing, Wallet, ShieldCheck, UserCog } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -225,15 +225,22 @@ function Landing() {
         <div className="mx-auto max-w-6xl px-4">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.6 }} className="text-center">
             <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Everything you need</h2>
+            <p className="mt-2 text-muted-foreground">One app for offices, field teams, multi-branch businesses, and schools.</p>
           </motion.div>
           <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[
+              { icon: Building2, title: "Multi-branch HQ", desc: "Unlimited branches/campuses, each with its own staff, shifts, and reports." },
+              { icon: UserCog, title: "Branch managers", desc: "Delegate per-location management — managers see only their branch." },
+              { icon: MapIcon, title: "Live staff map", desc: "See who's checked in and where, in real time, on one map." },
+              { icon: Briefcase, title: "Field staff mode", desc: "Reps & delivery staff punch from anywhere — distance & accuracy logged." },
+              { icon: MapPin, title: "Per-branch geofence", desc: "Set the office radius per location. Outside attempts are flagged automatically." },
+              { icon: Camera, title: "Selfie + GPS proof", desc: "Tamper-proof check-ins, encrypted & stored privately." },
+              { icon: ShieldCheck, title: "Anti-cheat", desc: "Mock-location and fake-GPS detection built in." },
               { icon: Clock, title: "Multi-shift scheduling", desc: "Morning, night, rotational — assign shifts per staff." },
-              { icon: Users, title: "Staff & roles", desc: "Add unlimited staff under your plan with role permissions." },
-              { icon: MapPin, title: "Multi-branch geofence", desc: "Define office radius for each location." },
-              { icon: Camera, title: "Selfie + GPS proof", desc: "Tamper-proof check-ins, stored privately." },
-              { icon: Shield, title: "Auto payroll", desc: "Salary calculated from attendance, OT, leaves — payslip ready." },
-              { icon: Building2, title: "White-label", desc: "Brand the app with your logo and colors." },
+              { icon: Wallet, title: "Auto payroll", desc: "Salary calculated from attendance, OT, leaves — payslip PDF ready." },
+              { icon: GraduationCap, title: "School mode", desc: "Teachers mark whole classes Present/Absent in one tap. No GPS needed." },
+              { icon: BellRing, title: "Parent / WhatsApp alerts", desc: "Notify parents on absence, or staff on shift changes." },
+              { icon: Smartphone, title: "PWA + white-label", desc: "Installs like an app. Brand it with your logo and colors." },
             ].map((f) => (
               <motion.div key={f.title} variants={fadeUp} whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 300 }}>
                 <Card className="p-6 h-full border-border/60 hover:border-primary/40 hover:shadow-md transition-all">
@@ -246,6 +253,10 @@ function Landing() {
           </motion.div>
         </div>
       </section>
+
+      {/* Modes — interactive Business vs School tabs */}
+      <ModesSection />
+
 
       {/* Pricing */}
       <section id="pricing" className="border-t border-border/60 bg-card/40 py-20">
@@ -335,3 +346,123 @@ function Landing() {
     </div>
   );
 }
+
+function ModesSection() {
+  const [mode, setMode] = useState<"business" | "school">("business");
+  const modes = {
+    business: {
+      title: "Business / Office mode",
+      tagline: "Offices, retail, factories, field teams.",
+      bullets: [
+        "GPS + selfie attendance with per-branch geofence",
+        "Field staff can punch from anywhere — distance auto-logged",
+        "Live map shows every active staff in real time",
+        "Multi-shift, overtime & break tracking",
+        "Auto payroll → payslip PDF every month",
+        "Multi-branch with branch manager role",
+      ],
+      icon: Briefcase,
+    },
+    school: {
+      title: "School / College mode",
+      tagline: "Schools, colleges, coaching centres.",
+      bullets: [
+        "Teachers mark whole classes in one tap (no GPS)",
+        "Students don't need phones — teacher marks attendance",
+        "Multiple campuses with campus-wise reports",
+        "Parent SMS / WhatsApp on absent",
+        "Monthly student attendance PDF",
+        "Teacher attendance with selfie (optional)",
+      ],
+      icon: GraduationCap,
+    },
+  } as const;
+  const m = modes[mode];
+
+  return (
+    <section className="border-t border-border/60 py-20">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Two modes. One app.</h2>
+          <p className="mt-2 text-muted-foreground">Switch between Business and School at signup — the whole app adapts.</p>
+        </div>
+        <div className="mt-8 flex justify-center">
+          <div className="inline-flex rounded-full border border-border/60 bg-card p-1">
+            {(["business", "school"] as const).map(k => (
+              <button
+                key={k}
+                onClick={() => setMode(k)}
+                className={`relative rounded-full px-6 py-2 text-sm font-medium capitalize transition-colors ${mode === k ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {mode === k && (
+                  <motion.span layoutId="mode-pill" className="absolute inset-0 rounded-full bg-primary" transition={{ type: "spring", stiffness: 400, damping: 30 }} />
+                )}
+                <span className="relative">{k === "business" ? "Business" : "School"}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <motion.div
+          key={mode}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="mt-10 grid items-center gap-8 md:grid-cols-2"
+        >
+          <Card className="p-8 border-border/60">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <m.icon className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold">{m.title}</h3>
+                <p className="text-sm text-muted-foreground">{m.tagline}</p>
+              </div>
+            </div>
+            <ul className="mt-6 space-y-2 text-sm">
+              {m.bullets.map(b => (
+                <li key={b} className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-success" /> {b}</li>
+              ))}
+            </ul>
+          </Card>
+          <div className="relative">
+            <motion.div
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-accent/10 p-8"
+            >
+              <div className="space-y-3">
+                {(mode === "business"
+                  ? [
+                      { l: "HQ — Mumbai", v: "42 / 45 in", c: "text-success" },
+                      { l: "Andheri Branch", v: "18 / 20 in", c: "text-success" },
+                      { l: "Pune Branch", v: "11 / 15 in", c: "text-warning" },
+                      { l: "Field reps (live)", v: "7 on the road", c: "text-primary" },
+                    ]
+                  : [
+                      { l: "Grade 6-A · Mrs. Sharma", v: "38 / 40 present", c: "text-success" },
+                      { l: "Grade 7-B · Mr. Khan", v: "35 / 36 present", c: "text-success" },
+                      { l: "Grade 8-A · Ms. Iyer", v: "30 / 32 present", c: "text-warning" },
+                      { l: "Today (whole school)", v: "94% attendance", c: "text-primary" },
+                    ]
+                ).map((row, i) => (
+                  <motion.div
+                    key={row.l}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.08 }}
+                    className="flex items-center justify-between rounded-lg bg-background/80 p-3 text-sm shadow-sm"
+                  >
+                    <span className="font-medium">{row.l}</span>
+                    <span className={`text-xs font-semibold ${row.c}`}>{row.v}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+

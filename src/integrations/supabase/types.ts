@@ -19,6 +19,7 @@ export type Database = {
           accuracy_meters: number | null
           address_text: string | null
           attendance_date: string
+          branch_id: string | null
           created_at: string
           distance_from_office_m: number | null
           enforcement_status: Database["public"]["Enums"]["enforcement_status"]
@@ -39,6 +40,7 @@ export type Database = {
           accuracy_meters?: number | null
           address_text?: string | null
           attendance_date?: string
+          branch_id?: string | null
           created_at?: string
           distance_from_office_m?: number | null
           enforcement_status?: Database["public"]["Enums"]["enforcement_status"]
@@ -59,6 +61,7 @@ export type Database = {
           accuracy_meters?: number | null
           address_text?: string | null
           attendance_date?: string
+          branch_id?: string | null
           created_at?: string
           distance_from_office_m?: number | null
           enforcement_status?: Database["public"]["Enums"]["enforcement_status"]
@@ -76,6 +79,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "attendance_records_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "attendance_records_office_location_id_fkey"
             columns: ["office_location_id"]
@@ -99,8 +109,65 @@ export type Database = {
           },
         ]
       }
+      branches: {
+        Row: {
+          address: string | null
+          city: string | null
+          code: string | null
+          country: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          manager_id: string | null
+          name: string
+          state: string | null
+          tenant_id: string
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          code?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          manager_id?: string | null
+          name: string
+          state?: string | null
+          tenant_id: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          code?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          manager_id?: string | null
+          name?: string
+          state?: string | null
+          tenant_id?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classes: {
         Row: {
+          branch_id: string | null
           created_at: string
           grade: string | null
           id: string
@@ -111,6 +178,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          branch_id?: string | null
           created_at?: string
           grade?: string | null
           id?: string
@@ -121,6 +189,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          branch_id?: string | null
           created_at?: string
           grade?: string | null
           id?: string
@@ -131,6 +200,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "classes_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "classes_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -225,6 +301,7 @@ export type Database = {
       }
       leave_requests: {
         Row: {
+          branch_id: string | null
           created_at: string
           days: number
           end_date: string
@@ -241,6 +318,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          branch_id?: string | null
           created_at?: string
           days: number
           end_date: string
@@ -257,6 +335,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          branch_id?: string | null
           created_at?: string
           days?: number
           end_date?: string
@@ -273,6 +352,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "leave_requests_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leave_requests_leave_type_id_fkey"
             columns: ["leave_type_id"]
@@ -327,6 +413,7 @@ export type Database = {
       office_locations: {
         Row: {
           address: string | null
+          branch_id: string | null
           created_at: string
           id: string
           is_active: boolean
@@ -338,6 +425,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          branch_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -349,6 +437,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          branch_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -359,6 +448,13 @@ export type Database = {
           tenant_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "office_locations_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "office_locations_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -445,6 +541,7 @@ export type Database = {
         Row: {
           absent_days: number
           base_salary: number
+          branch_id: string | null
           deductions: number
           generated_at: string
           id: string
@@ -462,6 +559,7 @@ export type Database = {
         Insert: {
           absent_days?: number
           base_salary: number
+          branch_id?: string | null
           deductions?: number
           generated_at?: string
           id?: string
@@ -479,6 +577,7 @@ export type Database = {
         Update: {
           absent_days?: number
           base_salary?: number
+          branch_id?: string | null
           deductions?: number
           generated_at?: string
           id?: string
@@ -494,6 +593,13 @@ export type Database = {
           working_days?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "payslips_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payslips_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -595,6 +701,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          branch_id: string | null
           created_at: string
           designation: string | null
           email: string | null
@@ -611,6 +718,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          branch_id?: string | null
           created_at?: string
           designation?: string | null
           email?: string | null
@@ -627,6 +735,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          branch_id?: string | null
           created_at?: string
           designation?: string | null
           email?: string | null
@@ -643,6 +752,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "profiles_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "profiles_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -653,6 +769,7 @@ export type Database = {
       }
       shifts: {
         Row: {
+          branch_id: string | null
           break_minutes: number | null
           created_at: string
           end_time: string
@@ -665,6 +782,7 @@ export type Database = {
           working_days: number[] | null
         }
         Insert: {
+          branch_id?: string | null
           break_minutes?: number | null
           created_at?: string
           end_time: string
@@ -677,6 +795,7 @@ export type Database = {
           working_days?: number[] | null
         }
         Update: {
+          branch_id?: string | null
           break_minutes?: number | null
           created_at?: string
           end_time?: string
@@ -690,6 +809,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "shifts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "shifts_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -700,6 +826,7 @@ export type Database = {
       }
       staff_shifts: {
         Row: {
+          branch_id: string | null
           created_at: string
           effective_from: string
           effective_to: string | null
@@ -709,6 +836,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          branch_id?: string | null
           created_at?: string
           effective_from?: string
           effective_to?: string | null
@@ -718,6 +846,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          branch_id?: string | null
           created_at?: string
           effective_from?: string
           effective_to?: string | null
@@ -727,6 +856,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "staff_shifts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "staff_shifts_shift_id_fkey"
             columns: ["shift_id"]
@@ -806,6 +942,7 @@ export type Database = {
       }
       students: {
         Row: {
+          branch_id: string | null
           class_id: string
           created_at: string
           full_name: string
@@ -817,6 +954,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          branch_id?: string | null
           class_id: string
           created_at?: string
           full_name: string
@@ -828,6 +966,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          branch_id?: string | null
           class_id?: string
           created_at?: string
           full_name?: string
@@ -839,6 +978,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "students_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "students_class_id_fkey"
             columns: ["class_id"]
@@ -996,6 +1142,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_branch_manager: {
+        Args: { _branch_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_tenant_admin: {
         Args: { _tenant_id: string; _user_id: string }
@@ -1003,7 +1153,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "super_admin" | "client_admin" | "staff"
+      app_role: "super_admin" | "client_admin" | "staff" | "branch_manager"
       attendance_kind: "check_in" | "check_out" | "break_out" | "break_in"
       enforcement_status: "inside" | "outside_allowed" | "outside_blocked"
       leave_status: "pending" | "approved" | "rejected" | "cancelled"
@@ -1145,7 +1295,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["super_admin", "client_admin", "staff"],
+      app_role: ["super_admin", "client_admin", "staff", "branch_manager"],
       attendance_kind: ["check_in", "check_out", "break_out", "break_in"],
       enforcement_status: ["inside", "outside_allowed", "outside_blocked"],
       leave_status: ["pending", "approved", "rejected", "cancelled"],
