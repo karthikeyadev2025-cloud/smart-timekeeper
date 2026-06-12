@@ -81,23 +81,35 @@ function CheckInFlow() {
 
   const isFieldStaff = (user?.profile as any)?.is_field_staff === true;
 
-  const getLocation = () => {
+  const getLocation = async () => {
     setGpsError(null);
+    setAntiCheat(null);
     if (!navigator.geolocation) { setGpsError("Geolocation not supported in this browser."); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords(pos.coords);
-        const match = (locations ?? []).find((l) => haversine(pos.coords.latitude, pos.coords.longitude, l.latitude, l.longitude) <= l.radius_meters);
-        if (match) { setMatchedLocation(match); }
-        else if (isFieldStaff) {
-          // Field staff: allow but no office match
-          setMatchedLocation(null);
-        }
-        else { setMatchedLocation(null); setGpsError("You're not inside any office geofence."); }
-      },
-      (err) => setGpsError(err.message),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    setVerifying(true);
+    try {
+      // Anti-cheat: take two readings ~3s apart and run heuristics
+      const result = await detectMockLocation();
+      setAntiCheat(result);
+      const pseudoCoords = {
+        latitude: result.reading.latitude,
+        longitude: result.reading.longitude,
+        accuracy: result.reading.accuracy ?? 0,
+        altitude: result.reading.altitude ?? null,
+        altitudeAccuracy: result.reading.altitudeAccuracy ?? null,
+        heading: result.reading.heading ?? null,
+        speed: result.reading.speed ?? null,
+        toJSON() { return this; },
+      } as unknown as GeolocationCoordinates;
+      setCoords(pseudoCoords);
+      const match = (locations ?? []).find((l) => haversine(pseudoCoords.latitude, pseudoCoords.longitude, l.latitude, l.longitude) <= l.radius_meters);
+      if (match) setMatchedLocation(match);
+      else if (isFieldStaff) setMatchedLocation(null);
+      else { setMatchedLocation(null); setGpsError("You're not inside any office geofence."); }
+    } catch (err: any) {
+      setGpsError(err?.message ?? "Could not read location");
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const startCamera = async () => {
