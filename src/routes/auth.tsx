@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Phone, Mail } from "lucide-react";
 import { phoneToStaffEmail, isValidPhone } from "@/lib/phone-auth";
+import { requestPinReset } from "@/lib/pin-reset.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
