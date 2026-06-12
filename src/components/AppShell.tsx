@@ -10,6 +10,7 @@ import {
   Wallet,
   Building2,
   Package,
+  KeyRound,
   LogOut,
   Menu,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/app", label: "Overview", icon: LayoutDashboard },
     { to: "/clients", label: "Client companies", icon: Building2 },
     { to: "/plans", label: "Plans", icon: Package },
+    { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
   ],
   client_admin: [
     { to: "/app", label: "Dashboard", icon: LayoutDashboard },
@@ -35,6 +37,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/shifts", label: "Shifts & locations", icon: Clock },
     { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
     { to: "/payroll", label: "Payroll", icon: Wallet },
+    { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
   ],
   staff: [
     { to: "/app", label: "Today", icon: LayoutDashboard },
