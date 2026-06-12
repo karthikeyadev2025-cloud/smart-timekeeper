@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Phone, Mail, Eye, EyeOff } from "lucide-react";
+import { Phone, Mail } from "lucide-react";
 import { phoneToStaffEmail, isValidPhone } from "@/lib/phone-auth";
 
 export const Route = createFileRoute("/auth")({
