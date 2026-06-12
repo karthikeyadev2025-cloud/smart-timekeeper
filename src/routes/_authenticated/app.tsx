@@ -8,7 +8,7 @@ import { useCurrentUser, primaryRole } from "@/hooks/useCurrentUser";
 import { supabase } from "@/integrations/supabase/client";
 import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/")({
+export const Route = createFileRoute("/_authenticated/app")({
   component: Dashboard,
 });
 
