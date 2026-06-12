@@ -49,6 +49,15 @@ function TeamPage() {
     },
   });
 
+  const { data: branches } = useQuery({
+    queryKey: ["branches", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data } = await supabase.from("branches").select("id,name").eq("tenant_id", tenantId!).eq("is_active", true);
+      return data ?? [];
+    },
+  });
+
   if (!tenantId) return <AppShell><Card className="p-6">You need a company to manage staff.</Card></AppShell>;
 
   return (
