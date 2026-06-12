@@ -58,10 +58,22 @@ function CheckInFlow() {
     queryFn: async () => {
       const { data } = await supabase
         .from("office_locations")
-        .select("*")
+        .select("id,name,latitude,longitude,radius_meters,branch_id")
         .eq("tenant_id", user!.tenant!.id)
         .eq("is_active", true);
       return (data ?? []) as Location[];
+    },
+  });
+
+  const { data: branchWindows } = useQuery({
+    queryKey: ["branch-windows", user?.tenant?.id],
+    enabled: !!user?.tenant?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("branches")
+        .select("id,checkin_window_start,checkin_window_end,checkout_window_start,checkout_window_end")
+        .eq("tenant_id", user!.tenant!.id);
+      return (data ?? []) as BranchWindow[];
     },
   });
 
