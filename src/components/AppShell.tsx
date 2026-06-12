@@ -24,6 +24,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser, primaryRole, type AppRole } from "@/hooks/useCurrentUser";
+import { HeaderBranchSwitcher } from "@/components/HeaderBranchSwitcher";
 import { cn } from "@/lib/utils";
 
 type NavItem = { to: string; label: string; icon: typeof MapPin };
@@ -160,21 +161,29 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex w-full flex-col md:hidden">
-        <header className="flex items-center justify-between border-b border-border bg-background px-4 py-3">
+        <header className="flex items-center justify-between gap-2 border-b border-border bg-background px-4 py-3">
           <Logo />
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon"><Menu className="h-5 w-5" /></Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0">
-              <SidebarContent />
-            </SheetContent>
-          </Sheet>
+          <div className="flex items-center gap-2">
+            <HeaderBranchSwitcher />
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon"><Menu className="h-5 w-5" /></Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72 p-0">
+                <SidebarContent />
+              </SheetContent>
+            </Sheet>
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 pb-20">{children}</main>
       </div>
 
-      <main className="hidden flex-1 overflow-y-auto p-8 md:block">{children}</main>
+      <div className="hidden flex-1 flex-col md:flex">
+        <header className="flex items-center justify-end gap-2 border-b border-border bg-background px-6 py-3">
+          <HeaderBranchSwitcher />
+        </header>
+        <main className="flex-1 overflow-y-auto p-8">{children}</main>
+      </div>
     </div>
   );
 }
