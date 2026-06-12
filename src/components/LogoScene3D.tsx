@@ -2,19 +2,8 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Float } from "@react-three/drei";
 import { useEffect, useRef, useState, useMemo } from "react";
 import * as THREE from "three";
-import logoAsset from "@/assets/punchly-logo.png.asset.json";
 
-function resolveAssetUrl(url: string): string {
-  if (typeof window === "undefined") return url;
-  if (/^https?:/i.test(url)) return url;
-  const host = window.location.hostname;
-  if (host.endsWith("lovableproject.com") && url.startsWith("/__l5e/")) {
-    const sub = host.replace(".lovableproject.com", "");
-    const lovableHost = sub.startsWith("id-preview--") ? sub : `id-preview--${sub}`;
-    return `https://${lovableHost}.lovable.app${url}`;
-  }
-  return url;
-}
+const LOGO_URL = "/punchly-logo.png";
 
 function LogoDisc({
   position,
