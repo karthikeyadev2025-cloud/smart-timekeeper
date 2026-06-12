@@ -140,14 +140,19 @@ function TeamPage() {
   );
 }
 
-function AddStaffForm({ tenantId, shifts, onDone }: { tenantId: string; shifts: any[]; onDone: () => void }) {
+function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBranchId, onDone }: {
+  tenantId: string; shifts: any[]; branches: { id: string; name: string }[];
+  branchLabel: string; mode: "staff" | "branch_manager";
+  defaultBranchId: string | null; onDone: () => void;
+}) {
   const createStaffFn = useServerFn(createStaff);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [designation, setDesignation] = useState("");
+  const [designation, setDesignation] = useState(mode === "branch_manager" ? `${branchLabel} Manager` : "");
   const [salary, setSalary] = useState("");
   const [shiftId, setShiftId] = useState("");
+  const [branchIdSel, setBranchIdSel] = useState<string>(defaultBranchId ?? "");
   const [loading, setLoading] = useState(false);
 
   const genPassword = () => setPassword(String(Math.floor(1000 + Math.random() * 9000)));
@@ -156,6 +161,7 @@ function AddStaffForm({ tenantId, shifts, onDone }: { tenantId: string; shifts: 
     e.preventDefault();
     if (!/^[0-9]{6,15}$/.test(phone)) { toast.error("Enter a valid phone (digits only)"); return; }
     if (password.length < 4) { toast.error("Password must be at least 4 characters"); return; }
+    if (mode === "branch_manager" && !branchIdSel) { toast.error(`Pick a ${branchLabel.toLowerCase()} to manage`); return; }
     setLoading(true);
     try {
       await createStaffFn({
@@ -167,9 +173,11 @@ function AddStaffForm({ tenantId, shifts, onDone }: { tenantId: string; shifts: 
           designation,
           monthly_salary: Number(salary) || 0,
           shift_id: shiftId || null,
+          branch_id: branchIdSel || null,
+          role: mode,
         },
       });
-      toast.success(`Staff added! Share login → ${phone} / ${password}`);
+      toast.success(`${mode === "branch_manager" ? `${branchLabel} manager` : "Staff"} added! Share login → ${phone} / ${password}`);
       onDone();
     } catch (e: any) {
       toast.error(e.message ?? "Could not add staff");
@@ -178,11 +186,17 @@ function AddStaffForm({ tenantId, shifts, onDone }: { tenantId: string; shifts: 
     }
   };
 
+  const isManager = mode === "branch_manager";
+
   return (
     <form onSubmit={submit} className="space-y-3">
       <DialogHeader>
-        <DialogTitle>Add staff member</DialogTitle>
-        <p className="text-sm text-muted-foreground">Staff sign in with phone + password. No email needed.</p>
+        <DialogTitle>{isManager ? `Invite ${branchLabel.toLowerCase()} manager` : "Add staff member"}</DialogTitle>
+        <p className="text-sm text-muted-foreground">
+          {isManager
+            ? `${branchLabel} managers see only their ${branchLabel.toLowerCase()}'s staff & reports.`
+            : "Staff sign in with phone + password. No email needed."}
+        </p>
       </DialogHeader>
       <div className="space-y-1"><Label>Full name</Label><Input value={name} onChange={e => setName(e.target.value)} required maxLength={100} placeholder="Aarav Singh" /></div>
       <div className="space-y-1">
@@ -203,7 +217,17 @@ function AddStaffForm({ tenantId, shifts, onDone }: { tenantId: string; shifts: 
         <div className="space-y-1"><Label>Designation</Label><Input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="Cashier" /></div>
         <div className="space-y-1"><Label>Monthly salary (₹)</Label><Input type="number" value={salary} onChange={e => setSalary(e.target.value)} placeholder="15000" /></div>
       </div>
-      {shifts.length > 0 && (
+      <div className="space-y-1">
+        <Label>{branchLabel}{isManager ? " (required)" : " (optional)"}</Label>
+        <Select value={branchIdSel || "none"} onValueChange={(v) => setBranchIdSel(v === "none" ? "" : v)}>
+          <SelectTrigger><SelectValue placeholder={`Assign to a ${branchLabel.toLowerCase()}`} /></SelectTrigger>
+          <SelectContent>
+            {!isManager && <SelectItem value="none">— Unassigned —</SelectItem>}
+            {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {!isManager && shifts.length > 0 && (
         <div className="space-y-1">
           <Label>Shift</Label>
           <Select value={shiftId} onValueChange={setShiftId}>
@@ -212,9 +236,9 @@ function AddStaffForm({ tenantId, shifts, onDone }: { tenantId: string; shifts: 
           </Select>
         </div>
       )}
-      <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Adding…" : "Add staff"}</Button></DialogFooter>
+      <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Adding…" : isManager ? "Invite manager" : "Add staff"}</Button></DialogFooter>
       <p className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
-        ✓ You stay signed in. Share the phone + password with your staff so they can log in.
+        ✓ You stay signed in. Share the phone + password so they can log in.
       </p>
     </form>
   );
