@@ -39,6 +39,8 @@ function CheckInFlow() {
   const [selfieBlob, setSelfieBlob] = useState<Blob | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [antiCheat, setAntiCheat] = useState<AntiCheatResult | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
