@@ -9,6 +9,11 @@ function normalizeEnvValue(value: string | undefined) {
   const normalized = value?.trim().replace(/^['"]|['"]$/g, '');
   if (!normalized) return undefined;
   if (normalized === 'undefined' || normalized === 'null') return undefined;
+  // Header values must be ISO-8859-1 (Latin-1). Reject anything containing
+  // non-Latin-1 characters (smart quotes, BOM, zero-width chars, Telugu, etc.)
+  // which would otherwise crash fetch() when used in apikey/Authorization headers.
+  // eslint-disable-next-line no-control-regex
+  if (/[^\x00-\xFF]/.test(normalized)) return undefined;
   return normalized;
 }
 
