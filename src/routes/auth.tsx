@@ -10,6 +10,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Phone, Mail, Eye, EyeOff } from "lucide-react";
+import { phoneToStaffEmail, isValidPhone } from "@/lib/phone-auth";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -22,7 +24,7 @@ export const Route = createFileRoute("/auth")({
 });
 
 const emailSchema = z.string().trim().email("Enter a valid email").max(255);
-const passwordSchema = z.string().min(6, "At least 6 characters").max(72);
+const passwordSchema = z.string().min(4, "At least 4 characters").max(72);
 
 function AuthPage() {
   const navigate = useNavigate();
@@ -34,29 +36,37 @@ function AuthPage() {
     });
   }, [navigate]);
 
-  const handleEmailAuth = async (mode: "signin" | "signup", email: string, password: string, fullName?: string) => {
+  const signInWithEmail = async (email: string, password: string) => {
+    setLoading(true);
     try {
-      emailSchema.parse(email);
-      passwordSchema.parse(password);
-    } catch (e) {
-      if (e instanceof z.ZodError) {
-        toast.error(e.errors[0].message);
-        return;
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      navigate({ to: "/app" });
+    } catch (e: any) {
+      toast.error(e.message ?? "Sign in failed. Check phone/password.");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleStaffPhoneSignIn = async (phone: string, password: string) => {
+    if (!isValidPhone(phone)) { toast.error("Enter a valid phone number"); return; }
+    if (password.length < 4) { toast.error("Password too short"); return; }
+    await signInWithEmail(phoneToStaffEmail(phone), password);
+  };
+
+  const handleEmailAuth = async (mode: "signin" | "signup", email: string, password: string, fullName?: string) => {
+    try { emailSchema.parse(email); passwordSchema.parse(password); }
+    catch (e) { if (e instanceof z.ZodError) { toast.error(e.errors[0].message); return; } }
     setLoading(true);
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { full_name: fullName ?? "" },
-          },
+          email, password,
+          options: { emailRedirectTo: window.location.origin, data: { full_name: fullName ?? "" } },
         });
         if (error) throw error;
-        toast.success("Account created! Signing you in…");
+        toast.success("Account created!");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -72,28 +82,34 @@ function AuthPage() {
   const handleGoogle = async () => {
     setLoading(true);
     const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/app" });
-    if (result.error) {
-      toast.error(result.error.message);
-      setLoading(false);
-      return;
-    }
+    if (result.error) { toast.error(result.error.message); setLoading(false); return; }
     if (result.redirected) return;
     navigate({ to: "/app" });
   };
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-background to-secondary/40 p-4">
-      <Link to="/" className="mb-6">
-        <Logo />
-      </Link>
+      <Link to="/" className="mb-6"><Logo /></Link>
       <Card className="w-full max-w-md p-6">
-        <Tabs defaultValue="signin">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="signin">Sign in</TabsTrigger>
-            <TabsTrigger value="signup">Create account</TabsTrigger>
+        <Tabs defaultValue="staff">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="staff" className="gap-1.5"><Phone className="h-4 w-4" /> Staff</TabsTrigger>
+            <TabsTrigger value="admin" className="gap-1.5"><Mail className="h-4 w-4" /> Admin</TabsTrigger>
+            <TabsTrigger value="signup">New</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="signin" className="space-y-4 pt-4">
+          <TabsContent value="staff" className="space-y-4 pt-4">
+            <div className="text-center">
+              <h2 className="text-xl font-bold">Welcome 👋</h2>
+              <p className="text-sm text-muted-foreground">Sign in with your phone & password</p>
+            </div>
+            <StaffPhoneForm loading={loading} onSubmit={handleStaffPhoneSignIn} />
+            <p className="text-center text-xs text-muted-foreground">
+              Don't have a password? Ask your manager.
+            </p>
+          </TabsContent>
+
+          <TabsContent value="admin" className="space-y-4 pt-4">
             <SignInForm loading={loading} onSubmit={(e, p) => handleEmailAuth("signin", e, p)} />
             <GoogleButton onClick={handleGoogle} loading={loading} />
           </TabsContent>
@@ -108,6 +124,55 @@ function AuthPage() {
         </Tabs>
       </Card>
     </div>
+  );
+}
+
+function StaffPhoneForm({ loading, onSubmit }: { loading: boolean; onSubmit: (phone: string, password: string) => void }) {
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  return (
+    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); onSubmit(phone, password); }}>
+      <div className="space-y-2">
+        <Label htmlFor="ph" className="text-base">Phone number</Label>
+        <div className="relative">
+          <Phone className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            id="ph"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
+            placeholder="98765 43210"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
+            className="h-14 pl-11 text-lg tracking-wider"
+            required
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="pw" className="text-base">Password</Label>
+        <div className="relative">
+          <Input
+            id="pw"
+            type={show ? "text" : "password"}
+            autoComplete="current-password"
+            placeholder="Your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="h-14 pr-12 text-lg"
+            required
+            minLength={4}
+          />
+          <button type="button" onClick={() => setShow(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Show password">
+            {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          </button>
+        </div>
+      </div>
+      <Button type="submit" size="lg" className="w-full h-14 text-base" disabled={loading}>
+        {loading ? "Signing in…" : "Sign in"}
+      </Button>
+    </form>
   );
 }
 
@@ -138,14 +203,8 @@ function SignInForm({ loading, onSubmit }: { loading: boolean; onSubmit: (e: str
   const [password, setPassword] = useState("");
   return (
     <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); onSubmit(email, password); }}>
-      <div className="space-y-1">
-        <Label htmlFor="si-email">Email</Label>
-        <Input id="si-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="si-pass">Password</Label>
-        <Input id="si-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
-      </div>
+      <div className="space-y-1"><Label htmlFor="si-email">Email</Label><Input id="si-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></div>
+      <div className="space-y-1"><Label htmlFor="si-pass">Password</Label><Input id="si-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" /></div>
       <Button type="submit" className="w-full" disabled={loading}>{loading ? "Signing in…" : "Sign in"}</Button>
     </form>
   );
@@ -157,18 +216,9 @@ function SignUpForm({ loading, onSubmit }: { loading: boolean; onSubmit: (name: 
   const [password, setPassword] = useState("");
   return (
     <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); onSubmit(name, email, password); }}>
-      <div className="space-y-1">
-        <Label htmlFor="su-name">Full name</Label>
-        <Input id="su-name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="su-email">Email</Label>
-        <Input id="su-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="su-pass">Password</Label>
-        <Input id="su-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={6} />
-      </div>
+      <div className="space-y-1"><Label htmlFor="su-name">Full name</Label><Input id="su-name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} /></div>
+      <div className="space-y-1"><Label htmlFor="su-email">Email</Label><Input id="su-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></div>
+      <div className="space-y-1"><Label htmlFor="su-pass">Password</Label><Input id="su-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={6} /></div>
       <Button type="submit" className="w-full" disabled={loading}>{loading ? "Creating…" : "Create account"}</Button>
     </form>
   );
