@@ -70,14 +70,14 @@ function SuperAdminHome() {
         <Card className="p-6">
           <h3 className="font-semibold">Create a new client company</h3>
           <p className="mt-1 text-sm text-muted-foreground">Onboard a company, assign a plan and invite their admin.</p>
-          <Link to="/app/clients" className="mt-4 inline-block">
+          <Link to="/clients" className="mt-4 inline-block">
             <Button>Go to clients →</Button>
           </Link>
         </Card>
         <Card className="p-6">
           <h3 className="font-semibold">Plans & pricing</h3>
           <p className="mt-1 text-sm text-muted-foreground">Edit lifetime / monthly plans and employee tiers.</p>
-          <Link to="/app/plans" className="mt-4 inline-block">
+          <Link to="/plans" className="mt-4 inline-block">
             <Button variant="outline">Manage plans →</Button>
           </Link>
         </Card>
@@ -116,12 +116,12 @@ function ClientAdminHome({ tenantId }: { tenantId?: string }) {
         <Card className="p-6">
           <h3 className="font-semibold">Add your first office location</h3>
           <p className="mt-1 text-sm text-muted-foreground">Set GPS geofence so staff can check in.</p>
-          <Link to="/app/shifts" className="mt-4 inline-block"><Button>Set up →</Button></Link>
+          <Link to="/shifts" className="mt-4 inline-block"><Button>Set up →</Button></Link>
         </Card>
         <Card className="p-6">
           <h3 className="font-semibold">Invite staff</h3>
           <p className="mt-1 text-sm text-muted-foreground">Add team members to start tracking attendance.</p>
-          <Link to="/app/team" className="mt-4 inline-block"><Button variant="outline">Manage staff →</Button></Link>
+          <Link to="/team" className="mt-4 inline-block"><Button variant="outline">Manage staff →</Button></Link>
         </Card>
       </div>
     </div>
@@ -160,7 +160,7 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
         <div className="bg-gradient-to-br from-primary to-primary-glow p-6 text-primary-foreground">
           <Badge variant="secondary" className="mb-2">{isCheckedIn ? "Currently checked in" : "Not checked in"}</Badge>
           <p className="text-2xl font-bold">{todayRecords?.length ?? 0} check-in events today</p>
-          <Link to="/app/check-in" className="mt-4 inline-block">
+          <Link to="/check-in" className="mt-4 inline-block">
             <Button size="lg" variant="secondary" className="gap-2">
               <MapPin className="h-4 w-4" /> {isCheckedIn ? "Check out" : "Check in"}
             </Button>
