@@ -150,10 +150,22 @@ function TeamPage() {
                     />
                   </TableCell>
                   <TableCell><Badge variant={s.is_active ? "default" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge></TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!s.phone}
+                      onClick={() => openWhatsapp(s.phone, `Hi ${s.full_name ?? "there"}, this is a notification from ${tenantName}.`)}
+                      title={s.phone ? "Send WhatsApp message" : "No phone on file"}
+                      className="gap-1"
+                    >
+                      <MessageCircle className="h-4 w-4 text-success" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               {staff?.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
