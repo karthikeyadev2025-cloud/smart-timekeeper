@@ -172,6 +172,7 @@ function RowActions({ tenant, onChange }: { tenant: any; onChange: () => void })
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={doImpersonate}><LogIn className="mr-2 h-4 w-4" /> Impersonate admin</DropdownMenuItem>
           <DropdownMenuItem onClick={() => setDetailsOpen(true)}><Eye className="mr-2 h-4 w-4" /> View details</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setPermsOpen(true)}><ShieldCheck className="mr-2 h-4 w-4" /> Admins & permissions</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => doExtend(30)}><Clock className="mr-2 h-4 w-4" /> Extend +30 days</DropdownMenuItem>
           <DropdownMenuItem onClick={() => doExtend(365)}><Clock className="mr-2 h-4 w-4" /> Extend +1 year</DropdownMenuItem>
