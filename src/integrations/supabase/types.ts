@@ -16,9 +16,14 @@ export type Database = {
     Tables: {
       attendance_records: {
         Row: {
+          accuracy_meters: number | null
+          address_text: string | null
           attendance_date: string
           created_at: string
+          distance_from_office_m: number | null
+          enforcement_status: Database["public"]["Enums"]["enforcement_status"]
           id: string
+          is_mock_location: boolean
           kind: Database["public"]["Enums"]["attendance_kind"]
           latitude: number | null
           longitude: number | null
@@ -31,9 +36,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          accuracy_meters?: number | null
+          address_text?: string | null
           attendance_date?: string
           created_at?: string
+          distance_from_office_m?: number | null
+          enforcement_status?: Database["public"]["Enums"]["enforcement_status"]
           id?: string
+          is_mock_location?: boolean
           kind: Database["public"]["Enums"]["attendance_kind"]
           latitude?: number | null
           longitude?: number | null
@@ -46,9 +56,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          accuracy_meters?: number | null
+          address_text?: string | null
           attendance_date?: string
           created_at?: string
+          distance_from_office_m?: number | null
+          enforcement_status?: Database["public"]["Enums"]["enforcement_status"]
           id?: string
+          is_mock_location?: boolean
           kind?: Database["public"]["Enums"]["attendance_kind"]
           latitude?: number | null
           longitude?: number | null
@@ -78,6 +93,85 @@ export type Database = {
           {
             foreignKeyName: "attendance_records_tenant_id_fkey"
             columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classes: {
+        Row: {
+          created_at: string
+          grade: string | null
+          id: string
+          name: string
+          section: string | null
+          teacher_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          name: string
+          section?: string | null
+          teacher_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          name?: string
+          section?: string | null
+          teacher_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      impersonation_audit: {
+        Row: {
+          id: string
+          magic_link_preview: string | null
+          reason: string | null
+          started_at: string
+          super_admin_id: string
+          target_tenant_id: string | null
+          target_user_id: string
+        }
+        Insert: {
+          id?: string
+          magic_link_preview?: string | null
+          reason?: string | null
+          started_at?: string
+          super_admin_id: string
+          target_tenant_id?: string | null
+          target_user_id: string
+        }
+        Update: {
+          id?: string
+          magic_link_preview?: string | null
+          reason?: string | null
+          started_at?: string
+          super_admin_id?: string
+          target_tenant_id?: string | null
+          target_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "impersonation_audit_target_tenant_id_fkey"
+            columns: ["target_tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
@@ -505,8 +599,11 @@ export type Database = {
           designation: string | null
           email: string | null
           full_name: string | null
+          home_latitude: number | null
+          home_longitude: number | null
           id: string
           is_active: boolean
+          is_field_staff: boolean
           monthly_salary: number | null
           phone: string | null
           tenant_id: string | null
@@ -518,8 +615,11 @@ export type Database = {
           designation?: string | null
           email?: string | null
           full_name?: string | null
+          home_latitude?: number | null
+          home_longitude?: number | null
           id: string
           is_active?: boolean
+          is_field_staff?: boolean
           monthly_salary?: number | null
           phone?: string | null
           tenant_id?: string | null
@@ -531,8 +631,11 @@ export type Database = {
           designation?: string | null
           email?: string | null
           full_name?: string | null
+          home_latitude?: number | null
+          home_longitude?: number | null
           id?: string
           is_active?: boolean
+          is_field_staff?: boolean
           monthly_salary?: number | null
           phone?: string | null
           tenant_id?: string | null
@@ -555,6 +658,7 @@ export type Database = {
           end_time: string
           id: string
           is_active: boolean
+          location_mode: Database["public"]["Enums"]["location_mode"]
           name: string
           start_time: string
           tenant_id: string
@@ -566,6 +670,7 @@ export type Database = {
           end_time: string
           id?: string
           is_active?: boolean
+          location_mode?: Database["public"]["Enums"]["location_mode"]
           name: string
           start_time: string
           tenant_id: string
@@ -577,6 +682,7 @@ export type Database = {
           end_time?: string
           id?: string
           is_active?: boolean
+          location_mode?: Database["public"]["Enums"]["location_mode"]
           name?: string
           start_time?: string
           tenant_id?: string
@@ -630,6 +736,118 @@ export type Database = {
           },
           {
             foreignKeyName: "staff_shifts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_attendance: {
+        Row: {
+          attendance_date: string
+          class_id: string
+          created_at: string
+          id: string
+          marked_by: string | null
+          note: string | null
+          status: Database["public"]["Enums"]["student_attendance_status"]
+          student_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          attendance_date: string
+          class_id: string
+          created_at?: string
+          id?: string
+          marked_by?: string | null
+          note?: string | null
+          status?: Database["public"]["Enums"]["student_attendance_status"]
+          student_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          attendance_date?: string
+          class_id?: string
+          created_at?: string
+          id?: string
+          marked_by?: string | null
+          note?: string | null
+          status?: Database["public"]["Enums"]["student_attendance_status"]
+          student_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_attendance_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_attendance_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_attendance_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          class_id: string
+          created_at: string
+          full_name: string
+          id: string
+          is_active: boolean
+          parent_phone: string | null
+          roll_no: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          full_name: string
+          id?: string
+          is_active?: boolean
+          parent_phone?: string | null
+          roll_no?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          parent_phone?: string | null
+          roll_no?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -700,6 +918,7 @@ export type Database = {
           name: string
           primary_color: string | null
           slug: string
+          tenant_type: Database["public"]["Enums"]["tenant_type"]
           updated_at: string
         }
         Insert: {
@@ -713,6 +932,7 @@ export type Database = {
           name: string
           primary_color?: string | null
           slug: string
+          tenant_type?: Database["public"]["Enums"]["tenant_type"]
           updated_at?: string
         }
         Update: {
@@ -726,6 +946,7 @@ export type Database = {
           name?: string
           primary_color?: string | null
           slug?: string
+          tenant_type?: Database["public"]["Enums"]["tenant_type"]
           updated_at?: string
         }
         Relationships: []
@@ -784,15 +1005,19 @@ export type Database = {
     Enums: {
       app_role: "super_admin" | "client_admin" | "staff"
       attendance_kind: "check_in" | "check_out" | "break_out" | "break_in"
+      enforcement_status: "inside" | "outside_allowed" | "outside_blocked"
       leave_status: "pending" | "approved" | "rejected" | "cancelled"
+      location_mode: "office_only" | "field" | "hybrid"
       payment_status: "pending" | "success" | "failed" | "refunded"
       plan_billing: "monthly" | "yearly" | "lifetime"
+      student_attendance_status: "present" | "absent" | "late"
       subscription_status:
         | "trial"
         | "active"
         | "suspended"
         | "cancelled"
         | "expired"
+      tenant_type: "business" | "school"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -922,9 +1147,12 @@ export const Constants = {
     Enums: {
       app_role: ["super_admin", "client_admin", "staff"],
       attendance_kind: ["check_in", "check_out", "break_out", "break_in"],
+      enforcement_status: ["inside", "outside_allowed", "outside_blocked"],
       leave_status: ["pending", "approved", "rejected", "cancelled"],
+      location_mode: ["office_only", "field", "hybrid"],
       payment_status: ["pending", "success", "failed", "refunded"],
       plan_billing: ["monthly", "yearly", "lifetime"],
+      student_attendance_status: ["present", "absent", "late"],
       subscription_status: [
         "trial",
         "active",
@@ -932,6 +1160,7 @@ export const Constants = {
         "cancelled",
         "expired",
       ],
+      tenant_type: ["business", "school"],
     },
   },
 } as const
