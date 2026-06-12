@@ -1116,6 +1116,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          permissions: Json
           role: Database["public"]["Enums"]["app_role"]
           tenant_id: string | null
           user_id: string
@@ -1123,6 +1124,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          permissions?: Json
           role: Database["public"]["Enums"]["app_role"]
           tenant_id?: string | null
           user_id: string
@@ -1130,6 +1132,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          permissions?: Json
           role?: Database["public"]["Enums"]["app_role"]
           tenant_id?: string | null
           user_id?: string
@@ -1155,6 +1158,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      has_tenant_permission: {
+        Args: { _perm: string; _tenant_id: string; _user_id: string }
         Returns: boolean
       }
       is_branch_manager: {

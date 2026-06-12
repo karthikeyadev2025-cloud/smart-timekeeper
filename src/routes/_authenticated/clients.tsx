@@ -16,12 +16,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle } from "lucide-react";
+import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   impersonateUser, setTenantActive, extendSubscription, changeTenantPlan, getTenantDetails,
 } from "@/lib/admin.functions";
+import { TenantPermissionsDialog } from "@/components/TenantPermissionsDialog";
 
 export const Route = createFileRoute("/_authenticated/clients")({
   component: ClientsPage,
@@ -130,6 +131,7 @@ function RowActions({ tenant, onChange }: { tenant: any; onChange: () => void })
   const extend = useServerFn(extendSubscription);
   const [planOpen, setPlanOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [permsOpen, setPermsOpen] = useState(false);
   const [magicLink, setMagicLink] = useState<string | null>(null);
 
   const doImpersonate = async () => {
@@ -170,6 +172,7 @@ function RowActions({ tenant, onChange }: { tenant: any; onChange: () => void })
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={doImpersonate}><LogIn className="mr-2 h-4 w-4" /> Impersonate admin</DropdownMenuItem>
           <DropdownMenuItem onClick={() => setDetailsOpen(true)}><Eye className="mr-2 h-4 w-4" /> View details</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setPermsOpen(true)}><ShieldCheck className="mr-2 h-4 w-4" /> Admins & permissions</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => doExtend(30)}><Clock className="mr-2 h-4 w-4" /> Extend +30 days</DropdownMenuItem>
           <DropdownMenuItem onClick={() => doExtend(365)}><Clock className="mr-2 h-4 w-4" /> Extend +1 year</DropdownMenuItem>
@@ -183,6 +186,7 @@ function RowActions({ tenant, onChange }: { tenant: any; onChange: () => void })
 
       <ChangePlanDialog open={planOpen} onOpenChange={setPlanOpen} tenant={tenant} onDone={onChange} />
       <TenantDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} tenantId={tenant.id} />
+      <TenantPermissionsDialog open={permsOpen} onOpenChange={setPermsOpen} tenantId={tenant.id} tenantName={tenant.name} />
 
       <Dialog open={!!magicLink} onOpenChange={(o) => !o && setMagicLink(null)}>
         <DialogContent>
