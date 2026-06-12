@@ -265,3 +265,55 @@ function SignUpForm({ loading, onSubmit }: { loading: boolean; onSubmit: (name: 
     </form>
   );
 }
+
+function ForgotPinDialog() {
+  const [open, setOpen] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [sending, setSending] = useState(false);
+  const submit = async () => {
+    if (!isValidPhone(phone)) { toast.error("Enter a valid phone number"); return; }
+    setSending(true);
+    try {
+      await requestPinReset({ data: { phone } });
+      toast.success("Request sent. Your admin will set a new PIN soon.");
+      setOpen(false);
+      setPhone("");
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not send request");
+    } finally {
+      setSending(false);
+    }
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <button type="button" onClick={() => setOpen(true)} className="font-medium text-primary underline-offset-2 hover:underline">
+        Forgot PIN?
+      </button>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Forgot your PIN?</DialogTitle>
+          <DialogDescription>
+            Enter your phone number. Your manager will set a new 4-digit PIN and share it with you.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="fp-phone">Phone number</Label>
+          <Input
+            id="fp-phone"
+            type="tel"
+            inputMode="numeric"
+            placeholder="98765 43210"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
+            className="h-12 text-lg"
+            autoFocus
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={submit} disabled={sending}>{sending ? "Sending…" : "Request reset"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
