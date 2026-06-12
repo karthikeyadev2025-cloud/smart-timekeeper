@@ -5,6 +5,13 @@ import type { Database } from './types';
 const FALLBACK_SUPABASE_URL = 'https://syukujnvznnpmjuasgpt.supabase.co';
 const FALLBACK_SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5dWt1am52em5ucG1qdWFzZ3B0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNDQ3ODMsImV4cCI6MjA5NjgyMDc4M30.JlrfTEFRFCAdN6TuKmhJDYQzOC2lAfQWcO7pJmY9xTc';
 
+function normalizeEnvValue(value: string | undefined) {
+  const normalized = value?.trim().replace(/^['"]|['"]$/g, '');
+  if (!normalized) return undefined;
+  if (normalized === 'undefined' || normalized === 'null') return undefined;
+  return normalized;
+}
+
 function isValidHttpUrl(value: string) {
   try {
     const url = new URL(value);
@@ -15,10 +22,11 @@ function isValidHttpUrl(value: string) {
 }
 
 function createSupabaseClient() {
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() || FALLBACK_SUPABASE_URL;
+  const configuredUrl = normalizeEnvValue(import.meta.env.VITE_SUPABASE_URL);
+  const SUPABASE_URL = configuredUrl && isValidHttpUrl(configuredUrl) ? configuredUrl : FALLBACK_SUPABASE_URL;
   const SUPABASE_PUBLISHABLE_KEY =
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ||
-    import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ||
+    normalizeEnvValue(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) ||
+    normalizeEnvValue(import.meta.env.VITE_SUPABASE_ANON_KEY) ||
     FALLBACK_SUPABASE_PUBLISHABLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
