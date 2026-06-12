@@ -1,10 +1,25 @@
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
-import { Float, Environment } from "@react-three/drei";
-import { Suspense, useEffect, useRef, useState, useMemo } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Float } from "@react-three/drei";
+import { useEffect, useRef, useState, useMemo } from "react";
 import * as THREE from "three";
 import logoAsset from "@/assets/punchly-logo.png.asset.json";
 
-function LogoDisc({ position, scale, rotationSpeed, texture }: {
+function resolveAssetUrl(url: string): string {
+  if (typeof window === "undefined") return url;
+  if (/^https?:/i.test(url)) return url;
+  const host = window.location.hostname;
+  if (host.endsWith("lovableproject.com") && url.startsWith("/__l5e/")) {
+    return `https://${host.replace(".lovableproject.com", ".lovable.app")}${url}`;
+  }
+  return url;
+}
+
+function LogoDisc({
+  position,
+  scale,
+  rotationSpeed,
+  texture,
+}: {
   position: [number, number, number];
   scale: number;
   rotationSpeed: number;
@@ -25,52 +40,43 @@ function LogoDisc({ position, scale, rotationSpeed, texture }: {
           map={texture}
           transparent
           side={THREE.DoubleSide}
-          metalness={0.6}
-          roughness={0.25}
+          metalness={0.5}
+          roughness={0.3}
           emissive={new THREE.Color("#3b5bdb")}
-          emissiveIntensity={0.15}
+          emissiveIntensity={0.18}
         />
       </mesh>
     </Float>
   );
 }
 
-function resolveAssetUrl(url: string): string {
-  if (typeof window === "undefined") return url;
-  if (/^https?:/i.test(url)) return url;
-  const host = window.location.hostname;
-  // Sandbox dev host doesn't proxy /__l5e/ — point at the lovable.app preview.
-  if (host.endsWith("lovableproject.com") && url.startsWith("/__l5e/")) {
-    return `https://${host.replace(".lovableproject.com", ".lovable.app")}${url}`;
-  }
-  return url;
-}
-
-function Scene({ pointer }: { pointer: React.MutableRefObject<{ x: number; y: number }> }) {
-  const texture = useLoader(THREE.TextureLoader, resolveAssetUrl(logoAsset.url));
+function Scene({
+  texture,
+  pointer,
+}: {
+  texture: THREE.Texture;
+  pointer: React.MutableRefObject<{ x: number; y: number }>;
+}) {
   const groupRef = useRef<THREE.Group>(null);
-
-  useEffect(() => {
-    texture.anisotropy = 8;
-    texture.needsUpdate = true;
-  }, [texture]);
-
   useFrame(() => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += (pointer.current.x * 0.3 - groupRef.current.rotation.y) * 0.04;
-      groupRef.current.rotation.x += (-pointer.current.y * 0.2 - groupRef.current.rotation.x) * 0.04;
+      groupRef.current.rotation.y +=
+        (pointer.current.x * 0.3 - groupRef.current.rotation.y) * 0.04;
+      groupRef.current.rotation.x +=
+        (-pointer.current.y * 0.2 - groupRef.current.rotation.x) * 0.04;
     }
   });
 
   const discs = useMemo(
-    () => [
-      { position: [0, 0, 0] as [number, number, number], scale: 2.2, speed: 0.25 },
-      { position: [-3.2, 1.4, -2] as [number, number, number], scale: 0.9, speed: 0.5 },
-      { position: [3.4, -1.2, -1.5] as [number, number, number], scale: 1.1, speed: -0.4 },
-      { position: [-2.6, -2.2, -3] as [number, number, number], scale: 0.6, speed: 0.7 },
-      { position: [2.8, 2.4, -2.5] as [number, number, number], scale: 0.7, speed: -0.6 },
-      { position: [0, 3.2, -4] as [number, number, number], scale: 0.5, speed: 0.9 },
-    ],
+    () =>
+      [
+        { position: [0, 0, 0], scale: 2.2, speed: 0.25 },
+        { position: [-3.2, 1.4, -2], scale: 0.9, speed: 0.5 },
+        { position: [3.4, -1.2, -1.5], scale: 1.1, speed: -0.4 },
+        { position: [-2.6, -2.2, -3], scale: 0.6, speed: 0.7 },
+        { position: [2.8, 2.4, -2.5], scale: 0.7, speed: -0.6 },
+        { position: [0, 3.2, -4], scale: 0.5, speed: 0.9 },
+      ] as { position: [number, number, number]; scale: number; speed: number }[],
     [],
   );
 
@@ -85,6 +91,7 @@ function Scene({ pointer }: { pointer: React.MutableRefObject<{ x: number; y: nu
 
 export function LogoScene3D() {
   const [mounted, setMounted] = useState(false);
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
   const pointer = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -94,10 +101,26 @@ export function LogoScene3D() {
       pointer.current.y = (e.clientY / window.innerHeight) * 2 - 1;
     };
     window.addEventListener("pointermove", onMove);
+
+    // Load texture manually so a failure can't break the route.
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const tex = new THREE.Texture(img);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      tex.needsUpdate = true;
+      setTexture(tex);
+    };
+    img.onerror = (e) => {
+      console.warn("[LogoScene3D] logo texture failed to load", e);
+    };
+    img.src = resolveAssetUrl(logoAsset.url);
+
     return () => window.removeEventListener("pointermove", onMove);
   }, []);
 
-  if (!mounted) return null;
+  if (!mounted || !texture) return null;
 
   return (
     <Canvas
@@ -106,14 +129,14 @@ export function LogoScene3D() {
       camera={{ position: [0, 0, 6], fov: 50 }}
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true }}
+      onCreated={({ gl }) => {
+        gl.setClearColor(0x000000, 0);
+      }}
     >
-      <ambientLight intensity={0.6} />
+      <ambientLight intensity={0.7} />
       <directionalLight position={[5, 5, 5]} intensity={1.2} />
       <directionalLight position={[-5, -3, 2]} intensity={0.5} color="#7c9cff" />
-      <Suspense fallback={null}>
-        <Scene pointer={pointer} />
-        <Environment preset="city" />
-      </Suspense>
+      <Scene texture={texture} pointer={pointer} />
     </Canvas>
   );
 }
