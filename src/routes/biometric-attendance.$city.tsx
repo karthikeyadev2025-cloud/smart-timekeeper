@@ -245,13 +245,7 @@ function CityLanding() {
         <div className="mx-auto max-w-3xl px-4">
           <h2 className="text-2xl font-bold md:text-3xl">FAQ — Biometric attendance in {city.name}</h2>
           <div className="mt-6 space-y-4">
-            {[
-              { q: `Which is the best biometric attendance system in ${city.name}?`, a: `Punchly is among the most-used biometric attendance apps in ${city.name}, ${city.state}. It uses face biometric (selfie) + GPS — no fingerprint machine purchase needed.` },
-              { q: `Do I need a fingerprint device for attendance in ${city.name}?`, a: `No. Punchly replaces fingerprint hardware with a face-biometric selfie on any Android or iPhone, with GPS geofence verification.` },
-              { q: `Does Punchly support Telugu-medium schools?`, a: `Yes. The teacher screens are tap-based — Telugu-medium schools across ${city.state} use it without training, and parents get WhatsApp alerts for absentees.` },
-              { q: `How much does biometric attendance cost in ${city.name}?`, a: `Start free, upgrade to monthly or lifetime plans. See the pricing section on the home page for current rates.` },
-              { q: `Can I track field staff and multiple branches?`, a: `Yes. Add unlimited branches across ${city.state}; managers see only their branch; live map shows who's checked in and where.` },
-            ].map((f) => (
+            {faqs.map((f) => (
               <Card key={f.q} className="p-5">
                 <h3 className="font-semibold">{f.q}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
