@@ -332,13 +332,24 @@ function CheckInFlow() {
               </div>
             )}
 
+            {windowBlocked && (
+              <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm space-y-1">
+                <p className="flex items-center gap-1.5 font-semibold text-warning-foreground">
+                  <Clock className="h-4 w-4" /> Outside allowed {nextKind.replace("_", "-")} window
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  This {matchedLocation ? "branch" : "branch"} only allows {nextKind.replace("_", "-")} between <strong>{windowCheck.label}</strong>.
+                </p>
+              </div>
+            )}
+
             {gpsError && !isFieldStaff && <p className="text-sm text-destructive">{gpsError}</p>}
 
             <div className="flex gap-2">
               {coords && <Button variant="outline" onClick={getLocation} className="gap-1" disabled={verifying}><RefreshCw className="h-4 w-4" /> Retry</Button>}
               <Button
                 className="flex-1"
-                disabled={!coords || (!matchedLocation && !isFieldStaff) || antiCheat?.suspicious === true}
+                disabled={!coords || (!matchedLocation && !isFieldStaff) || antiCheat?.suspicious === true || windowBlocked}
                 onClick={() => { setStep(2); startCamera(); }}
               >
                 Continue →
