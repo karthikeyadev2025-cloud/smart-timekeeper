@@ -1,12 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Camera, CheckCircle2, Clock, Users, Shield, Sparkles, Building2 } from "lucide-react";
+import { motion, useScroll, useTransform, type Variants } from "framer-motion";
+import { useRef } from "react";
+import { MapPin, Camera, CheckCircle2, Clock, Users, Shield, Sparkles, Building2, ArrowRight } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { BRAND } from "@/lib/brand";
+
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 28 },
+  show: (i: number = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.7, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] } }),
+};
+const stagger: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
+};
 
 export const Route = createFileRoute("/")({
   head: () => ({
