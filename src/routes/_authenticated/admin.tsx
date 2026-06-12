@@ -269,10 +269,10 @@ function IntegrationsEditor() {
   const setFb = (patch: Partial<PublishableKeys["firebase"]>) => set({ firebase: { ...fb, ...patch } });
 
   const secrets = [
-    { name: "RAZORPAY_KEY_SECRET", label: "Razorpay Key Secret", help: "From Razorpay Dashboard → Settings → API Keys. Used for verifying payment signatures on the server." },
+    { name: "RAZORPAY_KEY_SECRET", label: "Razorpay Key Secret", help: "From Razorpay Dashboard → Settings → API Keys. Used to verify payment signatures on the server." },
     { name: "RAZORPAY_WEBHOOK_SECRET", label: "Razorpay Webhook Secret", help: "Set when you create a webhook in Razorpay. Used to verify webhook signatures." },
-    { name: "FIREBASE_SERVICE_ACCOUNT_JSON", label: "Firebase Admin SDK service account (JSON)", help: "From Firebase Console → Project settings → Service accounts → Generate new private key. Paste the full JSON contents." },
-    { name: "GOOGLE_OAUTH_CLIENT_SECRET", label: "Google OAuth Client Secret", help: "Only needed if you bring your own Google OAuth credentials (otherwise Lovable's managed Google sign-in works out of the box)." },
+    { name: "FIREBASE_SERVICE_ACCOUNT_JSON", label: "Firebase Admin SDK service account (JSON)", help: "Firebase Console → Project settings → Service accounts → Generate new private key. Paste the full JSON contents as the value." },
+    { name: "GOOGLE_OAUTH_CLIENT_SECRET", label: "Google OAuth Client Secret", help: "From Google Cloud Console → APIs & Services → Credentials → your OAuth 2.0 Client ID." },
   ];
 
   return (
@@ -285,7 +285,7 @@ function IntegrationsEditor() {
         <Field label="Razorpay Key ID (starts with rzp_)">
           <Input value={current.razorpayKeyId} onChange={(e) => set({ razorpayKeyId: e.target.value })} placeholder="rzp_live_xxx or rzp_test_xxx" />
         </Field>
-        <Field label="Google OAuth Client ID (only for own credentials)">
+        <Field label="Google OAuth Client ID">
           <Input value={current.googleOauthClientId} onChange={(e) => set({ googleOauthClientId: e.target.value })} placeholder="123-xyz.apps.googleusercontent.com" />
         </Field>
 
@@ -308,22 +308,22 @@ function IntegrationsEditor() {
         <div className="flex items-start gap-3">
           <Lock className="mt-0.5 h-5 w-5 text-primary" />
           <div>
-            <h2 className="text-xl font-semibold">Server secrets</h2>
+            <h2 className="text-xl font-semibold">Server environment variables</h2>
             <p className="text-sm text-muted-foreground">
-              These never go into the browser or database. They live in encrypted Lovable Cloud secret
-              storage. To add or update a secret, ask in chat: <em>"add secret RAZORPAY_KEY_SECRET"</em>
-              {" "}— Lovable will pop a secure form so you can paste the value.
+              These secrets must never live in the browser or database. Add them as environment
+              variables in your hosting provider (Vercel → Project → Settings → Environment
+              Variables, or equivalent). Redeploy after changes so the server picks up the new values.
             </p>
           </div>
         </div>
 
         <Alert>
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Why not just type them here?</AlertTitle>
+          <AlertTitle>Why not store them in the database?</AlertTitle>
           <AlertDescription>
-            Putting payment/admin secrets in the database means anyone with read access (or any SQL
-            injection) can drain your live account. Lovable Secrets keeps them encrypted and only
-            available to server code.
+            Payment and admin secrets in the database can be drained by anyone with read access
+            or a SQL injection. Environment variables stay on the server and are never shipped to
+            the browser bundle.
           </AlertDescription>
         </Alert>
 
@@ -334,7 +334,7 @@ function IntegrationsEditor() {
                 <div className="flex items-center gap-2">
                   <code className="rounded bg-muted px-2 py-0.5 font-mono text-xs">{s.name}</code>
                   <Badge variant="outline" className="gap-1 text-[10px]">
-                    <CheckCircle2 className="h-3 w-3" /> Managed by Lovable
+                    <CheckCircle2 className="h-3 w-3" /> Server env var
                   </Badge>
                 </div>
                 <p className="mt-1 text-sm font-medium">{s.label}</p>
@@ -345,8 +345,8 @@ function IntegrationsEditor() {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          To list / rotate / delete a secret, just say so in chat. Example:{" "}
-          <em>"update RAZORPAY_KEY_SECRET"</em> or <em>"delete GOOGLE_OAUTH_CLIENT_SECRET"</em>.
+          After adding or changing any variable above, trigger a redeploy so the new values are
+          loaded by the server runtime.
         </p>
       </Card>
     </div>
