@@ -9,7 +9,9 @@ function resolveAssetUrl(url: string): string {
   if (/^https?:/i.test(url)) return url;
   const host = window.location.hostname;
   if (host.endsWith("lovableproject.com") && url.startsWith("/__l5e/")) {
-    return `https://${host.replace(".lovableproject.com", ".lovable.app")}${url}`;
+    const sub = host.replace(".lovableproject.com", "");
+    const lovableHost = sub.startsWith("id-preview--") ? sub : `id-preview--${sub}`;
+    return `https://${lovableHost}.lovable.app${url}`;
   }
   return url;
 }
