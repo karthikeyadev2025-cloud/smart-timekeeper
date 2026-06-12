@@ -220,14 +220,18 @@ function CheckInFlow() {
               </p>
             )}
 
-            {!coords && <Button onClick={getLocation} className="w-full" disabled={!locations?.length}>Use my location</Button>}
+            {!coords && <Button onClick={getLocation} className="w-full" disabled={!locations?.length && !isFieldStaff}>Use my location</Button>}
 
             {coords && (
               <div className="space-y-2 rounded-lg bg-muted/50 p-3 text-sm">
-                <p>Lat: {coords.latitude.toFixed(5)}, Lng: {coords.longitude.toFixed(5)}</p>
+                <p>Lat: {coords.latitude.toFixed(5)}, Lng: {coords.longitude.toFixed(5)} {coords.accuracy ? `(±${Math.round(coords.accuracy)}m)` : ""}</p>
                 {matchedLocation ? (
                   <p className="flex items-center gap-1 font-medium text-success">
                     <CheckCircle2 className="h-4 w-4" /> Inside: {matchedLocation.name}
+                  </p>
+                ) : isFieldStaff ? (
+                  <p className="flex items-center gap-1 font-medium text-primary">
+                    <MapPin className="h-4 w-4" /> Field punch — location recorded
                   </p>
                 ) : (
                   <p className="flex items-center gap-1 font-medium text-destructive">
@@ -237,13 +241,13 @@ function CheckInFlow() {
               </div>
             )}
 
-            {gpsError && <p className="text-sm text-destructive">{gpsError}</p>}
+            {gpsError && !isFieldStaff && <p className="text-sm text-destructive">{gpsError}</p>}
 
             <div className="flex gap-2">
               {coords && <Button variant="outline" onClick={getLocation} className="gap-1"><RefreshCw className="h-4 w-4" /> Retry</Button>}
               <Button
                 className="flex-1"
-                disabled={!matchedLocation}
+                disabled={!coords || (!matchedLocation && !isFieldStaff)}
                 onClick={() => { setStep(2); startCamera(); }}
               >
                 Continue →
