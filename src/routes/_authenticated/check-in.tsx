@@ -15,7 +15,14 @@ export const Route = createFileRoute("/_authenticated/check-in")({
   component: CheckInFlow,
 });
 
-type Location = { id: string; name: string; latitude: number; longitude: number; radius_meters: number };
+type Location = { id: string; name: string; latitude: number; longitude: number; radius_meters: number; branch_id: string | null };
+type BranchWindow = {
+  id: string;
+  checkin_window_start: string | null;
+  checkin_window_end: string | null;
+  checkout_window_start: string | null;
+  checkout_window_end: string | null;
+};
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371000;
