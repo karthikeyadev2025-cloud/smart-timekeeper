@@ -225,15 +225,22 @@ function Landing() {
         <div className="mx-auto max-w-6xl px-4">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.6 }} className="text-center">
             <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Everything you need</h2>
+            <p className="mt-2 text-muted-foreground">One app for offices, field teams, multi-branch businesses, and schools.</p>
           </motion.div>
           <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[
+              { icon: Building2, title: "Multi-branch HQ", desc: "Unlimited branches/campuses, each with its own staff, shifts, and reports." },
+              { icon: UserCog, title: "Branch managers", desc: "Delegate per-location management — managers see only their branch." },
+              { icon: MapIcon, title: "Live staff map", desc: "See who's checked in and where, in real time, on one map." },
+              { icon: Briefcase, title: "Field staff mode", desc: "Reps & delivery staff punch from anywhere — distance & accuracy logged." },
+              { icon: MapPin, title: "Per-branch geofence", desc: "Set the office radius per location. Outside attempts are flagged automatically." },
+              { icon: Camera, title: "Selfie + GPS proof", desc: "Tamper-proof check-ins, encrypted & stored privately." },
+              { icon: ShieldCheck, title: "Anti-cheat", desc: "Mock-location and fake-GPS detection built in." },
               { icon: Clock, title: "Multi-shift scheduling", desc: "Morning, night, rotational — assign shifts per staff." },
-              { icon: Users, title: "Staff & roles", desc: "Add unlimited staff under your plan with role permissions." },
-              { icon: MapPin, title: "Multi-branch geofence", desc: "Define office radius for each location." },
-              { icon: Camera, title: "Selfie + GPS proof", desc: "Tamper-proof check-ins, stored privately." },
-              { icon: Shield, title: "Auto payroll", desc: "Salary calculated from attendance, OT, leaves — payslip ready." },
-              { icon: Building2, title: "White-label", desc: "Brand the app with your logo and colors." },
+              { icon: Wallet, title: "Auto payroll", desc: "Salary calculated from attendance, OT, leaves — payslip PDF ready." },
+              { icon: GraduationCap, title: "School mode", desc: "Teachers mark whole classes Present/Absent in one tap. No GPS needed." },
+              { icon: BellRing, title: "Parent / WhatsApp alerts", desc: "Notify parents on absence, or staff on shift changes." },
+              { icon: Smartphone, title: "PWA + white-label", desc: "Installs like an app. Brand it with your logo and colors." },
             ].map((f) => (
               <motion.div key={f.title} variants={fadeUp} whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 300 }}>
                 <Card className="p-6 h-full border-border/60 hover:border-primary/40 hover:shadow-md transition-all">
@@ -246,6 +253,10 @@ function Landing() {
           </motion.div>
         </div>
       </section>
+
+      {/* Modes — interactive Business vs School tabs */}
+      <ModesSection />
+
 
       {/* Pricing */}
       <section id="pricing" className="border-t border-border/60 bg-card/40 py-20">
