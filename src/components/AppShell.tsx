@@ -17,6 +17,7 @@ import {
   GraduationCap,
   ClipboardCheck,
   TrendingUp,
+  ShieldAlert,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/clients", label: "Client companies", icon: Building2 },
       { to: "/plans", label: "Plans", icon: Package },
       { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
+      { to: "/audit", label: "Audit log", icon: ShieldAlert },
     ];
   }
   if (role === "client_admin") {
