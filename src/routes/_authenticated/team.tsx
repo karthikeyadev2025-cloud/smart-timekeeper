@@ -75,6 +75,7 @@ function TeamPage() {
                 <TableHead>Phone</TableHead>
                 <TableHead>Designation</TableHead>
                 <TableHead>Salary</TableHead>
+                <TableHead>Field staff</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -85,11 +86,23 @@ function TeamPage() {
                   <TableCell className="font-mono">{s.phone ?? "—"}</TableCell>
                   <TableCell>{s.designation ?? "—"}</TableCell>
                   <TableCell>{s.monthly_salary ? `₹${Number(s.monthly_salary).toLocaleString("en-IN")}` : "—"}</TableCell>
+                  <TableCell>
+                    <input
+                      type="checkbox"
+                      checked={!!(s as any).is_field_staff}
+                      onChange={async (e) => {
+                        const { error } = await supabase.from("profiles").update({ is_field_staff: e.target.checked }).eq("id", s.id);
+                        if (error) toast.error(error.message);
+                        else { toast.success("Updated"); qc.invalidateQueries({ queryKey: ["staff"] }); }
+                      }}
+                      className="h-4 w-4 cursor-pointer"
+                    />
+                  </TableCell>
                   <TableCell><Badge variant={s.is_active ? "default" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge></TableCell>
                 </TableRow>
               ))}
               {staff?.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

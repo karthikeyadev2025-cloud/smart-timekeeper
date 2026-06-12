@@ -78,6 +78,7 @@ function TenantForm({ onDone }: { onDone: () => void }) {
   const [adminName, setAdminName] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [planId, setPlanId] = useState("");
+  const [tenantType, setTenantType] = useState<"business" | "school">("business");
   const [loading, setLoading] = useState(false);
 
   const { data: plans } = useQuery({
@@ -95,7 +96,8 @@ function TenantForm({ onDone }: { onDone: () => void }) {
       const { data: tenant, error: tErr } = await supabase.from("tenants").insert({
         name, slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
         employee_limit: plan.employee_limit, contact_email: adminEmail,
-      }).select().single();
+        tenant_type: tenantType,
+      } as any).select().single();
       if (tErr) throw tErr;
 
       const expiresAt = plan.billing === "lifetime" ? null
@@ -128,6 +130,16 @@ function TenantForm({ onDone }: { onDone: () => void }) {
       <DialogHeader><DialogTitle>New client company</DialogTitle></DialogHeader>
       <div className="space-y-1"><Label>Company name</Label><Input value={name} onChange={e => setName(e.target.value)} required /></div>
       <div className="space-y-1"><Label>URL slug</Label><Input value={slug} onChange={e => setSlug(e.target.value)} required placeholder="acme-corp" /></div>
+      <div className="space-y-1">
+        <Label>Type</Label>
+        <Select value={tenantType} onValueChange={(v) => setTenantType(v as any)}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="business">Business (staff + payroll)</SelectItem>
+            <SelectItem value="school">School (students, no payroll)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <div className="space-y-1">
         <Label>Plan</Label>
         <Select value={planId} onValueChange={setPlanId}>
