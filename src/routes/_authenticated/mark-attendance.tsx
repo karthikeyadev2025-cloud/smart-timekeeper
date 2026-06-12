@@ -76,6 +76,19 @@ function MarkAttendancePage() {
   };
 
   const presentCount = Object.values(marks).filter((s) => s === "present").length;
+  const absentees = (students ?? []).filter((s) => marks[s.id] === "absent" && (s as any).parent_phone);
+  const className = (classes ?? []).find((c) => c.id === classId)?.name ?? "your child's class";
+  const dateLabel = new Date(date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+  const notifyAllAbsent = async () => {
+    if (absentees.length === 0) { toast.error("No absentees with a parent phone number"); return; }
+    const recipients = absentees.map((s) => ({
+      phone: (s as any).parent_phone as string,
+      message: `Hello, this is ${user?.tenant?.name ?? "school"}. ${s.full_name} was marked ABSENT in ${className} on ${dateLabel}. Please reply if this is unexpected.`,
+    }));
+    const opened = await broadcastWhatsapp(recipients);
+    toast.success(`Opened ${opened} WhatsApp chats`);
+  };
 
   if (!tenantId) return <AppShell><Card className="p-6">Need a company.</Card></AppShell>;
 
