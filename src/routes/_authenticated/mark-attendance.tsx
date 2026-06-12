@@ -142,11 +142,12 @@ function MarkAttendancePage() {
             <div className="grid gap-2">
               {(students ?? []).map((s) => {
                 const status = marks[s.id];
+                const parentPhone = (s as any).parent_phone as string | null;
                 return (
                   <div key={s.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                     <div>
                       <p className="font-medium">{s.full_name}</p>
-                      <p className="text-xs text-muted-foreground">Roll {s.roll_no ?? "—"}</p>
+                      <p className="text-xs text-muted-foreground">Roll {s.roll_no ?? "—"}{parentPhone ? ` · 📱 ${parentPhone}` : ""}</p>
                     </div>
                     <div className="flex gap-1">
                       <Button size="sm" variant={status === "present" ? "default" : "outline"} onClick={() => setMarks((m) => ({ ...m, [s.id]: "present" }))} className="gap-1">
@@ -158,6 +159,17 @@ function MarkAttendancePage() {
                       <Button size="sm" variant={status === "absent" ? "destructive" : "outline"} onClick={() => setMarks((m) => ({ ...m, [s.id]: "absent" }))} className="gap-1">
                         <X className="h-4 w-4" /> A
                       </Button>
+                      {status === "absent" && parentPhone && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openWhatsapp(parentPhone, `Hello, this is ${user?.tenant?.name ?? "school"}. ${s.full_name} was marked ABSENT in ${className} on ${dateLabel}.`)}
+                          className="gap-1 text-success"
+                          title="Message this parent on WhatsApp"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
