@@ -126,6 +126,11 @@ function AuthPage() {
           </TabsContent>
         </Tabs>
       </Card>
+      <div className="mt-4 text-center">
+        <Link to="/" className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline">
+          ← Back to home
+        </Link>
+      </div>
     </div>
   );
 }
