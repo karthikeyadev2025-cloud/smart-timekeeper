@@ -35,7 +35,6 @@ function LogoDisc({ position, scale, rotationSpeed, texture }: {
   );
 }
 
-function Scene({ pointer }: { pointer: React.MutableRefObject<{ x: number; y: number }> }) {
 function resolveAssetUrl(url: string): string {
   if (typeof window === "undefined") return url;
   if (/^https?:/i.test(url)) return url;
