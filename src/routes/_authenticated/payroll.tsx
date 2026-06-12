@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Wallet, Sparkles } from "lucide-react";
+import { Sparkles, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
+import { downloadPayslipPdf } from "@/lib/payslip-pdf";
 
 export const Route = createFileRoute("/_authenticated/payroll")({
   component: Payroll,
@@ -128,6 +129,7 @@ function Payroll() {
                 <TableHead>Base</TableHead>
                 <TableHead>Deductions</TableHead>
                 <TableHead className="text-right">Net pay</TableHead>
+                <TableHead className="text-right">Payslip</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -140,10 +142,15 @@ function Payroll() {
                   <TableCell>₹{Number(p.base_salary).toLocaleString("en-IN")}</TableCell>
                   <TableCell className="text-destructive">-₹{Number(p.deductions).toFixed(0)}</TableCell>
                   <TableCell className="text-right font-bold">₹{Number(p.net_pay).toLocaleString("en-IN")}</TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadPayslipPdf(p, { employeeName: p.profiles?.full_name ?? "Employee", companyName: user?.tenant?.name })}>
+                      <Download className="h-4 w-4" /> PDF
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               {payslips?.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No payslips for this period. Click "Generate" to create them.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No payslips for this period. Click "Generate" to create them.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
