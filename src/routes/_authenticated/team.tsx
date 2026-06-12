@@ -83,8 +83,9 @@ function TeamPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Designation</TableHead>
+                <TableHead>Branch</TableHead>
                 <TableHead>Salary</TableHead>
-                <TableHead>Field staff</TableHead>
+                <TableHead>Field</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -94,6 +95,23 @@ function TeamPage() {
                   <TableCell className="font-medium">{s.full_name ?? "—"}</TableCell>
                   <TableCell className="font-mono">{s.phone ?? "—"}</TableCell>
                   <TableCell>{s.designation ?? "—"}</TableCell>
+                  <TableCell>
+                    <Select
+                      value={(s as any).branch_id ?? "none"}
+                      onValueChange={async (val) => {
+                        const branch_id = val === "none" ? null : val;
+                        const { error } = await supabase.from("profiles").update({ branch_id }).eq("id", s.id);
+                        if (error) toast.error(error.message);
+                        else { toast.success("Moved"); qc.invalidateQueries({ queryKey: ["staff"] }); }
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[140px]"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Unassigned —</SelectItem>
+                        {(branches ?? []).map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
                   <TableCell>{s.monthly_salary ? `₹${Number(s.monthly_salary).toLocaleString("en-IN")}` : "—"}</TableCell>
                   <TableCell>
                     <input
@@ -111,7 +129,7 @@ function TeamPage() {
                 </TableRow>
               ))}
               {staff?.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
