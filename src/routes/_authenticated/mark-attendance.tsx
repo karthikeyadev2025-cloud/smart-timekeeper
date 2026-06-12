@@ -123,9 +123,21 @@ function MarkAttendancePage() {
 
         {classId && (
           <Card className="p-4">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <Badge variant="secondary">{presentCount}/{students?.length ?? 0} present</Badge>
-              <Button onClick={submit} disabled={saving || !students?.length}>{saving ? "Saving…" : "Save attendance"}</Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={notifyAllAbsent}
+                  variant="outline"
+                  size="sm"
+                  disabled={absentees.length === 0}
+                  className="gap-1"
+                  title={absentees.length === 0 ? "No absent students with a parent phone" : `Notify ${absentees.length} parents on WhatsApp`}
+                >
+                  <MessageCircle className="h-4 w-4" /> Notify parents ({absentees.length})
+                </Button>
+                <Button onClick={submit} disabled={saving || !students?.length}>{saving ? "Saving…" : "Save attendance"}</Button>
+              </div>
             </div>
             <div className="grid gap-2">
               {(students ?? []).map((s) => {
