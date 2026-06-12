@@ -286,16 +286,17 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
   );
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: typeof Building2; label: string; value: string | number }) {
+function StatCard({ icon: Icon, label, value, sub }: { icon: typeof Building2; label: string; value: string | number; sub?: string }) {
   return (
     <Card className="p-5">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="h-5 w-5" />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-xs text-muted-foreground">{label}</p>
           <p className="text-2xl font-bold">{value}</p>
+          {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
         </div>
       </div>
     </Card>
