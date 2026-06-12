@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/Logo";
 import { CITIES, getCity, type CityData } from "@/lib/cities";
+import { useSiteContent, cityKey, cityFallback, type CityOverride } from "@/lib/site-content";
 
 export const Route = createFileRoute("/biometric-attendance/$city")({
   loader: ({ params }) => {
@@ -133,7 +134,24 @@ export const Route = createFileRoute("/biometric-attendance/$city")({
 });
 
 function CityLanding() {
-  const { city } = Route.useLoaderData();
+  const { city: base } = Route.useLoaderData();
+  const { data: override } = useSiteContent<CityOverride>(cityKey(base.slug) as any, cityFallback(base.slug));
+  const city = {
+    ...base,
+    name: override?.name || base.name,
+    intro: override?.intro || base.intro,
+    areas: override?.areas?.length ? override.areas : base.areas,
+    industries: override?.industries?.length ? override.industries : base.industries,
+  };
+  const h1 = override?.h1 || `Biometric Attendance System in ${city.name}`;
+  const defaultFaqs = [
+    { q: `Which is the best biometric attendance system in ${city.name}?`, a: `Punchly is among the most-used biometric attendance apps in ${city.name}, ${city.state}. It uses face biometric (selfie) + GPS — no fingerprint machine purchase needed.` },
+    { q: `Do I need a fingerprint device for attendance in ${city.name}?`, a: `No. Punchly replaces fingerprint hardware with a face-biometric selfie on any Android or iPhone, with GPS geofence verification.` },
+    { q: `Does Punchly support Telugu-medium schools?`, a: `Yes. The teacher screens are tap-based — Telugu-medium schools across ${city.state} use it without training, and parents get WhatsApp alerts for absentees.` },
+    { q: `How much does biometric attendance cost in ${city.name}?`, a: `Start free, upgrade to monthly or lifetime plans. See the pricing section on the home page for current rates.` },
+    { q: `Can I track field staff and multiple branches?`, a: `Yes. Add unlimited branches across ${city.state}; managers see only their branch; live map shows who's checked in and where.` },
+  ];
+  const faqs = override?.faqs?.length ? override.faqs : defaultFaqs;
 
   return (
     <div className="min-h-screen bg-background">
@@ -155,7 +173,7 @@ function CityLanding() {
               <MapPin className="h-3 w-3" /> {city.name}, {city.state}
             </Badge>
             <h1 className="text-3xl font-bold leading-tight tracking-tight md:text-5xl">
-              Biometric Attendance System in {city.name}
+              {h1}
             </h1>
             <p className="mt-4 max-w-2xl text-lg text-muted-foreground">{city.intro}</p>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -227,13 +245,7 @@ function CityLanding() {
         <div className="mx-auto max-w-3xl px-4">
           <h2 className="text-2xl font-bold md:text-3xl">FAQ — Biometric attendance in {city.name}</h2>
           <div className="mt-6 space-y-4">
-            {[
-              { q: `Which is the best biometric attendance system in ${city.name}?`, a: `Punchly is among the most-used biometric attendance apps in ${city.name}, ${city.state}. It uses face biometric (selfie) + GPS — no fingerprint machine purchase needed.` },
-              { q: `Do I need a fingerprint device for attendance in ${city.name}?`, a: `No. Punchly replaces fingerprint hardware with a face-biometric selfie on any Android or iPhone, with GPS geofence verification.` },
-              { q: `Does Punchly support Telugu-medium schools?`, a: `Yes. The teacher screens are tap-based — Telugu-medium schools across ${city.state} use it without training, and parents get WhatsApp alerts for absentees.` },
-              { q: `How much does biometric attendance cost in ${city.name}?`, a: `Start free, upgrade to monthly or lifetime plans. See the pricing section on the home page for current rates.` },
-              { q: `Can I track field staff and multiple branches?`, a: `Yes. Add unlimited branches across ${city.state}; managers see only their branch; live map shows who's checked in and where.` },
-            ].map((f) => (
+            {faqs.map((f) => (
               <Card key={f.q} className="p-5">
                 <h3 className="font-semibold">{f.q}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
