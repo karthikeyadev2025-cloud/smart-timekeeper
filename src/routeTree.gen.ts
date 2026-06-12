@@ -9,9 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BiometricAttendanceCityRouteImport } from './routes/biometric-attendance.$city'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
 import { Route as AuthenticatedShiftsRouteImport } from './routes/_authenticated/shifts'
 import { Route as AuthenticatedRevenueRouteImport } from './routes/_authenticated/revenue'
@@ -31,6 +33,11 @@ import { Route as AuthenticatedBranchesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -43,6 +50,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BiometricAttendanceCityRoute = BiometricAttendanceCityRouteImport.update({
+  id: '/biometric-attendance/$city',
+  path: '/biometric-attendance/$city',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
@@ -142,6 +154,7 @@ const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/app': typeof AuthenticatedAppRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/branches': typeof AuthenticatedBranchesRoute
@@ -160,10 +173,12 @@ export interface FileRoutesByFullPath {
   '/revenue': typeof AuthenticatedRevenueRoute
   '/shifts': typeof AuthenticatedShiftsRoute
   '/team': typeof AuthenticatedTeamRoute
+  '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/app': typeof AuthenticatedAppRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/branches': typeof AuthenticatedBranchesRoute
@@ -182,12 +197,14 @@ export interface FileRoutesByTo {
   '/revenue': typeof AuthenticatedRevenueRoute
   '/shifts': typeof AuthenticatedShiftsRoute
   '/team': typeof AuthenticatedTeamRoute
+  '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/branches': typeof AuthenticatedBranchesRoute
@@ -206,12 +223,14 @@ export interface FileRoutesById {
   '/_authenticated/revenue': typeof AuthenticatedRevenueRoute
   '/_authenticated/shifts': typeof AuthenticatedShiftsRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
+  '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/auth'
+    | '/sitemap.xml'
     | '/app'
     | '/audit'
     | '/branches'
@@ -230,10 +249,12 @@ export interface FileRouteTypes {
     | '/revenue'
     | '/shifts'
     | '/team'
+    | '/biometric-attendance/$city'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/sitemap.xml'
     | '/app'
     | '/audit'
     | '/branches'
@@ -252,11 +273,13 @@ export interface FileRouteTypes {
     | '/revenue'
     | '/shifts'
     | '/team'
+    | '/biometric-attendance/$city'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/sitemap.xml'
     | '/_authenticated/app'
     | '/_authenticated/audit'
     | '/_authenticated/branches'
@@ -275,16 +298,26 @@ export interface FileRouteTypes {
     | '/_authenticated/revenue'
     | '/_authenticated/shifts'
     | '/_authenticated/team'
+    | '/biometric-attendance/$city'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  BiometricAttendanceCityRoute: typeof BiometricAttendanceCityRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -304,6 +337,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/biometric-attendance/$city': {
+      id: '/biometric-attendance/$city'
+      path: '/biometric-attendance/$city'
+      fullPath: '/biometric-attendance/$city'
+      preLoaderRoute: typeof BiometricAttendanceCityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/team': {
@@ -484,6 +524,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
+  BiometricAttendanceCityRoute: BiometricAttendanceCityRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
