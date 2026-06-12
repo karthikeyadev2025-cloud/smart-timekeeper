@@ -237,7 +237,11 @@ function CheckInFlow() {
               </p>
             )}
 
-            {!coords && <Button onClick={getLocation} className="w-full" disabled={!locations?.length && !isFieldStaff}>Use my location</Button>}
+            {!coords && (
+              <Button onClick={getLocation} className="w-full" disabled={(!locations?.length && !isFieldStaff) || verifying}>
+                {verifying ? "Verifying location…" : "Use my location"}
+              </Button>
+            )}
 
             {coords && (
               <div className="space-y-2 rounded-lg bg-muted/50 p-3 text-sm">
@@ -258,13 +262,25 @@ function CheckInFlow() {
               </div>
             )}
 
+            {antiCheat?.suspicious && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive space-y-1">
+                <p className="flex items-center gap-1.5 font-semibold">
+                  <ShieldAlert className="h-4 w-4" /> Suspicious location signals detected
+                </p>
+                <ul className="list-disc pl-5 text-xs">
+                  {antiCheat.reasons.map((r) => <li key={r}>{r}</li>)}
+                </ul>
+                <p className="text-xs">Disable mock-location apps and try again from a real device.</p>
+              </div>
+            )}
+
             {gpsError && !isFieldStaff && <p className="text-sm text-destructive">{gpsError}</p>}
 
             <div className="flex gap-2">
-              {coords && <Button variant="outline" onClick={getLocation} className="gap-1"><RefreshCw className="h-4 w-4" /> Retry</Button>}
+              {coords && <Button variant="outline" onClick={getLocation} className="gap-1" disabled={verifying}><RefreshCw className="h-4 w-4" /> Retry</Button>}
               <Button
                 className="flex-1"
-                disabled={!coords || (!matchedLocation && !isFieldStaff)}
+                disabled={!coords || (!matchedLocation && !isFieldStaff) || antiCheat?.suspicious === true}
                 onClick={() => { setStep(2); startCamera(); }}
               >
                 Continue →
