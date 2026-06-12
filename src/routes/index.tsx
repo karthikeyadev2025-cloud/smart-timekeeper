@@ -346,3 +346,123 @@ function Landing() {
     </div>
   );
 }
+
+function ModesSection() {
+  const [mode, setMode] = useState<"business" | "school">("business");
+  const modes = {
+    business: {
+      title: "Business / Office mode",
+      tagline: "Offices, retail, factories, field teams.",
+      bullets: [
+        "GPS + selfie attendance with per-branch geofence",
+        "Field staff can punch from anywhere — distance auto-logged",
+        "Live map shows every active staff in real time",
+        "Multi-shift, overtime & break tracking",
+        "Auto payroll → payslip PDF every month",
+        "Multi-branch with branch manager role",
+      ],
+      icon: Briefcase,
+    },
+    school: {
+      title: "School / College mode",
+      tagline: "Schools, colleges, coaching centres.",
+      bullets: [
+        "Teachers mark whole classes in one tap (no GPS)",
+        "Students don't need phones — teacher marks attendance",
+        "Multiple campuses with campus-wise reports",
+        "Parent SMS / WhatsApp on absent",
+        "Monthly student attendance PDF",
+        "Teacher attendance with selfie (optional)",
+      ],
+      icon: GraduationCap,
+    },
+  } as const;
+  const m = modes[mode];
+
+  return (
+    <section className="border-t border-border/60 py-20">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Two modes. One app.</h2>
+          <p className="mt-2 text-muted-foreground">Switch between Business and School at signup — the whole app adapts.</p>
+        </div>
+        <div className="mt-8 flex justify-center">
+          <div className="inline-flex rounded-full border border-border/60 bg-card p-1">
+            {(["business", "school"] as const).map(k => (
+              <button
+                key={k}
+                onClick={() => setMode(k)}
+                className={`relative rounded-full px-6 py-2 text-sm font-medium capitalize transition-colors ${mode === k ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {mode === k && (
+                  <motion.span layoutId="mode-pill" className="absolute inset-0 rounded-full bg-primary" transition={{ type: "spring", stiffness: 400, damping: 30 }} />
+                )}
+                <span className="relative">{k === "business" ? "Business" : "School"}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <motion.div
+          key={mode}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="mt-10 grid items-center gap-8 md:grid-cols-2"
+        >
+          <Card className="p-8 border-border/60">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <m.icon className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold">{m.title}</h3>
+                <p className="text-sm text-muted-foreground">{m.tagline}</p>
+              </div>
+            </div>
+            <ul className="mt-6 space-y-2 text-sm">
+              {m.bullets.map(b => (
+                <li key={b} className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-success" /> {b}</li>
+              ))}
+            </ul>
+          </Card>
+          <div className="relative">
+            <motion.div
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-accent/10 p-8"
+            >
+              <div className="space-y-3">
+                {(mode === "business"
+                  ? [
+                      { l: "HQ — Mumbai", v: "42 / 45 in", c: "text-success" },
+                      { l: "Andheri Branch", v: "18 / 20 in", c: "text-success" },
+                      { l: "Pune Branch", v: "11 / 15 in", c: "text-warning" },
+                      { l: "Field reps (live)", v: "7 on the road", c: "text-primary" },
+                    ]
+                  : [
+                      { l: "Grade 6-A · Mrs. Sharma", v: "38 / 40 present", c: "text-success" },
+                      { l: "Grade 7-B · Mr. Khan", v: "35 / 36 present", c: "text-success" },
+                      { l: "Grade 8-A · Ms. Iyer", v: "30 / 32 present", c: "text-warning" },
+                      { l: "Today (whole school)", v: "94% attendance", c: "text-primary" },
+                    ]
+                ).map((row, i) => (
+                  <motion.div
+                    key={row.l}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.08 }}
+                    className="flex items-center justify-between rounded-lg bg-background/80 p-3 text-sm shadow-sm"
+                  >
+                    <span className="font-medium">{row.l}</span>
+                    <span className={`text-xs font-semibold ${row.c}`}>{row.v}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
