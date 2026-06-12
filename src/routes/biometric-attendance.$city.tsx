@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/Logo";
 import { CITIES, getCity, type CityData } from "@/lib/cities";
+import { useSiteContent, cityKey, cityFallback, type CityOverride } from "@/lib/site-content";
 
 export const Route = createFileRoute("/biometric-attendance/$city")({
   loader: ({ params }) => {
