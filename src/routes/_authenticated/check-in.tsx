@@ -177,6 +177,8 @@ function CheckInFlow() {
         distance_from_office_m: distance,
         enforcement_status: enforcement,
         selfie_url: path,
+        is_mock_location: antiCheat?.suspicious ?? false,
+        notes: antiCheat?.suspicious ? `anti-cheat: ${antiCheat.reasons.join("; ")}` : null,
       });
       if (insErr) throw insErr;
 
