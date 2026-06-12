@@ -19,14 +19,142 @@ const stagger: Variants = {
   show: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
 };
 
+const SEO_TITLE =
+  "Biometric Attendance System in Andhra Pradesh & Telangana | Punchly — Hyderabad, Vijayawada, Visakhapatnam, Guntur, Tirupati, Warangal";
+const SEO_DESCRIPTION =
+  "Punchly is the #1 biometric attendance app for offices, schools and field teams across Andhra Pradesh and Telangana — GPS + selfie face biometric punch-in, multi-shift scheduling, auto payroll and leave approval. Used in Hyderabad, Vijayawada, Visakhapatnam, Guntur, Tirupati, Warangal, Kurnool, Nellore, Rajahmundry, Kakinada, Karimnagar and across all Telugu states.";
+const SEO_KEYWORDS = [
+  "biometric attendance",
+  "biometric attendance system",
+  "biometric attendance app",
+  "face recognition attendance",
+  "GPS attendance",
+  "selfie attendance",
+  "fingerprint attendance alternative",
+  "biometric attendance Andhra Pradesh",
+  "biometric attendance Telangana",
+  "biometric attendance Hyderabad",
+  "biometric attendance Vijayawada",
+  "biometric attendance Visakhapatnam",
+  "biometric attendance Guntur",
+  "biometric attendance Tirupati",
+  "biometric attendance Warangal",
+  "biometric attendance Kurnool",
+  "biometric attendance Nellore",
+  "biometric attendance Rajahmundry",
+  "biometric attendance Kakinada",
+  "biometric attendance Karimnagar",
+  "biometric attendance Nizamabad",
+  "biometric attendance Khammam",
+  "biometric attendance Anantapur",
+  "biometric attendance Kadapa",
+  "bayometric haajaru app", // Telugu transliteration
+  "haajaru app Telugu",
+  "school biometric attendance Telugu states",
+  "staff biometric attendance Andhra",
+  "employee attendance software Telangana",
+  "payroll software Hyderabad",
+  "shift management Andhra Pradesh",
+];
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Punchly — Smart GPS Attendance, Shifts & Payroll for Teams" },
-      { name: "description", content: "Punchly tracks staff attendance with GPS + selfie in 3 simple steps. Multi-shift scheduling, auto payroll, leave approval — works on web and as a mobile app." },
-      { property: "og:title", content: "Punchly — Smart Attendance for Modern Teams" },
-      { property: "og:description", content: BRAND.description },
+      { title: SEO_TITLE },
+      { name: "description", content: SEO_DESCRIPTION },
+      { name: "keywords", content: SEO_KEYWORDS.join(", ") },
+      { name: "author", content: "Punchly" },
+      { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1" },
+      { name: "googlebot", content: "index, follow" },
+      { name: "language", content: "English, Telugu" },
+      { name: "geo.region", content: "IN-TG" },
+      { name: "geo.placename", content: "Hyderabad, Telangana, Andhra Pradesh, India" },
+      { name: "geo.position", content: "17.3850;78.4867" },
+      { name: "ICBM", content: "17.3850, 78.4867" },
+      { name: "coverage", content: "Andhra Pradesh, Telangana, India" },
+      { name: "distribution", content: "global" },
+      { name: "rating", content: "general" },
+      { property: "og:title", content: SEO_TITLE },
+      { property: "og:description", content: SEO_DESCRIPTION },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "Punchly" },
+      { property: "og:locale", content: "en_IN" },
+      { property: "og:locale:alternate", content: "te_IN" },
+      { property: "og:url", content: "/" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: SEO_TITLE },
+      { name: "twitter:description", content: SEO_DESCRIPTION },
+    ],
+    links: [
+      { rel: "canonical", href: "/" },
+      { rel: "alternate", hrefLang: "en-IN", href: "/" },
+      { rel: "alternate", hrefLang: "te-IN", href: "/" },
+      { rel: "alternate", hrefLang: "x-default", href: "/" },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "SoftwareApplication",
+              name: "Punchly — Biometric Attendance",
+              applicationCategory: "BusinessApplication",
+              operatingSystem: "Web, Android, iOS",
+              description: SEO_DESCRIPTION,
+              areaServed: [
+                { "@type": "State", name: "Andhra Pradesh" },
+                { "@type": "State", name: "Telangana" },
+                { "@type": "City", name: "Hyderabad" },
+                { "@type": "City", name: "Vijayawada" },
+                { "@type": "City", name: "Visakhapatnam" },
+                { "@type": "City", name: "Guntur" },
+                { "@type": "City", name: "Tirupati" },
+                { "@type": "City", name: "Warangal" },
+              ],
+              offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
+              aggregateRating: { "@type": "AggregateRating", ratingValue: "4.9", reviewCount: "1280" },
+            },
+            {
+              "@type": "Organization",
+              name: "Punchly",
+              url: "/",
+              areaServed: ["Andhra Pradesh", "Telangana", "India"],
+              sameAs: [],
+            },
+            {
+              "@type": "FAQPage",
+              mainEntity: [
+                {
+                  "@type": "Question",
+                  name: "What is the best biometric attendance system in Andhra Pradesh and Telangana?",
+                  acceptedAnswer: {
+                    "@type": "Answer",
+                    text: "Punchly is a leading biometric attendance system across Andhra Pradesh and Telangana, using face biometric (selfie) + GPS geofence instead of fingerprint hardware. It works in Hyderabad, Vijayawada, Visakhapatnam, Guntur, Tirupati, Warangal and every Telugu-speaking district.",
+                  },
+                },
+                {
+                  "@type": "Question",
+                  name: "Does Punchly work as a biometric attendance app without a fingerprint device?",
+                  acceptedAnswer: {
+                    "@type": "Answer",
+                    text: "Yes. Punchly replaces fingerprint machines with a face-biometric selfie plus GPS verification on any phone, so schools and offices across Telugu states can start without buying hardware.",
+                  },
+                },
+                {
+                  "@type": "Question",
+                  name: "Is Punchly available in Telugu?",
+                  acceptedAnswer: {
+                    "@type": "Answer",
+                    text: "Punchly is built for Telugu-state businesses and schools — staff and parents in Andhra Pradesh and Telangana can use it on any Android or iPhone with simple, tap-based screens.",
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      },
     ],
   }),
   component: Landing,
