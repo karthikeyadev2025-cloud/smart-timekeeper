@@ -6,10 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Clock, CheckCheck } from "lucide-react";
+import { Check, X, Clock, CheckCheck, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
+import { broadcastWhatsapp, openWhatsapp } from "@/lib/whatsapp";
 
 export const Route = createFileRoute("/_authenticated/mark-attendance")({
   component: MarkAttendancePage,
