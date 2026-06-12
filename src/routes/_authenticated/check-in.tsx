@@ -100,6 +100,13 @@ function CheckInFlow() {
 
   const isFieldStaff = (user?.profile as any)?.is_field_staff === true;
 
+  // Resolve the active branch window from the matched location (or first branch as fallback)
+  const activeBranchId = matchedLocation?.branch_id ?? (user?.profile as any)?.branch_id ?? null;
+  const branchWindow = (branchWindows ?? []).find((b) => b.id === activeBranchId) ?? null;
+  const windowCheck = checkWindow(nextKind, branchWindow);
+  const windowBlocked = !isFieldStaff && windowCheck.outsideWindow;
+
+
   const getLocation = async () => {
     setGpsError(null);
     setAntiCheat(null);
