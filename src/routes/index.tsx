@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { BRAND } from "@/lib/brand";
+import { LogoScene3D } from "@/components/LogoScene3D";
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 28 },
@@ -217,6 +218,9 @@ function Landing() {
           className="absolute inset-0 -z-10 opacity-[0.04]"
           style={{ backgroundImage: "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)", backgroundSize: "48px 48px" }}
         />
+        <div aria-hidden className="absolute inset-0 -z-10 opacity-70">
+          <LogoScene3D />
+        </div>
 
         <motion.div style={{ y: heroY, opacity: heroOpacity }} className="mx-auto max-w-6xl px-4 py-20 md:py-28">
           <div className="grid items-center gap-12 md:grid-cols-2">
