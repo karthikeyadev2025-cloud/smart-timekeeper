@@ -42,6 +42,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
     if (tenantType === "school") {
       return [
         { to: "/app", label: "Dashboard", icon: LayoutDashboard },
+        { to: "/branches", label: "Campuses", icon: Building2 },
         { to: "/team", label: "Teachers & staff", icon: Users },
         { to: "/classes", label: "Classes & students", icon: GraduationCap },
         { to: "/mark-attendance", label: "Mark attendance", icon: ClipboardCheck },
@@ -51,6 +52,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
     }
     return [
       { to: "/app", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/branches", label: "Branches", icon: Building2 },
       { to: "/team", label: "Staff", icon: Users },
       { to: "/shifts", label: "Shifts & locations", icon: Clock },
       { to: "/live-map", label: "Live map", icon: Map },
