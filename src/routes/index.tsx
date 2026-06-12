@@ -199,30 +199,30 @@ function Landing() {
       </motion.header>
 
       {/* Hero */}
-      <section ref={heroRef} className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10" style={{ background: "var(--gradient-soft)" }} />
+      <section ref={heroRef} className="relative isolate overflow-hidden">
+        <div className="absolute inset-0 z-0" style={{ background: "var(--gradient-soft)" }} />
         <motion.div
           aria-hidden
-          className="absolute -top-32 -left-32 -z-10 h-[500px] w-[500px] rounded-full bg-primary/20 blur-3xl"
+          className="absolute -top-32 -left-32 z-0 h-[500px] w-[500px] rounded-full bg-primary/20 blur-3xl"
           animate={{ x: [0, 40, 0], y: [0, 30, 0], scale: [1, 1.1, 1] }}
           transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
           aria-hidden
-          className="absolute -bottom-40 -right-20 -z-10 h-[400px] w-[400px] rounded-full bg-accent/25 blur-3xl"
+          className="absolute -bottom-40 -right-20 z-0 h-[400px] w-[400px] rounded-full bg-accent/25 blur-3xl"
           animate={{ x: [0, -30, 0], y: [0, -40, 0], scale: [1, 1.15, 1] }}
           transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
         />
         <div
           aria-hidden
-          className="absolute inset-0 -z-10 opacity-[0.04]"
+          className="absolute inset-0 z-0 opacity-[0.04]"
           style={{ backgroundImage: "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)", backgroundSize: "48px 48px" }}
         />
-        <div aria-hidden className="absolute inset-0 -z-10 opacity-70">
+        <div aria-hidden className="absolute inset-0 z-0 opacity-90">
           <LogoScene3D />
         </div>
 
-        <motion.div style={{ y: heroY, opacity: heroOpacity }} className="mx-auto max-w-6xl px-4 py-20 md:py-28">
+        <motion.div style={{ y: heroY, opacity: heroOpacity }} className="relative z-10 mx-auto max-w-6xl px-4 py-20 md:py-28">
           <div className="grid items-center gap-12 md:grid-cols-2">
             <motion.div variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeUp}>

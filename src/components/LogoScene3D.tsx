@@ -1,134 +1,84 @@
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Float } from "@react-three/drei";
-import { useEffect, useRef, useState, useMemo } from "react";
-import * as THREE from "three";
+import { motion, useMotionTemplate, useMotionValue, useSpring } from "framer-motion";
+import { useEffect } from "react";
 
 const LOGO_URL = "/punchly-logo.png";
 
-function LogoDisc({
-  position,
-  scale,
-  rotationSpeed,
-  texture,
-}: {
-  position: [number, number, number];
-  scale: number;
-  rotationSpeed: number;
-  texture: THREE.Texture;
-}) {
-  const ref = useRef<THREE.Mesh>(null);
-  useFrame((_, dt) => {
-    if (ref.current) {
-      ref.current.rotation.y += dt * rotationSpeed;
-      ref.current.rotation.x += dt * rotationSpeed * 0.3;
-    }
-  });
-  return (
-    <Float speed={1.4} rotationIntensity={0.4} floatIntensity={1.2}>
-      <mesh ref={ref} position={position} scale={scale}>
-        <circleGeometry args={[1, 64]} />
-        <meshStandardMaterial
-          map={texture}
-          transparent
-          side={THREE.DoubleSide}
-          metalness={0.5}
-          roughness={0.3}
-          emissive={new THREE.Color("#3b5bdb")}
-          emissiveIntensity={0.18}
-        />
-      </mesh>
-    </Float>
-  );
-}
-
-function Scene({
-  texture,
-  pointer,
-}: {
-  texture: THREE.Texture;
-  pointer: React.MutableRefObject<{ x: number; y: number }>;
-}) {
-  const groupRef = useRef<THREE.Group>(null);
-  useFrame(() => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y +=
-        (pointer.current.x * 0.3 - groupRef.current.rotation.y) * 0.04;
-      groupRef.current.rotation.x +=
-        (-pointer.current.y * 0.2 - groupRef.current.rotation.x) * 0.04;
-    }
-  });
-
-  const discs = useMemo(
-    () =>
-      [
-        { position: [0, 0, 0], scale: 2.2, speed: 0.25 },
-        { position: [-3.2, 1.4, -2], scale: 0.9, speed: 0.5 },
-        { position: [3.4, -1.2, -1.5], scale: 1.1, speed: -0.4 },
-        { position: [-2.6, -2.2, -3], scale: 0.6, speed: 0.7 },
-        { position: [2.8, 2.4, -2.5], scale: 0.7, speed: -0.6 },
-        { position: [0, 3.2, -4], scale: 0.5, speed: 0.9 },
-      ] as { position: [number, number, number]; scale: number; speed: number }[],
-    [],
-  );
-
-  return (
-    <group ref={groupRef}>
-      {discs.map((d, i) => (
-        <LogoDisc key={i} position={d.position} scale={d.scale} rotationSpeed={d.speed} texture={texture} />
-      ))}
-    </group>
-  );
-}
+const layers = [
+  { size: 320, top: "14%", left: "56%", depth: 1, duration: 18, delay: 0 },
+  { size: 164, top: "12%", left: "74%", depth: 0.7, duration: 14, delay: 1.8 },
+  { size: 132, top: "58%", left: "66%", depth: 0.55, duration: 16, delay: 0.6 },
+  { size: 104, top: "68%", left: "50%", depth: 0.4, duration: 12, delay: 1.2 },
+  { size: 88, top: "32%", left: "44%", depth: 0.35, duration: 11, delay: 2.2 },
+] as const;
 
 export function LogoScene3D() {
-  const [mounted, setMounted] = useState(false);
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  const pointer = useRef({ x: 0, y: 0 });
+  const pointerX = useMotionValue(0);
+  const pointerY = useMotionValue(0);
+  const rotateX = useSpring(pointerY, { stiffness: 90, damping: 18, mass: 0.8 });
+  const rotateY = useSpring(pointerX, { stiffness: 90, damping: 18, mass: 0.8 });
+  const groupTransform = useMotionTemplate`perspective(1600px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
 
   useEffect(() => {
-    setMounted(true);
-    const onMove = (e: PointerEvent) => {
-      pointer.current.x = (e.clientX / window.innerWidth) * 2 - 1;
-      pointer.current.y = (e.clientY / window.innerHeight) * 2 - 1;
+    const onMove = (event: PointerEvent) => {
+      const x = ((event.clientX / window.innerWidth) * 2 - 1) * 8;
+      const y = ((event.clientY / window.innerHeight) * 2 - 1) * -6;
+      pointerX.set(x);
+      pointerY.set(y);
     };
+
+    const onLeave = () => {
+      pointerX.set(0);
+      pointerY.set(0);
+    };
+
     window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerleave", onLeave);
 
-    // Load texture manually so a failure can't break the route.
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const tex = new THREE.Texture(img);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 8;
-      tex.needsUpdate = true;
-      setTexture(tex);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerleave", onLeave);
     };
-    img.onerror = (e) => {
-      console.warn("[LogoScene3D] logo texture failed to load", e);
-    };
-    img.src = LOGO_URL;
-
-    return () => window.removeEventListener("pointermove", onMove);
-  }, []);
-
-  if (!mounted || !texture) return null;
+  }, [pointerX, pointerY]);
 
   return (
-    <Canvas
-      className="!absolute inset-0"
-      style={{ pointerEvents: "none" }}
-      camera={{ position: [0, 0, 6], fov: 50 }}
-      dpr={[1, 2]}
-      gl={{ antialias: true, alpha: true }}
-      onCreated={({ gl }) => {
-        gl.setClearColor(0x000000, 0);
-      }}
-    >
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[5, 5, 5]} intensity={1.2} />
-      <directionalLight position={[-5, -3, 2]} intensity={0.5} color="#7c9cff" />
-      <Scene texture={texture} pointer={pointer} />
-    </Canvas>
+    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+      <motion.div style={{ transform: groupTransform, transformStyle: "preserve-3d" }} className="absolute inset-0">
+        {layers.map((layer, index) => (
+          <motion.img
+            key={`${layer.left}-${layer.top}-${index}`}
+            src={LOGO_URL}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            className="absolute object-contain opacity-90"
+            style={{
+              width: layer.size,
+              height: layer.size,
+              top: layer.top,
+              left: layer.left,
+              x: "-50%",
+              y: "-50%",
+              filter: "drop-shadow(0 22px 40px color-mix(in oklab, var(--primary) 18%, transparent))",
+              transformStyle: "preserve-3d",
+            }}
+            initial={{ opacity: 0, scale: 0.86, rotate: -12 }}
+            animate={{
+              opacity: [0.56, 0.9, 0.62],
+              scale: [1, 1.08, 0.98, 1],
+              rotate: [-8, 10, -6],
+              y: ["-50%", "calc(-50% - 16px)", "-50%", "calc(-50% + 10px)", "-50%"],
+            }}
+            transition={{
+              duration: layer.duration,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: layer.delay,
+            }}
+            whileInView={{ opacity: 1 }}
+          />
+        ))}
+      </motion.div>
+    </div>
   );
 }
 
