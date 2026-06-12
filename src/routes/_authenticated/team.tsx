@@ -110,6 +110,7 @@ function TeamPage() {
                 <TableHead>Salary</TableHead>
                 <TableHead>Field</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Alert</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
