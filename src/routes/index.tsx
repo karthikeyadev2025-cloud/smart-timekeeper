@@ -263,44 +263,8 @@ function Landing() {
 
 
       {/* Pricing */}
-      <section id="pricing" className="border-t border-border/60 bg-card/40 py-20">
-        <div className="mx-auto max-w-6xl px-4">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.6 }} className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Simple, transparent pricing</h2>
-            <p className="mt-2 text-muted-foreground">One-time lifetime plans available. Pay once, use forever.</p>
-          </motion.div>
-          <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} className="mt-12 grid gap-6 md:grid-cols-3">
-            {(plans ?? []).filter((p) => p.billing === "lifetime").map((p) => (
-              <motion.div key={p.id} variants={fadeUp} whileHover={{ y: -8 }} transition={{ type: "spring", stiffness: 300 }}>
-                <Card className="relative p-6 h-full border-border/60 hover:border-primary/60 hover:shadow-xl transition-all">
-                  {p.employee_limit === 25 && (
-                    <Badge className="absolute -top-3 left-6">Most popular</Badge>
-                  )}
-                  <h3 className="text-xl font-semibold">{p.name}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{p.description}</p>
-                  <div className="mt-4 flex items-baseline gap-1">
-                    <span className="text-4xl font-bold">₹{Number(p.price_inr).toLocaleString("en-IN")}</span>
-                    <span className="text-sm text-muted-foreground">one-time</span>
-                  </div>
-                  <ul className="mt-6 space-y-2 text-sm">
-                    {(Array.isArray(p.features) ? (p.features as unknown as string[]) : []).map((f) => (
-                      <li key={f} className="flex gap-2">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-success" /> {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link to="/auth" className="mt-6 block">
-                    <Button className="w-full">Get {p.employee_limit}-employee plan</Button>
-                  </Link>
-                </Card>
-              </motion.div>
-            ))}
-          </motion.div>
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            Also available monthly from ₹499/mo. Need 100+ employees? Contact us.
-          </p>
-        </div>
-      </section>
+      <PricingSection plans={plans ?? []} />
+
 
       {/* CTA */}
       <section className="relative py-24 overflow-hidden">
