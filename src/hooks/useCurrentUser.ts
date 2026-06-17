@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AppRole = "super_admin" | "client_admin" | "staff";
+export type AppRole = "super_admin" | "client_admin" | "branch_manager" | "staff";
 
 export interface CurrentUserData {
   userId: string;
@@ -64,6 +64,7 @@ export function useCurrentUser() {
 export function primaryRole(roles: AppRole[]): AppRole | null {
   if (roles.includes("super_admin")) return "super_admin";
   if (roles.includes("client_admin")) return "client_admin";
+  if (roles.includes("branch_manager")) return "branch_manager";
   if (roles.includes("staff")) return "staff";
   return null;
 }

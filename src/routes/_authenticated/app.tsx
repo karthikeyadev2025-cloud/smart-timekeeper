@@ -20,6 +20,7 @@ function Dashboard() {
     <AppShell>
       {role === "super_admin" && <SuperAdminHome />}
       {role === "client_admin" && <ClientAdminHome tenantId={user?.tenant?.id} />}
+      {role === "branch_manager" && <ClientAdminHome tenantId={user?.tenant?.id} branchManagerMode />}
       {role === "staff" && <StaffHome userId={user?.userId} tenantId={user?.tenant?.id} />}
       {!role && <NoRoleHome />}
     </AppShell>
@@ -183,7 +184,30 @@ function SuperAdminHome() {
   );
 }
 
-function ClientAdminHome({ tenantId }: { tenantId?: string }) {
+function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; branchManagerMode?: boolean }) {
+  const { data: sub } = useQuery({
+    queryKey: ["subscription", tenantId],
+    enabled: !!tenantId && !branchManagerMode,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("subscriptions")
+        .select("status, expires_at, plans(name)")
+        .eq("tenant_id", tenantId!)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const isExpired =
+    sub &&
+    (sub.status !== "active" || (sub.expires_at && new Date(sub.expires_at) < new Date()));
+
+  const expiresInDays =
+    sub?.expires_at
+      ? Math.ceil((new Date(sub.expires_at).getTime() - Date.now()) / 86400000)
+      : null;
   const { data: stats } = useQuery({
     queryKey: ["admin-stats", tenantId],
     enabled: !!tenantId,
@@ -201,9 +225,31 @@ function ClientAdminHome({ tenantId }: { tenantId?: string }) {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Today at a glance.</p>
+        <h1 className="text-3xl font-bold tracking-tight">{branchManagerMode ? "Branch Dashboard" : "Dashboard"}</h1>
+        <p className="text-muted-foreground">{branchManagerMode ? "Your branch at a glance." : "Today at a glance."}</p>
       </header>
+
+      {isExpired && (
+        <Card className="flex items-center gap-3 border-destructive/40 bg-destructive/5 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+          <div className="flex-1 text-sm">
+            <span className="font-semibold text-destructive">Subscription expired.</span>{" "}
+            Your team can still check in, but admin features are limited. Please renew to continue.
+          </div>
+          <Link to="/"><Button size="sm">Renew now</Button></Link>
+        </Card>
+      )}
+
+      {!isExpired && expiresInDays !== null && expiresInDays <= 7 && (
+        <Card className="flex items-center gap-3 border-amber-500/40 bg-amber-500/5 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+          <div className="flex-1 text-sm">
+            <span className="font-semibold">Subscription expires in {expiresInDays} day{expiresInDays === 1 ? "" : "s"}.</span>{" "}
+            Renew now to avoid any disruption.
+          </div>
+          <Link to="/"><Button size="sm" variant="outline">Renew</Button></Link>
+        </Card>
+      )}
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard icon={Users} label="Total staff" value={stats?.staff ?? 0} />
         <StatCard icon={CheckCircle2} label="Checked in today" value={stats?.presentToday ?? 0} />

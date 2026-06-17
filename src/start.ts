@@ -11,6 +11,14 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
       throw error;
     }
     console.error(error);
+    // Report to Sentry if configured
+    try {
+      const dsn = process.env.SENTRY_DSN;
+      if (dsn) {
+        const Sentry = await import("@sentry/react");
+        Sentry.captureException(error);
+      }
+    } catch { /* Sentry not installed yet */ }
     return new Response(renderErrorPage(), {
       status: 500,
       headers: { "content-type": "text/html; charset=utf-8" },

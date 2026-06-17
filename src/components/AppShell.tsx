@@ -66,6 +66,17 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
     ];
   }
+  if (role === "branch_manager") {
+    return [
+      { to: "/app", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/team", label: "My branch staff", icon: Users },
+      { to: "/live-map", label: "Live map", icon: Map },
+      { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
+      { to: "/payroll", label: "Payroll", icon: Wallet },
+      { to: "/my-attendance", label: "My attendance", icon: Calendar },
+      { to: "/my-leaves", label: "My leaves", icon: Calendar },
+    ];
+  }
   // staff
   if (tenantType === "school") {
     return [

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { BRAND } from "@/lib/brand";
 import { LogoScene3D } from "@/components/LogoScene3D";
+import { RazorpayCheckoutModal } from "@/components/RazorpayCheckoutModal";
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 28 },
@@ -167,6 +168,11 @@ function Landing() {
   const heroY = useTransform(scrollYProgress, [0, 1], [0, 120]);
   const heroOpacity = useTransform(scrollYProgress, [0, 1], [1, 0.3]);
   const phoneRotate = useTransform(scrollYProgress, [0, 1], [0, -8]);
+
+  const [checkoutPlan, setCheckoutPlan] = useState<{ id: string; name: string; price: number; billing: string } | null>(null);
+
+  const { data: session } = useQuery({ queryKey: ["session"], queryFn: async () => { const { data } = await supabase.auth.getUser(); return data.user ?? null; } });
+  const { data: tenantId } = useQuery({ queryKey: ["my-tenant", session?.id], enabled: !!session?.id, queryFn: async () => { const { data } = await supabase.from("user_roles").select("tenant_id").eq("user_id", session!.id).eq("role", "client_admin").limit(1).maybeSingle(); return data?.tenant_id ?? null; } });
 
   const { data: plans } = useQuery({
     queryKey: ["public-plans"],
@@ -392,7 +398,22 @@ function Landing() {
 
 
       {/* Pricing */}
-      <PricingSection plans={plans ?? []} />
+      <PricingSection
+        plans={plans ?? []}
+        tenantId={tenantId ?? ""}
+        isLoggedIn={!!session}
+        onCheckout={(p) => {
+          if (!session) {
+            window.location.href = "/auth#signup";
+            return;
+          }
+          if (!tenantId) {
+            window.location.href = "/app";
+            return;
+          }
+          setCheckoutPlan(p);
+        }}
+      />
 
 
       {/* CTA */}
@@ -428,6 +449,10 @@ function Landing() {
         <div className="mx-auto max-w-6xl px-4 space-y-6">
           <div className="flex flex-col items-center justify-between gap-4 text-sm text-muted-foreground md:flex-row">
             <Logo size={20} />
+            <div className="flex gap-6">
+              <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
+            </div>
             <p>© {new Date().getFullYear()} {BRAND.name}. All rights reserved.</p>
           </div>
           <div className="border-t border-border/40 pt-6 text-center">
@@ -440,6 +465,19 @@ function Landing() {
           </div>
         </div>
       </footer>
+
+      {checkoutPlan && (
+        <RazorpayCheckoutModal
+          isOpen={!!checkoutPlan}
+          onClose={() => setCheckoutPlan(null)}
+          planId={checkoutPlan.id}
+          planName={checkoutPlan.name}
+          amountInr={checkoutPlan.price}
+          billing={checkoutPlan.billing}
+          tenantId={tenantId ?? ""}
+          onSuccess={() => { setCheckoutPlan(null); window.location.href = "/app"; }}
+        />
+      )}
     </div>
   );
 }
@@ -573,7 +611,7 @@ type Plan = {
   features: unknown;
 };
 
-function PricingSection({ plans }: { plans: Plan[] }) {
+function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Plan[]; tenantId: string; isLoggedIn: boolean; onCheckout: (p: { id: string; name: string; price: number; billing: string }) => void }) {
   const [billing, setBilling] = useState<"lifetime" | "monthly">("lifetime");
   const core = plans
     .filter((p) => p.billing === billing && p.employee_limit <= 50)
@@ -628,11 +666,13 @@ function PricingSection({ plans }: { plans: Plan[] }) {
                     <span className="text-4xl font-bold tracking-tight">₹{Number(p.price_inr).toLocaleString("en-IN")}</span>
                     <span className="text-sm text-muted-foreground">{billing === "lifetime" ? "one-time" : "/mo"}</span>
                   </div>
-                  <Link to="/auth" className="mt-5 block">
-                    <Button className="w-full" variant={popular ? "default" : "outline"}>
-                      Get started <ArrowRight className="ml-1 h-4 w-4" />
-                    </Button>
-                  </Link>
+                  <Button
+                    className="w-full mt-5"
+                    variant={popular ? "default" : "outline"}
+                    onClick={() => onCheckout({ id: p.id, name: p.name.replace(/ (Lifetime|Monthly)$/i, ''), price: Number(p.price_inr), billing: p.billing })}
+                  >
+                    {isLoggedIn ? "Pay now" : "Sign up & pay"} <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
                   <ul className="mt-6 space-y-2 text-sm">
                     {featuresArr.map((f) => (
                       <li key={f} className="flex gap-2">
