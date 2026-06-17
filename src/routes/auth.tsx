@@ -57,23 +57,42 @@ function AuthPage() {
     await signInWithEmail(phoneToStaffEmail(phone), password);
   };
 
-  const handleEmailAuth = async (mode: "signin" | "signup", email: string, password: string, fullName?: string) => {
+  const handleEmailAuth = async (
+    mode: "signin" | "signup",
+    email: string,
+    password: string,
+    fullName?: string,
+    companyName?: string,
+    tenantType?: "business" | "school",
+  ) => {
     try { emailSchema.parse(email); passwordSchema.parse(password); }
     catch (e) { if (e instanceof z.ZodError) { toast.error(e.errors[0].message); return; } }
+    if (mode === "signup" && !companyName?.trim()) {
+      toast.error("Please enter your company name");
+      return;
+    }
     setLoading(true);
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: window.location.origin, data: { full_name: fullName ?? "" } },
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: {
+              full_name: fullName ?? "",
+              company_name: companyName?.trim() ?? "",
+              tenant_type: tenantType ?? "business",
+            },
+          },
         });
         if (error) throw error;
-        toast.success("Account created!");
+        toast.success("Account created! Your 7-day free trial has started.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      navigate({ to: "/app" });
+      // Hard reload so all React Query caches refresh with new auth context
+      window.location.href = "/app";
     } catch (e: any) {
       toast.error(e.message ?? "Authentication failed");
     } finally {
@@ -119,7 +138,7 @@ function AuthPage() {
           </TabsContent>
 
           <TabsContent value="signup" className="space-y-4 pt-4">
-            <SignUpForm loading={loading} onSubmit={(name, e, p) => handleEmailAuth("signup", e, p, name)} />
+            <SignUpForm loading={loading} onSubmit={(name, e, p, company, type) => handleEmailAuth("signup", e, p, name, company, type)} />
             <GoogleButton onClick={handleGoogle} loading={loading} />
             <p className="text-center text-xs text-muted-foreground">
               The first account created becomes the Super Admin.
@@ -258,15 +277,25 @@ function SignInForm({ loading, onSubmit }: { loading: boolean; onSubmit: (e: str
   );
 }
 
-function SignUpForm({ loading, onSubmit }: { loading: boolean; onSubmit: (name: string, e: string, p: string) => void }) {
+function SignUpForm({ loading, onSubmit }: { loading: boolean; onSubmit: (name: string, e: string, p: string, companyName: string, tenantType: "business" | "school") => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [tenantType, setTenantType] = useState<"business" | "school">("business");
   return (
-    <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); onSubmit(name, email, password); }}>
-      <div className="space-y-1"><Label htmlFor="su-name">Full name</Label><Input id="su-name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} /></div>
+    <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); onSubmit(name, email, password, companyName, tenantType); }}>
+      <div className="space-y-1"><Label htmlFor="su-name">Your full name</Label><Input id="su-name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} /></div>
+      <div className="space-y-1"><Label htmlFor="su-company">Company name</Label><Input id="su-company" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required maxLength={100} placeholder="e.g. Acme Logistics" /></div>
+      <div className="space-y-1">
+        <Label>Organisation type</Label>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => setTenantType("business")} className={`rounded-md border p-2 text-sm transition-all ${tenantType === "business" ? "border-primary bg-primary/5 font-medium" : "border-border hover:border-primary/40"}`}>Business</button>
+          <button type="button" onClick={() => setTenantType("school")} className={`rounded-md border p-2 text-sm transition-all ${tenantType === "school" ? "border-primary bg-primary/5 font-medium" : "border-border hover:border-primary/40"}`}>School</button>
+        </div>
+      </div>
       <div className="space-y-1"><Label htmlFor="su-email">Email</Label><Input id="su-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></div>
-      <div className="space-y-1"><Label htmlFor="su-pass">Password</Label><Input id="su-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={6} /></div>
+      <div className="space-y-1"><Label htmlFor="su-pass">Password</Label><Input id="su-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={4} /></div>
       <Button type="submit" className="w-full" disabled={loading}>{loading ? "Creating…" : "Create account"}</Button>
     </form>
   );

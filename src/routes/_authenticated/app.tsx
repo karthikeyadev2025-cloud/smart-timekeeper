@@ -1,5 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
@@ -29,17 +28,19 @@ function Dashboard() {
 }
 
 function NoRoleHome() {
-  const navigate = useNavigate();
-  useEffect(() => {
-    // No role yet — guide them through company setup
-    navigate({ to: "/onboarding" });
-  }, [navigate]);
   return (
     <div className="mx-auto max-w-2xl">
       <Card className="p-8 text-center">
-        <Sparkles className="mx-auto h-10 w-10 text-primary animate-pulse" />
-        <h2 className="mt-4 text-2xl font-bold">Setting things up…</h2>
-        <p className="mt-2 text-muted-foreground">Taking you to company setup.</p>
+        <Sparkles className="mx-auto h-10 w-10 text-primary" />
+        <h2 className="mt-4 text-2xl font-bold">Account not linked</h2>
+        <p className="mt-2 text-muted-foreground">
+          Your account isn't linked to a company yet. If you just signed up, sign out and back in.
+          If you were added by an administrator, ask them to confirm your role.
+        </p>
+        <Button className="mt-4" variant="outline" onClick={async () => {
+          await supabase.auth.signOut();
+          window.location.href = "/auth";
+        }}>Sign out</Button>
       </Card>
     </div>
   );
