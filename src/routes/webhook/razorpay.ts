@@ -1,6 +1,9 @@
 import { createServerFileRoute } from "@tanstack/react-start/server";
 
 export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
+  GET: async () => {
+    return new Response("Razorpay webhook endpoint active", { status: 200 });
+  },
   POST: async ({ request }) => {
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
     if (!webhookSecret) {
@@ -8,7 +11,6 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
       return new Response("Webhook secret not configured", { status: 500 });
     }
 
-    // Read raw body for signature verification
     const rawBody = await request.text();
     const signature = request.headers.get("x-razorpay-signature");
 
@@ -16,14 +18,13 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
       return new Response("Missing signature", { status: 400 });
     }
 
-    // Verify HMAC-SHA256 signature
     const { createHmac } = await import("crypto");
     const expected = createHmac("sha256", webhookSecret)
       .update(rawBody)
       .digest("hex");
 
     if (expected !== signature) {
-      console.warn("[Razorpay webhook] Invalid signature — possible spoofed request");
+      console.warn("[Razorpay webhook] Invalid signature");
       return new Response("Invalid signature", { status: 400 });
     }
 
@@ -34,7 +35,6 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
       return new Response("Invalid JSON", { status: 400 });
     }
 
-    // Only handle payment.captured — this is the authoritative success event
     if (event.event !== "payment.captured") {
       return new Response("OK", { status: 200 });
     }
@@ -49,7 +49,6 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Find the pending order
     const { data: order, error: orderErr } = await supabaseAdmin
       .from("payment_orders" as any)
       .select("*, plans(*)")
@@ -57,12 +56,9 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
       .maybeSingle();
 
     if (orderErr || !order) {
-      console.error("[Razorpay webhook] Order not found for", orderId);
-      // Return 200 so Razorpay doesn't keep retrying for unknown orders
       return new Response("Order not found", { status: 200 });
     }
 
-    // Idempotent — skip if already processed
     if ((order as any).status === "completed") {
       return new Response("Already processed", { status: 200 });
     }
@@ -70,7 +66,6 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
     const plan = (order as any).plans;
     const tenantId = (order as any).tenant_id;
 
-    // Calculate subscription expiry
     const expiresAt =
       plan?.billing === "lifetime"
         ? null
@@ -78,7 +73,6 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
         ? new Date(Date.now() + 30 * 86400000).toISOString()
         : new Date(Date.now() + 365 * 86400000).toISOString();
 
-    // Upsert subscription
     const { data: existingSub } = await supabaseAdmin
       .from("subscriptions" as any)
       .select("id")
@@ -90,24 +84,15 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
     if (existingSub) {
       await supabaseAdmin
         .from("subscriptions" as any)
-        .update({
-          plan_id: plan.id,
-          status: "active",
-          expires_at: expiresAt,
-          razorpay_payment_id: paymentId,
-        })
+        .update({ plan_id: plan.id, status: "active", expires_at: expiresAt, razorpay_payment_id: paymentId })
         .eq("id", (existingSub as any).id);
     } else {
       await supabaseAdmin.from("subscriptions" as any).insert({
-        tenant_id: tenantId,
-        plan_id: plan.id,
-        status: "active",
-        expires_at: expiresAt,
-        razorpay_payment_id: paymentId,
+        tenant_id: tenantId, plan_id: plan.id, status: "active",
+        expires_at: expiresAt, razorpay_payment_id: paymentId,
       });
     }
 
-    // Record payment
     await supabaseAdmin.from("payments").insert({
       tenant_id: tenantId,
       amount_inr: Number(payment.amount) / 100,
@@ -118,7 +103,6 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
       payer_email: payment.email ?? null,
     });
 
-    // Mark order complete
     await supabaseAdmin
       .from("payment_orders" as any)
       .update({ status: "completed", razorpay_payment_id: paymentId })
