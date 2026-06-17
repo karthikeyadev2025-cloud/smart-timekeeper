@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
@@ -28,15 +29,17 @@ function Dashboard() {
 }
 
 function NoRoleHome() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    // No role yet — guide them through company setup
+    navigate({ to: "/onboarding" });
+  }, [navigate]);
   return (
     <div className="mx-auto max-w-2xl">
       <Card className="p-8 text-center">
-        <Sparkles className="mx-auto h-10 w-10 text-primary" />
-        <h2 className="mt-4 text-2xl font-bold">Welcome to Punchly</h2>
-        <p className="mt-2 text-muted-foreground">
-          Your account isn't linked to a company yet. Ask your administrator to add you as staff,
-          or contact the Punchly super admin if you're setting up a new company.
-        </p>
+        <Sparkles className="mx-auto h-10 w-10 text-primary animate-pulse" />
+        <h2 className="mt-4 text-2xl font-bold">Setting things up…</h2>
+        <p className="mt-2 text-muted-foreground">Taking you to company setup.</p>
       </Card>
     </div>
   );

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Routes that don't need an active subscription
 const SUBSCRIPTION_FREE_ROUTES = [
   "/_authenticated/app",
+  "/_authenticated/onboarding",
   "/_authenticated/my-attendance",
   "/_authenticated/my-leaves",
   "/_authenticated/my-salary",
