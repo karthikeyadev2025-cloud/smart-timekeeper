@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
+import { createTenantOnboarding } from "@/lib/onboarding.functions";
 import { toast } from "sonner";
 import { Building2, GraduationCap, ArrowRight } from "lucide-react";
 
@@ -20,7 +21,7 @@ function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
 
-  // If they already have a tenant, send them to /app
+  // If they already have a tenant, jump to /app
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -29,10 +30,8 @@ function OnboardingPage() {
         .from("user_roles")
         .select("tenant_id, role")
         .eq("user_id", user.id);
-      if (roles && roles.some(r => r.tenant_id !== null || r.role === "super_admin")) {
-        navigate({ to: "/app" });
-        return;
-      }
+      const hasTenantOrSuper = roles?.some(r => r.tenant_id !== null || r.role === "super_admin");
+      if (hasTenantOrSuper) { navigate({ to: "/app" }); return; }
       setChecking(false);
     })();
   }, [navigate]);
@@ -42,43 +41,12 @@ function OnboardingPage() {
     if (!companyName.trim()) { toast.error("Please enter your company name"); return; }
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // 1. Create tenant
-      const { data: tenant, error: tenantErr } = await supabase
-        .from("tenants")
-        .insert({ name: companyName.trim(), tenant_type: tenantType, owner_user_id: user.id })
-        .select()
-        .single();
-      if (tenantErr) throw tenantErr;
-
-      // 2. Link profile to tenant
-      const { error: profileErr } = await supabase
-        .from("profiles")
-        .update({ tenant_id: tenant.id })
-        .eq("id", user.id);
-      if (profileErr) throw profileErr;
-
-      // 3. Assign client_admin role for this tenant
-      const { error: roleErr } = await supabase
-        .from("user_roles")
-        .insert({ user_id: user.id, role: "client_admin", tenant_id: tenant.id });
-      if (roleErr) throw roleErr;
-
-      // 4. Start a 7-day free trial so they can use the app immediately
-      const trialEnd = new Date(Date.now() + 7 * 86400000).toISOString();
-      await supabase.from("subscriptions").insert({
-        tenant_id: tenant.id,
-        status: "active",
-        expires_at: trialEnd,
-      });
-
-      toast.success("Welcome to Punchly! Your 7-day free trial has started.");
-      navigate({ to: "/app" });
+      await createTenantOnboarding({ data: { name: companyName.trim(), tenant_type: tenantType } });
+      toast.success("Welcome! Your 7-day free trial has started.");
+      // Hard reload so all queries refetch with the new tenant context
+      window.location.href = "/app";
     } catch (e: any) {
       toast.error(e.message ?? "Setup failed");
-    } finally {
       setLoading(false);
     }
   };
