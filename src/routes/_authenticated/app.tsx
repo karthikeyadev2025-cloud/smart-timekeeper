@@ -206,7 +206,7 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
 
   const isExpired =
     sub &&
-    (sub.status !== "active" || (sub.expires_at && new Date(sub.expires_at) < new Date()));
+    ((sub.status !== "active" && sub.status !== "trial") || (sub.expires_at && new Date(sub.expires_at) < new Date()));
 
   const expiresInDays =
     sub?.expires_at
