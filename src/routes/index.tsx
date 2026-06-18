@@ -172,20 +172,6 @@ function Landing() {
 
   const [checkoutPlan, setCheckoutPlan] = useState<{ id: string; name: string; price: number; billing: string } | null>(null);
 
-  // Resume any checkout flow the user started before signing up
-  useEffect(() => {
-    if (!session || !tenantId || checkoutPlan) return;
-    try {
-      const stashed = sessionStorage.getItem("pendingCheckoutPlan");
-      if (stashed) {
-        const plan = JSON.parse(stashed);
-        sessionStorage.removeItem("pendingCheckoutPlan");
-        setCheckoutPlan(plan);
-        toast.success("Welcome! Continuing your checkout.");
-      }
-    } catch {}
-  }, [session, tenantId, checkoutPlan]);
-
   const { data: session } = useQuery({ queryKey: ["session"], queryFn: async () => { const { data } = await supabase.auth.getUser(); return data.user ?? null; } });
   const { data: userInfo } = useQuery({
     queryKey: ["my-roles-and-tenant", session?.id],
@@ -203,6 +189,21 @@ function Landing() {
     },
   });
   const tenantId = userInfo?.tenantId ?? null;
+
+  // Resume any checkout flow the user started before signing up.
+  // Declared AFTER session/tenantId so the deps array isn't a TDZ trap.
+  useEffect(() => {
+    if (!session || !tenantId || checkoutPlan) return;
+    try {
+      const stashed = sessionStorage.getItem("pendingCheckoutPlan");
+      if (stashed) {
+        const plan = JSON.parse(stashed);
+        sessionStorage.removeItem("pendingCheckoutPlan");
+        setCheckoutPlan(plan);
+        toast.success("Welcome! Continuing your checkout.");
+      }
+    } catch {}
+  }, [session, tenantId, checkoutPlan]);
   const isSuper = userInfo?.isSuper ?? false;
 
   const { data: plans } = useQuery({
