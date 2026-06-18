@@ -16,11 +16,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle, ShieldCheck, Trash2, BellRing } from "lucide-react";
+import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  impersonateUser, setTenantActive, extendSubscription, changeTenantPlan, getTenantDetails, deleteTenant, broadcastAnnouncement, clearAnnouncement,
+  impersonateUser, setTenantActive, extendSubscription, changeTenantPlan, getTenantDetails,
 } from "@/lib/admin.functions";
 import { TenantPermissionsDialog } from "@/components/TenantPermissionsDialog";
 
@@ -31,7 +31,6 @@ export const Route = createFileRoute("/_authenticated/clients")({
 function ClientsPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
 
@@ -58,16 +57,10 @@ function ClientsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Client companies</h1>
             <p className="text-muted-foreground">{rows.length} of {data?.length ?? 0} companies</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Dialog open={broadcastOpen} onOpenChange={setBroadcastOpen}>
-              <DialogTrigger asChild><Button variant="outline" className="gap-2"><BellRing className="h-4 w-4" /> Broadcast</Button></DialogTrigger>
-              <DialogContent><BroadcastForm onDone={() => setBroadcastOpen(false)} /></DialogContent>
-            </Dialog>
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> New client</Button></DialogTrigger>
-              <DialogContent><TenantForm onDone={() => { setOpen(false); refresh(); }} /></DialogContent>
-            </Dialog>
-          </div>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> New client</Button></DialogTrigger>
+            <DialogContent><TenantForm onDone={() => { setOpen(false); refresh(); }} /></DialogContent>
+          </Dialog>
         </header>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -136,26 +129,6 @@ function RowActions({ tenant, onChange }: { tenant: any; onChange: () => void })
   const impersonate = useServerFn(impersonateUser);
   const setActive = useServerFn(setTenantActive);
   const extend = useServerFn(extendSubscription);
-  const delTenant = useServerFn(deleteTenant);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState("");
-  const [deleting, setDeleting] = useState(false);
-
-  const doDelete = async () => {
-    if (deleteConfirm !== "DELETE") { toast.error('Please type DELETE to confirm'); return; }
-    setDeleting(true);
-    try {
-      const res = await delTenant({ data: { tenant_id: tenant.id, confirm: "DELETE" } });
-      toast.success(`Tenant deleted. ${res.users_deleted} user accounts removed.`);
-      setDeleteOpen(false);
-      setDeleteConfirm("");
-      onChange?.();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Delete failed");
-    } finally {
-      setDeleting(false);
-    }
-  };
   const [planOpen, setPlanOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [permsOpen, setPermsOpen] = useState(false);
@@ -208,44 +181,12 @@ function RowActions({ tenant, onChange }: { tenant: any; onChange: () => void })
           <DropdownMenuItem onClick={doToggle} className={tenant.is_active ? "text-destructive" : ""}>
             {tenant.is_active ? <><Pause className="mr-2 h-4 w-4" /> Suspend</> : <><Play className="mr-2 h-4 w-4" /> Reactivate</>}
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-destructive">
-            <Trash2 className="mr-2 h-4 w-4" /> Delete tenant
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <ChangePlanDialog open={planOpen} onOpenChange={setPlanOpen} tenant={tenant} onDone={onChange} />
       <TenantDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} tenantId={tenant.id} />
       <TenantPermissionsDialog open={permsOpen} onOpenChange={setPermsOpen} tenantId={tenant.id} tenantName={tenant.name} />
-
-      <Dialog open={deleteOpen} onOpenChange={(o) => { setDeleteOpen(o); if (!o) setDeleteConfirm(""); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="h-5 w-5" /> Delete tenant — permanent</DialogTitle>
-            <DialogDescription>
-              This will permanently delete <strong>{tenant.name}</strong>, all of its staff accounts,
-              branches, attendance records, payslips, and payment history. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <p className="text-sm">Type <strong>DELETE</strong> to confirm:</p>
-            <input
-              value={deleteConfirm}
-              onChange={(e) => setDeleteConfirm(e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm font-mono"
-              placeholder="DELETE"
-              autoFocus
-            />
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</Button>
-            <Button variant="destructive" onClick={doDelete} disabled={deleting || deleteConfirm !== "DELETE"}>
-              {deleting ? "Deleting…" : "Permanently delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!magicLink} onOpenChange={(o) => !o && setMagicLink(null)}>
         <DialogContent>
@@ -457,94 +398,5 @@ function TenantForm({ onDone }: { onDone: () => void }) {
       <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Creating…" : "Create client"}</Button></DialogFooter>
       <p className="text-xs text-muted-foreground">Note: creating an admin signs you in as them. Sign back into your super-admin account afterwards.</p>
     </form>
-  );
-}
-
-function BroadcastForm({ onDone }: { onDone: () => void }) {
-  const broadcast = useServerFn(broadcastAnnouncement);
-  const clear = useServerFn(clearAnnouncement);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [severity, setSeverity] = useState<"info" | "warning" | "critical">("info");
-  const [hoursValid, setHoursValid] = useState("24");
-  const [loading, setLoading] = useState(false);
-
-  const post = async () => {
-    if (!title.trim() || !body.trim()) { toast.error("Title and message are required"); return; }
-    setLoading(true);
-    try {
-      const expires_at = hoursValid && Number(hoursValid) > 0
-        ? new Date(Date.now() + Number(hoursValid) * 3600 * 1000).toISOString()
-        : null;
-      await broadcast({ data: { title: title.trim(), body: body.trim(), severity, expires_at } });
-      toast.success("Announcement posted to all clients");
-      onDone();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not broadcast");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const wipe = async () => {
-    if (!confirm("Remove the current announcement from every client's dashboard?")) return;
-    setLoading(true);
-    try {
-      await clear({});
-      toast.success("Announcement cleared");
-      onDone();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not clear");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <DialogHeader>
-        <DialogTitle>Broadcast to all clients</DialogTitle>
-        <DialogDescription>Shown as a banner on every client admin's dashboard until it expires or you clear it.</DialogDescription>
-      </DialogHeader>
-
-      <div className="space-y-1">
-        <Label>Title</Label>
-        <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Scheduled maintenance Sunday 2 AM IST" />
-      </div>
-
-      <div className="space-y-1">
-        <Label>Message</Label>
-        <textarea
-          value={body}
-          onChange={e => setBody(e.target.value)}
-          rows={3}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          placeholder="We'll be performing scheduled maintenance for ~10 minutes…"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label>Severity</Label>
-          <Select value={severity} onValueChange={(v) => setSeverity(v as any)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="info">Info (blue)</SelectItem>
-              <SelectItem value="warning">Warning (amber)</SelectItem>
-              <SelectItem value="critical">Critical (red)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label>Auto-expire after (hours, blank = never)</Label>
-          <Input type="number" min={0} value={hoursValid} onChange={e => setHoursValid(e.target.value)} placeholder="24" />
-        </div>
-      </div>
-
-      <DialogFooter className="gap-2">
-        <Button variant="outline" onClick={wipe} disabled={loading}>Clear current</Button>
-        <Button onClick={post} disabled={loading}>{loading ? "Posting…" : "Post announcement"}</Button>
-      </DialogFooter>
-    </div>
   );
 }
