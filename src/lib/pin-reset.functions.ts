@@ -119,3 +119,44 @@ export const resolvePinReset = createServerFn({ method: "POST" })
 
     return { ok: true, phone: req.phone, new_pin: data.new_pin };
   });
+
+// ADMIN: deny a pending PIN reset request without changing the PIN
+export const denyPinReset = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ request_id: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: req, error: reqErr } = await supabase
+      .from("pin_reset_requests")
+      .select("id, phone, tenant_id, status")
+      .eq("id", data.request_id)
+      .maybeSingle();
+    if (reqErr || !req) throw new Error("Request not found");
+    if (req.status !== "pending") throw new Error("Request already resolved");
+
+    const { data: isSuper } = await supabase.rpc("is_super_admin", { _user_id: userId });
+    let allowed = !!isSuper;
+    if (!allowed && req.tenant_id) {
+      const { data: isAdmin } = await supabase.rpc("is_tenant_admin", {
+        _user_id: userId, _tenant_id: req.tenant_id,
+      });
+      allowed = !!isAdmin;
+    }
+    if (!allowed) throw new Error("Not authorized");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: resErr } = await supabaseAdmin
+      .from("pin_reset_requests")
+      .update({
+        status: "denied",
+        resolved_by: userId,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("id", data.request_id);
+    if (resErr) throw new Error(resErr.message);
+
+    return { ok: true, phone: req.phone };
+  });

@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { listPinResetRequests, resolvePinReset } from "@/lib/pin-reset.functions";
+import { listPinResetRequests, resolvePinReset, denyPinReset } from "@/lib/pin-reset.functions";
 import { KeyRound, Phone, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,6 +32,7 @@ function generatePin() {
 function PinResetsPage() {
   const list = useServerFn(listPinResetRequests);
   const resolve = useServerFn(resolvePinReset);
+  const deny = useServerFn(denyPinReset);
   const qc = useQueryClient();
 
   const { data: requests = [], isLoading } = useQuery({
@@ -92,11 +93,28 @@ function PinResetsPage() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  onClick={() => { setActive(r); setNewPin(generatePin()); }}
-                >
-                  Reset PIN
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (!confirm(`Deny PIN reset request for ${r.phone}?`)) return;
+                      try {
+                        await deny({ data: { request_id: r.id } });
+                        toast.success("Request denied");
+                        qc.invalidateQueries({ queryKey: ["pin-resets"] });
+                      } catch (e: any) {
+                        toast.error(e?.message ?? "Could not deny");
+                      }
+                    }}
+                  >
+                    Deny
+                  </Button>
+                  <Button
+                    onClick={() => { setActive(r); setNewPin(generatePin()); }}
+                  >
+                    Reset PIN
+                  </Button>
+                </div>
               </Card>
             ))
           )}
