@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
@@ -11,13 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Phone, Shield, MessageCircle } from "lucide-react";
+import { UserPlus, Phone, Shield, MessageCircle, Pencil, Trash2 } from "lucide-react";
 import { openWhatsapp } from "@/lib/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useBranchFilter } from "@/hooks/useBranchFilter";
 import { toast } from "sonner";
-import { createStaff } from "@/lib/staff.functions";
+import { createStaff, updateStaff, deleteStaff } from "@/lib/staff.functions";
 
 export const Route = createFileRoute("/_authenticated/team")({
   component: TeamPage,
@@ -32,6 +32,19 @@ function TeamPage() {
   const { branchId } = useBranchFilter(tenantId);
   const [open, setOpen] = useState(false);
   const [inviteMode, setInviteMode] = useState<"staff" | "branch_manager">("staff");
+  const [editStaff, setEditStaff] = useState<any | null>(null);
+  const deleteStaffFn = useServerFn(deleteStaff);
+
+  const handleDelete = async (s: any) => {
+    if (!confirm(`Delete ${s.full_name ?? "this staff member"}? This cannot be undone — their attendance history will also be removed.`)) return;
+    try {
+      await deleteStaffFn({ data: { tenant_id: tenantId!, user_id: s.id } });
+      toast.success("Staff removed");
+      qc.invalidateQueries({ queryKey: ["staff"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not delete");
+    }
+  };
 
   const { data: staff } = useQuery({
     queryKey: ["staff", tenantId, branchId],
@@ -110,7 +123,7 @@ function TeamPage() {
                 <TableHead>Salary</TableHead>
                 <TableHead>Field</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Alert</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -151,16 +164,23 @@ function TeamPage() {
                   </TableCell>
                   <TableCell><Badge variant={s.is_active ? "default" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge></TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={!s.phone}
-                      onClick={() => openWhatsapp(s.phone, `Hi ${s.full_name ?? "there"}, this is a notification from ${user?.tenant?.name ?? "your team"}.`)}
-                      title={s.phone ? "Send WhatsApp message" : "No phone on file"}
-                      className="gap-1"
-                    >
-                      <MessageCircle className="h-4 w-4 text-success" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-0.5">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={!s.phone}
+                        onClick={() => openWhatsapp(s.phone, `Hi ${s.full_name ?? "there"}, this is a notification from ${user?.tenant?.name ?? "your team"}.`)}
+                        title={s.phone ? "Send WhatsApp message" : "No phone on file"}
+                      >
+                        <MessageCircle className="h-4 w-4 text-success" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditStaff(s)} title="Edit">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleDelete(s)} title="Delete">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -170,6 +190,21 @@ function TeamPage() {
             </TableBody>
           </Table>
         </Card>
+
+        <Dialog open={!!editStaff} onOpenChange={(v) => !v && setEditStaff(null)}>
+          <DialogContent>
+            {editStaff && (
+              <EditStaffForm
+                tenantId={tenantId!}
+                staff={editStaff}
+                shifts={shifts ?? []}
+                branches={branches ?? []}
+                branchLabel={branchLabel}
+                onDone={() => { setEditStaff(null); qc.invalidateQueries({ queryKey: ["staff"] }); }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AppShell>
   );
@@ -282,6 +317,121 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
       <p className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
         ✓ You stay signed in. Share the phone + password so they can log in.
       </p>
+    </form>
+  );
+}
+
+function EditStaffForm({
+  tenantId, staff, shifts, branches, branchLabel, onDone,
+}: {
+  tenantId: string;
+  staff: any;
+  shifts: any[];
+  branches: { id: string; name: string }[];
+  branchLabel: string;
+  onDone: () => void;
+}) {
+  const updateStaffFn = useServerFn(updateStaff);
+  const [name, setName] = useState(staff.full_name ?? "");
+  const [designation, setDesignation] = useState(staff.designation ?? "");
+  const [salary, setSalary] = useState(staff.monthly_salary?.toString() ?? "");
+  const [branchIdSel, setBranchIdSel] = useState<string>(staff.branch_id ?? "");
+  const [shiftId, setShiftId] = useState<string>("");
+  const [isField, setIsField] = useState<boolean>(!!staff.is_field_staff);
+  const [newPin, setNewPin] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Load currently assigned shift
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("staff_shifts").select("shift_id").eq("user_id", staff.id).limit(1).maybeSingle();
+      if (data?.shift_id) setShiftId(data.shift_id);
+    })();
+  }, [staff.id]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) { toast.error("Name is required"); return; }
+    setLoading(true);
+    try {
+      await updateStaffFn({
+        data: {
+          tenant_id: tenantId,
+          user_id: staff.id,
+          full_name: name.trim(),
+          designation,
+          monthly_salary: Number(salary) || 0,
+          branch_id: branchIdSel || null,
+          shift_id: shiftId || null,
+          is_field_staff: isField,
+          new_password: newPin.trim() ? newPin.trim() : null,
+        },
+      });
+      toast.success(newPin.trim() ? `Updated. New PIN: ${newPin.trim()}` : "Staff updated");
+      onDone();
+    } catch (e: any) {
+      const msg = e?.message || e?.body?.message || "Could not update staff";
+      console.error("[UpdateStaff] failed:", e);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      <DialogHeader>
+        <DialogTitle>Edit staff member</DialogTitle>
+        <p className="text-sm text-muted-foreground font-mono">{staff.phone}</p>
+      </DialogHeader>
+
+      <div className="space-y-1"><Label>Full name</Label><Input value={name} onChange={e => setName(e.target.value)} required /></div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1"><Label>Designation</Label><Input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="Cashier" /></div>
+        <div className="space-y-1"><Label>Monthly salary (₹)</Label><Input type="number" min={0} value={salary} onChange={e => setSalary(e.target.value)} placeholder="15000" /></div>
+      </div>
+
+      <div className="space-y-1">
+        <Label>{branchLabel}</Label>
+        <Select value={branchIdSel || "none"} onValueChange={(v) => setBranchIdSel(v === "none" ? "" : v)}>
+          <SelectTrigger><SelectValue placeholder={`Assign to a ${branchLabel.toLowerCase()}`} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— Unassigned —</SelectItem>
+            {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {shifts.length > 0 && (
+        <div className="space-y-1">
+          <Label>Shift</Label>
+          <Select value={shiftId || "none"} onValueChange={(v) => setShiftId(v === "none" ? "" : v)}>
+            <SelectTrigger><SelectValue placeholder="No shift assigned" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— No shift —</SelectItem>
+              {shifts.map(s => <SelectItem key={s.id} value={s.id}>{s.name} · {s.start_time}–{s.end_time}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" checked={isField} onChange={e => setIsField(e.target.checked)} className="h-4 w-4" />
+        <span>Field staff (can check in from anywhere — bypasses geofence)</span>
+      </label>
+
+      <div className="space-y-1 border-t pt-3">
+        <Label className="text-xs text-muted-foreground">Reset PIN (optional)</Label>
+        <div className="flex gap-2">
+          <Input value={newPin} onChange={e => setNewPin(e.target.value)} placeholder="Leave blank to keep current PIN" className="font-mono" />
+          <Button type="button" size="sm" variant="outline" onClick={() => setNewPin(String(Math.floor(1000 + Math.random() * 9000)))}>Generate</Button>
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button type="submit" disabled={loading}>{loading ? "Saving…" : "Save changes"}</Button>
+      </DialogFooter>
     </form>
   );
 }

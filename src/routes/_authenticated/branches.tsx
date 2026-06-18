@@ -181,6 +181,8 @@ function AddBranchForm({ tenantId, noun, onDone }: { tenantId: string; noun: str
 }
 
 function BranchSettingsForm({ branch, noun, onDone }: { branch: Branch; noun: string; onDone: () => void }) {
+  const [name, setName] = useState<string>(branch.name ?? "");
+  const [address, setAddress] = useState<string>((branch as any).address ?? "");
   const [radius, setRadius] = useState<number>(branch.default_radius_meters ?? 100);
   const [ciStart, setCiStart] = useState<string>(toTime(branch.checkin_window_start));
   const [ciEnd, setCiEnd] = useState<string>(toTime(branch.checkin_window_end));
@@ -190,6 +192,8 @@ function BranchSettingsForm({ branch, noun, onDone }: { branch: Branch; noun: st
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    setName(branch.name ?? "");
+    setAddress((branch as any).address ?? "");
     setRadius(branch.default_radius_meters ?? 100);
     setCiStart(toTime(branch.checkin_window_start));
     setCiEnd(toTime(branch.checkin_window_end));
@@ -211,6 +215,8 @@ function BranchSettingsForm({ branch, noun, onDone }: { branch: Branch; noun: st
     }
     setLoading(true);
     const { error } = await supabase.from("branches").update({
+      name: name.trim() || branch.name,
+      address: address?.trim() || null,
       default_radius_meters: radius,
       checkin_window_start: ciStart || null,
       checkin_window_end: ciEnd || null,
@@ -238,6 +244,12 @@ function BranchSettingsForm({ branch, noun, onDone }: { branch: Branch; noun: st
       </DialogHeader>
 
       <section className="space-y-2">
+        <h3 className="text-sm font-semibold">Details</h3>
+        <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder={branch.name} /></div>
+        <div className="space-y-1"><Label className="text-xs">Address</Label><Input value={address} onChange={e => setAddress(e.target.value)} placeholder="Street, City" /></div>
+      </section>
+
+      <section className="space-y-2 border-t pt-4">
         <h3 className="text-sm font-semibold flex items-center gap-1.5"><MapPin className="h-4 w-4" /> Geofence radius</h3>
         <p className="text-xs text-muted-foreground">Default radius for new office locations added to this {noun.toLowerCase()}.</p>
         <div className="flex items-center gap-2">
