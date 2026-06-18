@@ -26,6 +26,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser, primaryRole, type AppRole } from "@/hooks/useCurrentUser";
+import { useSubscriptionState } from "@/hooks/useSubscriptionState";
 import { HeaderBranchSwitcher } from "@/components/HeaderBranchSwitcher";
 import { cn } from "@/lib/utils";
 
@@ -124,6 +125,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             {role.replace("_", " ")}{tenantType === "school" ? " · school" : ""}
           </p>
         )}
+        {(role === "client_admin" || role === "branch_manager") && user?.tenant?.id && (
+          <SubscriptionPill tenantId={user.tenant.id} />
+        )}
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {items.map((it) => {
@@ -201,5 +205,29 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="flex-1 overflow-y-auto p-8">{children}</main>
       </div>
     </div>
+  );
+}
+
+function SubscriptionPill({ tenantId }: { tenantId: string }) {
+  const { state, daysLeft, planName } = useSubscriptionState(tenantId);
+  if (state === "loading" || state === "active") return null;
+
+  const config = {
+    trial: { cls: "bg-primary/10 text-primary border-primary/20", text: `Trial · ${daysLeft}d left` },
+    trial_ending: { cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30", text: `Trial ends in ${daysLeft}d` },
+    expiring_soon: { cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30", text: `${planName ?? "Plan"} expires in ${daysLeft}d` },
+    suspended: { cls: "bg-destructive/10 text-destructive border-destructive/30", text: "Read-only · Renew" },
+  }[state as Exclude<typeof state, "loading" | "active">];
+
+  return (
+    <Link
+      to="/"
+      className={cn(
+        "mt-2 inline-flex items-center justify-center rounded-md border px-2 py-1 text-[10px] font-semibold w-full",
+        config.cls,
+      )}
+    >
+      {config.text}
+    </Link>
   );
 }

@@ -205,14 +205,40 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
     },
   });
 
-  const isExpired =
-    sub &&
-    ((sub.status !== "active" && sub.status !== "trial") || (sub.expires_at && new Date(sub.expires_at) < new Date()));
+  // --- Subscription state computation ---
+  // Five possible states:
+  //   loading       → don't show anything yet
+  //   trial         → trial active, banner with countdown
+  //   trial_ending  → trial active, < 3 days, urgent banner
+  //   active        → paid plan healthy
+  //   expiring_soon → paid plan, < 7 days left
+  //   suspended     → trial or paid expired → read-only mode, all data preserved
+  const subState = (() => {
+    if (!sub) return "loading" as const;
+    const isPaid = sub.status === "active";
+    const isTrial = sub.status === "trial";
+    const exp = sub.expires_at ? new Date(sub.expires_at) : null;
+    const now = new Date();
+    const expired = exp ? exp < now : (!isPaid && !isTrial);
+
+    if (expired) return "suspended" as const;
+    if (isTrial) {
+      const days = exp ? Math.ceil((exp.getTime() - now.getTime()) / 86400000) : 0;
+      return days <= 3 ? "trial_ending" : "trial";
+    }
+    if (isPaid && exp) {
+      const days = Math.ceil((exp.getTime() - now.getTime()) / 86400000);
+      if (days <= 7) return "expiring_soon" as const;
+    }
+    return "active" as const;
+  })();
 
   const expiresInDays =
     sub?.expires_at
-      ? Math.ceil((new Date(sub.expires_at).getTime() - Date.now()) / 86400000)
+      ? Math.max(0, Math.ceil((new Date(sub.expires_at).getTime() - Date.now()) / 86400000))
       : null;
+
+  const isSuspended = subState === "suspended";
   const { data: stats } = useQuery({
     queryKey: ["admin-stats", tenantId],
     enabled: !!tenantId,
@@ -229,23 +255,70 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight">{branchManagerMode ? "Branch Dashboard" : "Dashboard"}</h1>
-        <p className="text-muted-foreground">{branchManagerMode ? "Your branch at a glance." : "Today at a glance."}</p>
+      <header className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{branchManagerMode ? "Branch Dashboard" : "Dashboard"}</h1>
+          <p className="text-muted-foreground">{branchManagerMode ? "Your branch at a glance." : "Today at a glance."}</p>
+        </div>
+        {(subState === "trial" || subState === "trial_ending") && expiresInDays !== null && (
+          <Badge
+            variant="outline"
+            className={
+              subState === "trial_ending"
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 gap-1.5 py-1.5 px-3"
+                : "border-primary/30 bg-primary/10 text-primary gap-1.5 py-1.5 px-3"
+            }
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Trial · {expiresInDays} day{expiresInDays === 1 ? "" : "s"} left
+          </Badge>
+        )}
       </header>
 
-      {isExpired && (
-        <Card className="flex items-center gap-3 border-destructive/40 bg-destructive/5 p-4">
-          <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
-          <div className="flex-1 text-sm">
-            <span className="font-semibold text-destructive">Subscription expired.</span>{" "}
-            Your team can still check in, but admin features are limited. Please renew to continue.
+      {subState === "suspended" && (
+        <Card className="flex items-start gap-3 border-destructive/40 bg-destructive/5 p-4">
+          <ShieldAlert className="h-5 w-5 shrink-0 text-destructive mt-0.5" />
+          <div className="flex-1 text-sm space-y-1">
+            <p className="font-semibold text-destructive">
+              {sub?.status === "trial" ? "Trial ended." : "Subscription expired."} Your account is now read-only.
+            </p>
+            <p className="text-muted-foreground">
+              All your data is safe — staff, branches, attendance history, payslips are exactly as you left them.
+              Renew any plan and full access returns instantly.
+            </p>
           </div>
           <Link to="/"><Button size="sm">Renew now</Button></Link>
         </Card>
       )}
 
-      {!isExpired && expiresInDays !== null && expiresInDays <= 7 && (
+      {subState === "trial_ending" && (
+        <Card className="flex items-start gap-3 border-amber-500/40 bg-amber-500/5 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" />
+          <div className="flex-1 text-sm">
+            <p className="font-semibold">Your free trial ends in {expiresInDays} day{expiresInDays === 1 ? "" : "s"}.</p>
+            <p className="text-muted-foreground mt-0.5">
+              Pick a plan now to keep things running. Your data stays put either way.
+            </p>
+          </div>
+          <Link to="/"><Button size="sm">Pick a plan</Button></Link>
+        </Card>
+      )}
+
+      {subState === "trial" && (
+        <Card className="flex items-start gap-3 border-primary/30 bg-primary/5 p-4">
+          <Sparkles className="h-5 w-5 shrink-0 text-primary mt-0.5" />
+          <div className="flex-1 text-sm">
+            <p className="font-semibold">You're on a free trial</p>
+            <p className="text-muted-foreground mt-0.5">
+              Everything is unlocked for {expiresInDays} more day{expiresInDays === 1 ? "" : "s"}.
+              Pick a plan whenever you're ready — no rush.
+            </p>
+          </div>
+          <Link to="/"><Button size="sm" variant="outline">See plans</Button></Link>
+        </Card>
+      )}
+
+      {subState === "expiring_soon" && (
         <Card className="flex items-center gap-3 border-amber-500/40 bg-amber-500/5 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
           <div className="flex-1 text-sm">
