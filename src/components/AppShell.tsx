@@ -62,6 +62,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/shifts", label: "Shifts & locations", icon: Clock },
       { to: "/live-map", label: "Live map", icon: Map },
       { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
+      { to: "/leave-types", label: "Leave types", icon: Calendar },
       { to: "/payroll", label: "Payroll", icon: Wallet },
       { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
     ];
