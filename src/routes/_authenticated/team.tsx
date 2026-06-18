@@ -215,7 +215,14 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
       toast.success(`${mode === "branch_manager" ? `${branchLabel} manager` : "Staff"} added! Share login → ${phone} / ${password}`);
       onDone();
     } catch (e: any) {
-      toast.error(e.message ?? "Could not add staff");
+      // TanStack server fn errors come wrapped — dig out the real message
+      const msg = e?.message
+        || e?.body?.message
+        || e?.cause?.message
+        || (typeof e === "string" ? e : null)
+        || "Could not add staff. Check your connection and try again.";
+      console.error("[AddStaff] failed:", e);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
