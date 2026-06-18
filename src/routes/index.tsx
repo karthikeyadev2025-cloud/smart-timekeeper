@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useScroll, useTransform, type Variants } from "framer-motion";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapPin, Camera, CheckCircle2, Clock, Users, Shield, Sparkles, Building2, ArrowRight, Map as MapIcon, GraduationCap, Briefcase, Smartphone, BellRing, Wallet, ShieldCheck, UserCog, ShieldAlert } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { BRAND } from "@/lib/brand";
 import { LogoScene3D } from "@/components/LogoScene3D";
 import { RazorpayCheckoutModal } from "@/components/RazorpayCheckoutModal";
+import { toast } from "sonner";
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 28 },
@@ -171,8 +172,38 @@ function Landing() {
 
   const [checkoutPlan, setCheckoutPlan] = useState<{ id: string; name: string; price: number; billing: string } | null>(null);
 
+  // Resume any checkout flow the user started before signing up
+  useEffect(() => {
+    if (!session || !tenantId || checkoutPlan) return;
+    try {
+      const stashed = sessionStorage.getItem("pendingCheckoutPlan");
+      if (stashed) {
+        const plan = JSON.parse(stashed);
+        sessionStorage.removeItem("pendingCheckoutPlan");
+        setCheckoutPlan(plan);
+        toast.success("Welcome! Continuing your checkout.");
+      }
+    } catch {}
+  }, [session, tenantId, checkoutPlan]);
+
   const { data: session } = useQuery({ queryKey: ["session"], queryFn: async () => { const { data } = await supabase.auth.getUser(); return data.user ?? null; } });
-  const { data: tenantId } = useQuery({ queryKey: ["my-tenant", session?.id], enabled: !!session?.id, queryFn: async () => { const { data } = await supabase.from("user_roles").select("tenant_id").eq("user_id", session!.id).eq("role", "client_admin").limit(1).maybeSingle(); return data?.tenant_id ?? null; } });
+  const { data: userInfo } = useQuery({
+    queryKey: ["my-roles-and-tenant", session?.id],
+    enabled: !!session?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role, tenant_id")
+        .eq("user_id", session!.id);
+      const rows = data ?? [];
+      const isSuper = rows.some((r) => r.role === "super_admin");
+      // First tenant_id where the user is an admin of the tenant
+      const tenantId = rows.find((r) => (r.role === "client_admin" || r.role === "branch_manager") && r.tenant_id)?.tenant_id ?? null;
+      return { isSuper, tenantId };
+    },
+  });
+  const tenantId = userInfo?.tenantId ?? null;
+  const isSuper = userInfo?.isSuper ?? false;
 
   const { data: plans } = useQuery({
     queryKey: ["public-plans"],
@@ -404,11 +435,18 @@ function Landing() {
         isLoggedIn={!!session}
         onCheckout={(p) => {
           if (!session) {
-            window.location.href = "/auth#signup";
+            // Stash the plan they wanted so we can resume after signup
+            try { sessionStorage.setItem("pendingCheckoutPlan", JSON.stringify(p)); } catch {}
+            toast.info("Create an account to continue with payment");
+            window.location.href = "/auth";
+            return;
+          }
+          if (isSuper) {
+            toast.info("Switch to a client admin account to purchase");
             return;
           }
           if (!tenantId) {
-            window.location.href = "/app";
+            toast.error("Your account isn't linked to a company yet. Contact support.");
             return;
           }
           setCheckoutPlan(p);
