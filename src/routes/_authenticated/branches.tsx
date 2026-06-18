@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Building2, Trash2, GraduationCap, Settings, Clock, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { TimeInput12h } from "@/components/ui/time-input";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/branches")({
@@ -253,8 +254,8 @@ function BranchSettingsForm({ branch, noun, onDone }: { branch: Branch; noun: st
         <h3 className="text-sm font-semibold flex items-center gap-1.5"><Clock className="h-4 w-4" /> Allowed check-in window</h3>
         <p className="text-xs text-muted-foreground">Staff can only check in during this time range. Leave both blank for any time.</p>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1"><Label className="text-xs">From</Label><Input type="time" value={ciStart} onChange={e => setCiStart(e.target.value)} /></div>
-          <div className="space-y-1"><Label className="text-xs">To</Label><Input type="time" value={ciEnd} onChange={e => setCiEnd(e.target.value)} /></div>
+          <div className="space-y-1"><Label className="text-xs">From</Label><TimeInput12h value={ciStart} onChange={setCiStart} /></div>
+          <div className="space-y-1"><Label className="text-xs">To</Label><TimeInput12h value={ciEnd} onChange={setCiEnd} /></div>
         </div>
       </section>
 
@@ -262,8 +263,8 @@ function BranchSettingsForm({ branch, noun, onDone }: { branch: Branch; noun: st
         <h3 className="text-sm font-semibold flex items-center gap-1.5"><Clock className="h-4 w-4" /> Allowed check-out window</h3>
         <p className="text-xs text-muted-foreground">Staff can only check out during this range. Blank = any time.</p>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1"><Label className="text-xs">From</Label><Input type="time" value={coStart} onChange={e => setCoStart(e.target.value)} /></div>
-          <div className="space-y-1"><Label className="text-xs">To</Label><Input type="time" value={coEnd} onChange={e => setCoEnd(e.target.value)} /></div>
+          <div className="space-y-1"><Label className="text-xs">From</Label><TimeInput12h value={coStart} onChange={setCoStart} /></div>
+          <div className="space-y-1"><Label className="text-xs">To</Label><TimeInput12h value={coEnd} onChange={setCoEnd} /></div>
         </div>
       </section>
 

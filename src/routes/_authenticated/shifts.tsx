@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Plus, MapPin, Clock, RefreshCw, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { TimeInput12h, formatTime12h } from "@/components/ui/time-input";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/shifts")({
@@ -206,7 +207,7 @@ function ShiftsPanel({ tenantId }: { tenantId: string }) {
               <div className="min-w-0">
                 <h3 className="font-semibold truncate">{s.name}</h3>
                 <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5" /> {s.start_time} – {s.end_time}
+                  <Clock className="h-3.5 w-3.5" /> {formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}
                 </p>
               </div>
               <div className="flex flex-col items-end gap-2 shrink-0">
@@ -260,8 +261,8 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
       <DialogHeader><DialogTitle>{isEdit ? "Edit shift" : "New shift"}</DialogTitle></DialogHeader>
       <div className="space-y-1"><Label>Name</Label><Input value={name} onChange={e => setName(e.target.value)} required placeholder="Morning, Night, etc." /></div>
       <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1"><Label>Start</Label><Input type="time" value={start} onChange={e => setStart(e.target.value)} required /></div>
-        <div className="space-y-1"><Label>End</Label><Input type="time" value={end} onChange={e => setEnd(e.target.value)} required /></div>
+        <div className="space-y-1"><Label>Start</Label><TimeInput12h value={start} onChange={setStart} required /></div>
+        <div className="space-y-1"><Label>End</Label><TimeInput12h value={end} onChange={setEnd} required /></div>
       </div>
       <div className="space-y-1"><Label>Break (minutes)</Label><Input type="number" value={breakMin} onChange={e => setBreakMin(e.target.value)} min={0} max={480} /></div>
       <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Saving…" : isEdit ? "Save changes" : "Save"}</Button></DialogFooter>

@@ -611,6 +611,17 @@ type Plan = {
   features: unknown;
 };
 
+
+function billingLabel(b?: string): string {
+  switch ((b ?? "").toLowerCase()) {
+    case "lifetime": return "one-time";
+    case "monthly":  return "/month";
+    case "yearly":   return "/year";
+    case "weekly":   return "/week";
+    default:         return b || "";
+  }
+}
+
 function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Plan[]; tenantId: string; isLoggedIn: boolean; onCheckout: (p: { id: string; name: string; price: number; billing: string }) => void }) {
   const [billing, setBilling] = useState<"lifetime" | "monthly">("lifetime");
   const core = plans
@@ -664,7 +675,7 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
                   <p className="mt-1 text-sm text-muted-foreground">Up to {p.employee_limit} employees</p>
                   <div className="mt-4 flex items-baseline gap-1">
                     <span className="text-4xl font-bold tracking-tight">₹{Number(p.price_inr).toLocaleString("en-IN")}</span>
-                    <span className="text-sm text-muted-foreground">{billing === "lifetime" ? "one-time" : "/mo"}</span>
+                    <span className="text-sm text-muted-foreground">{billingLabel(p.billing)}</span>
                   </div>
                   <Button
                     className="w-full mt-5"
@@ -703,7 +714,7 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold">₹{Number(school.price_inr).toLocaleString("en-IN")}</div>
-                    <div className="text-[11px] text-muted-foreground">lifetime</div>
+                    <div className="text-[11px] text-muted-foreground">{billingLabel(school.billing)}</div>
                   </div>
                 </div>
                 <ul className="mt-4 grid gap-1.5 text-sm sm:grid-cols-2">
@@ -732,7 +743,7 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold">₹{Number(enterprise.price_inr).toLocaleString("en-IN")}</div>
-                    <div className="text-[11px] opacity-70">lifetime</div>
+                    <div className="text-[11px] opacity-70">{billingLabel(enterprise.billing)}</div>
                   </div>
                 </div>
                 <ul className="mt-4 grid gap-1.5 text-sm sm:grid-cols-2">
