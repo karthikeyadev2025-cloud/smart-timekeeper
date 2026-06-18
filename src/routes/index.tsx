@@ -229,9 +229,9 @@ function Landing() {
             <a href="#features" className="story-link hover:text-foreground">Features</a>
             <a href="#pricing" className="story-link hover:text-foreground">Pricing</a>
           </nav>
-          <div className="flex items-center gap-2">
-            <Link to="/auth"><Button variant="ghost" size="sm">Sign in</Button></Link>
-            <Link to="/auth"><Button size="sm" className="gap-1">Get started <ArrowRight className="h-3.5 w-3.5" /></Button></Link>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Link to="/auth"><Button variant="ghost" size="sm" className="px-2 sm:px-3">Sign in</Button></Link>
+            <Link to="/auth"><Button size="sm" className="gap-1 px-2.5 sm:px-3"><span className="hidden xs:inline sm:inline">Get started </span><ArrowRight className="h-3.5 w-3.5" /></Button></Link>
           </div>
         </div>
       </motion.header>

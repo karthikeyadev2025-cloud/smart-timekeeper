@@ -182,7 +182,7 @@ function Payroll() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

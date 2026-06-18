@@ -301,3 +301,48 @@ export const clearAnnouncement = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/* ─────────────── UPDATE OWN COMPANY PROFILE (client admin) ─────────────── */
+// Lets a client_admin edit their own tenant's name/contact/logo without
+// touching is_active or other sensitive columns.
+export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: {
+    name?: string;
+    logo_url?: string | null;
+    primary_color?: string | null;
+    contact_email?: string | null;
+    contact_phone?: string | null;
+  }) => data)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    // Resolve the user's tenant
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("tenant_id, role")
+      .eq("user_id", userId);
+    const tenantId = roles?.find((r: any) => r.role === "client_admin" && r.tenant_id)?.tenant_id;
+    if (!tenantId) throw new Error("You must be a client admin to edit company profile");
+
+    const update: Record<string, unknown> = {};
+    if (data.name !== undefined) {
+      const n = data.name.trim();
+      if (!n) throw new Error("Company name cannot be empty");
+      update.name = n;
+    }
+    if (data.logo_url !== undefined) update.logo_url = data.logo_url || null;
+    if (data.primary_color !== undefined) update.primary_color = data.primary_color || null;
+    if (data.contact_email !== undefined) update.contact_email = data.contact_email || null;
+    if (data.contact_phone !== undefined) update.contact_phone = data.contact_phone || null;
+
+    if (Object.keys(update).length === 0) return { ok: true };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("tenants")
+      .update(update)
+      .eq("id", tenantId);
+    if (error) throw new Error(`Update failed: ${error.message}`);
+    return { ok: true, tenant_id: tenantId };
+  });

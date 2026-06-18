@@ -112,7 +112,7 @@ function TeamPage() {
           </div>
         </header>
 
-        <Card>
+        <Card className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

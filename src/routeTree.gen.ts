@@ -29,6 +29,7 @@ import { Route as AuthenticatedMarkAttendanceRouteImport } from './routes/_authe
 import { Route as AuthenticatedLiveMapRouteImport } from './routes/_authenticated/live-map'
 import { Route as AuthenticatedLeavesAdminRouteImport } from './routes/_authenticated/leaves-admin'
 import { Route as AuthenticatedLeaveTypesRouteImport } from './routes/_authenticated/leave-types'
+import { Route as AuthenticatedCompanyRouteImport } from './routes/_authenticated/company'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedClassesRouteImport } from './routes/_authenticated/classes'
 import { Route as AuthenticatedCheckInRouteImport } from './routes/_authenticated/check-in'
@@ -139,6 +140,11 @@ const AuthenticatedLeaveTypesRoute = AuthenticatedLeaveTypesRouteImport.update({
   path: '/leave-types',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCompanyRoute = AuthenticatedCompanyRouteImport.update({
+  id: '/company',
+  path: '/company',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
   id: '/clients',
   path: '/clients',
@@ -188,6 +194,7 @@ export interface FileRoutesByFullPath {
   '/check-in': typeof AuthenticatedCheckInRoute
   '/classes': typeof AuthenticatedClassesRoute
   '/clients': typeof AuthenticatedClientsRoute
+  '/company': typeof AuthenticatedCompanyRoute
   '/leave-types': typeof AuthenticatedLeaveTypesRoute
   '/leaves-admin': typeof AuthenticatedLeavesAdminRoute
   '/live-map': typeof AuthenticatedLiveMapRoute
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/check-in': typeof AuthenticatedCheckInRoute
   '/classes': typeof AuthenticatedClassesRoute
   '/clients': typeof AuthenticatedClientsRoute
+  '/company': typeof AuthenticatedCompanyRoute
   '/leave-types': typeof AuthenticatedLeaveTypesRoute
   '/leaves-admin': typeof AuthenticatedLeavesAdminRoute
   '/live-map': typeof AuthenticatedLiveMapRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/_authenticated/check-in': typeof AuthenticatedCheckInRoute
   '/_authenticated/classes': typeof AuthenticatedClassesRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
+  '/_authenticated/company': typeof AuthenticatedCompanyRoute
   '/_authenticated/leave-types': typeof AuthenticatedLeaveTypesRoute
   '/_authenticated/leaves-admin': typeof AuthenticatedLeavesAdminRoute
   '/_authenticated/live-map': typeof AuthenticatedLiveMapRoute
@@ -276,6 +285,7 @@ export interface FileRouteTypes {
     | '/check-in'
     | '/classes'
     | '/clients'
+    | '/company'
     | '/leave-types'
     | '/leaves-admin'
     | '/live-map'
@@ -304,6 +314,7 @@ export interface FileRouteTypes {
     | '/check-in'
     | '/classes'
     | '/clients'
+    | '/company'
     | '/leave-types'
     | '/leaves-admin'
     | '/live-map'
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
     | '/_authenticated/check-in'
     | '/_authenticated/classes'
     | '/_authenticated/clients'
+    | '/_authenticated/company'
     | '/_authenticated/leave-types'
     | '/_authenticated/leaves-admin'
     | '/_authenticated/live-map'
@@ -501,6 +513,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLeaveTypesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/company': {
+      id: '/_authenticated/company'
+      path: '/company'
+      fullPath: '/company'
+      preLoaderRoute: typeof AuthenticatedCompanyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/clients': {
       id: '/_authenticated/clients'
       path: '/clients'
@@ -561,6 +580,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCheckInRoute: typeof AuthenticatedCheckInRoute
   AuthenticatedClassesRoute: typeof AuthenticatedClassesRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
+  AuthenticatedCompanyRoute: typeof AuthenticatedCompanyRoute
   AuthenticatedLeaveTypesRoute: typeof AuthenticatedLeaveTypesRoute
   AuthenticatedLeavesAdminRoute: typeof AuthenticatedLeavesAdminRoute
   AuthenticatedLiveMapRoute: typeof AuthenticatedLiveMapRoute
@@ -584,6 +604,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCheckInRoute: AuthenticatedCheckInRoute,
   AuthenticatedClassesRoute: AuthenticatedClassesRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
+  AuthenticatedCompanyRoute: AuthenticatedCompanyRoute,
   AuthenticatedLeaveTypesRoute: AuthenticatedLeaveTypesRoute,
   AuthenticatedLeavesAdminRoute: AuthenticatedLeavesAdminRoute,
   AuthenticatedLiveMapRoute: AuthenticatedLiveMapRoute,

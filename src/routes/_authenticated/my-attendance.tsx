@@ -31,7 +31,7 @@ function MyAttendance() {
           <h1 className="text-3xl font-bold tracking-tight">My attendance</h1>
           <p className="text-muted-foreground">Last 100 events</p>
         </header>
-        <Card>
+        <Card className="overflow-x-auto">
           <Table>
             <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Time</TableHead><TableHead>Action</TableHead><TableHead>Location</TableHead></TableRow></TableHeader>
             <TableBody>

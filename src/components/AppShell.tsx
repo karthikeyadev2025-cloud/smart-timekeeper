@@ -48,6 +48,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
     if (tenantType === "school") {
       return [
         { to: "/app", label: "Dashboard", icon: LayoutDashboard },
+        { to: "/company", label: "School profile", icon: Building2 },
         { to: "/branches", label: "Campuses", icon: Building2 },
         { to: "/team", label: "Teachers & staff", icon: Users },
         { to: "/classes", label: "Classes & students", icon: GraduationCap },
@@ -58,6 +59,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
     }
     return [
       { to: "/app", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/company", label: "Company profile", icon: Building2 },
       { to: "/branches", label: "Branches", icon: Building2 },
       { to: "/team", label: "Staff", icon: Users },
       { to: "/shifts", label: "Shifts & locations", icon: Clock },
@@ -181,13 +183,15 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex w-full flex-col md:hidden">
-        <header className="flex items-center justify-between gap-2 border-b border-border bg-background px-4 py-3">
-          <Logo />
-          <div className="flex items-center gap-2">
+        <header className="flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-3">
+          <div className="min-w-0 flex-1">
+            <Logo size={26} />
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
             <HeaderBranchSwitcher />
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon"><Menu className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="icon" aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-72 p-0">
                 <SidebarContent />
@@ -195,7 +199,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Sheet>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 pb-20">{children}</main>
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 pb-20">{children}</main>
       </div>
 
       <div className="hidden flex-1 flex-col md:flex">
