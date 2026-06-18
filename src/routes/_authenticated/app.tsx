@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, primaryRole } from "@/hooks/useCurrentUser";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles, TrendingUp, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles, TrendingUp, AlertTriangle, ShieldAlert, Clock } from "lucide-react";
+import { formatTime12h } from "@/components/ui/time-input";
 
 export const Route = createFileRoute("/_authenticated/app")({
   component: Dashboard,
@@ -291,6 +292,21 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
     },
   });
 
+  // Live-fetched assigned shift — any admin change propagates here on next refetch
+  const { data: myShift } = useQuery({
+    queryKey: ["my-shift", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("staff_shifts")
+        .select("shifts(id, name, start_time, end_time, break_minutes)")
+        .eq("user_id", userId!)
+        .limit(1)
+        .maybeSingle();
+      return (data as any)?.shifts ?? null;
+    },
+  });
+
   const lastKind = todayRecords?.[todayRecords.length - 1]?.kind;
   const isCheckedIn = lastKind === "check_in" || lastKind === "break_in";
 
@@ -302,6 +318,22 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
         <h1 className="text-3xl font-bold tracking-tight">Today</h1>
         <p className="text-muted-foreground">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
       </header>
+
+      {myShift && (
+        <Card className="flex items-center gap-3 p-4 border-primary/30 bg-primary/5">
+          <div className="rounded-full bg-primary/15 p-2.5">
+            <Clock className="h-5 w-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Your shift</p>
+            <p className="font-semibold">{(myShift as any).name}</p>
+            <p className="text-sm text-muted-foreground">
+              {formatTime12h((myShift as any).start_time)} – {formatTime12h((myShift as any).end_time)}
+              {(myShift as any).break_minutes ? ` · ${(myShift as any).break_minutes} min break` : ""}
+            </p>
+          </div>
+        </Card>
+      )}
 
       <Card className="overflow-hidden">
         <div className="bg-gradient-to-br from-primary to-primary-glow p-6 text-primary-foreground">

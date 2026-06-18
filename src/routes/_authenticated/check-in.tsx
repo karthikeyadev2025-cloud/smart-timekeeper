@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Camera, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, ShieldAlert, Clock } from "lucide-react";
+import { formatTime12h } from "@/components/ui/time-input";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
@@ -120,6 +121,20 @@ function CheckInFlow() {
         .eq("attendance_date", today)
         .order("occurred_at");
       return data ?? [];
+    },
+  });
+
+  const { data: myShift } = useQuery({
+    queryKey: ["my-shift", user?.userId],
+    enabled: !!user?.userId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("staff_shifts")
+        .select("shifts(id, name, start_time, end_time, break_minutes)")
+        .eq("user_id", user!.userId)
+        .limit(1)
+        .maybeSingle();
+      return (data as any)?.shifts ?? null;
     },
   });
 
@@ -270,6 +285,16 @@ function CheckInFlow() {
           <h1 className="text-2xl font-bold">{nextKind.replace("_", " ").replace(/^\w/, c => c.toUpperCase())}</h1>
           <p className="text-sm text-muted-foreground">3 simple steps to record your attendance.</p>
         </header>
+
+        {myShift && (
+          <Card className="flex items-center gap-3 p-3 border-primary/30 bg-primary/5">
+            <Clock className="h-4 w-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0 text-sm">
+              <span className="font-medium">{(myShift as any).name}</span>
+              <span className="text-muted-foreground"> · {formatTime12h((myShift as any).start_time)}–{formatTime12h((myShift as any).end_time)}</span>
+            </div>
+          </Card>
+        )}
 
         <div className="flex gap-2">
           {[1, 2, 3].map((s) => (
