@@ -217,3 +217,87 @@ export const revokeClientAdmin = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/* ─────────────── DELETE TENANT ─────────────── */
+export const deleteTenant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { tenant_id: string; confirm: string }) => data)
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.supabase, context.userId);
+    if (data.confirm !== "DELETE") throw new Error("Confirmation phrase did not match");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: profiles } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("tenant_id", data.tenant_id);
+    const userIds = (profiles ?? []).map((p) => p.id);
+
+    const { error: tenantErr } = await supabaseAdmin
+      .from("tenants")
+      .delete()
+      .eq("id", data.tenant_id);
+    if (tenantErr) throw new Error(`Tenant delete failed: ${tenantErr.message}`);
+
+    const errors: string[] = [];
+    for (const uid of userIds) {
+      const { data: otherRoles } = await supabaseAdmin
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", uid)
+        .limit(1);
+      if (otherRoles && otherRoles.length === 0) {
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(uid);
+        if (error) errors.push(`user ${uid}: ${error.message}`);
+      }
+    }
+
+    return { ok: true, users_deleted: userIds.length - errors.length, auth_errors: errors };
+  });
+
+/* ─────────────── BROADCAST ANNOUNCEMENT ─────────────── */
+export const broadcastAnnouncement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: {
+    title: string;
+    body: string;
+    severity?: "info" | "warning" | "critical";
+    expires_at?: string | null;
+  }) => data)
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.supabase, context.userId);
+    if (!data.title.trim() || !data.body.trim()) throw new Error("Title and body required");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const payload = {
+      title: data.title.trim(),
+      body: data.body.trim(),
+      severity: data.severity ?? "info",
+      expires_at: data.expires_at ?? null,
+      posted_at: new Date().toISOString(),
+      posted_by: context.userId,
+    };
+
+    const { error } = await supabaseAdmin
+      .from("app_settings")
+      .upsert(
+        { key: "announcement", value: payload },
+        { onConflict: "key" }
+      );
+    if (error) throw new Error(error.message);
+
+    return { ok: true, posted_at: payload.posted_at };
+  });
+
+/* ─────────────── CLEAR ANNOUNCEMENT ─────────────── */
+export const clearAnnouncement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("app_settings").delete().eq("key", "announcement");
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

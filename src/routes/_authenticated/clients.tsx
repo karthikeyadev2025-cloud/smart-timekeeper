@@ -16,7 +16,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle, ShieldCheck, Trash2, BellRing } from "lucide-react";
+import { BroadcastForm } from "@/components/BroadcastForm";
+import { DeleteTenantDialog } from "@/components/DeleteTenantDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -31,6 +33,7 @@ export const Route = createFileRoute("/_authenticated/clients")({
 function ClientsPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
 
@@ -57,10 +60,20 @@ function ClientsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Client companies</h1>
             <p className="text-muted-foreground">{rows.length} of {data?.length ?? 0} companies</p>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> New client</Button></DialogTrigger>
-            <DialogContent><TenantForm onDone={() => { setOpen(false); refresh(); }} /></DialogContent>
-          </Dialog>
+          <div className="flex items-center gap-2">
+            <Dialog open={broadcastOpen} onOpenChange={setBroadcastOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2"><BellRing className="h-4 w-4" /> Broadcast</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <BroadcastForm onDone={() => setBroadcastOpen(false)} />
+              </DialogContent>
+            </Dialog>
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> New client</Button></DialogTrigger>
+              <DialogContent><TenantForm onDone={() => { setOpen(false); refresh(); }} /></DialogContent>
+            </Dialog>
+          </div>
         </header>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -132,6 +145,7 @@ function RowActions({ tenant, onChange }: { tenant: any; onChange: () => void })
   const [planOpen, setPlanOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [permsOpen, setPermsOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [magicLink, setMagicLink] = useState<string | null>(null);
 
   const doImpersonate = async () => {
@@ -181,12 +195,23 @@ function RowActions({ tenant, onChange }: { tenant: any; onChange: () => void })
           <DropdownMenuItem onClick={doToggle} className={tenant.is_active ? "text-destructive" : ""}>
             {tenant.is_active ? <><Pause className="mr-2 h-4 w-4" /> Suspend</> : <><Play className="mr-2 h-4 w-4" /> Reactivate</>}
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-destructive">
+            <Trash2 className="mr-2 h-4 w-4" /> Delete tenant
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <ChangePlanDialog open={planOpen} onOpenChange={setPlanOpen} tenant={tenant} onDone={onChange} />
       <TenantDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} tenantId={tenant.id} />
       <TenantPermissionsDialog open={permsOpen} onOpenChange={setPermsOpen} tenantId={tenant.id} tenantName={tenant.name} />
+      <DeleteTenantDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        tenantId={tenant.id}
+        tenantName={tenant.name}
+        onDeleted={onChange}
+      />
 
       <Dialog open={!!magicLink} onOpenChange={(o) => !o && setMagicLink(null)}>
         <DialogContent>

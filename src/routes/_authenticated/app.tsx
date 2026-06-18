@@ -205,6 +205,17 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
     },
   });
 
+  const { data: announcement } = useQuery({
+    queryKey: ["announcement"],
+    queryFn: async () => {
+      const { data } = await supabase.from("app_settings").select("value").eq("key", "announcement").maybeSingle();
+      const v = (data as any)?.value;
+      if (!v) return null;
+      if (v.expires_at && new Date(v.expires_at) < new Date()) return null;
+      return v as { title: string; body: string; severity: string };
+    },
+  });
+
   // --- Subscription state computation ---
   // Five possible states:
   //   loading       → don't show anything yet
@@ -274,6 +285,24 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
           </Badge>
         )}
       </header>
+
+      {announcement && (
+        <Card className={
+          announcement.severity === "critical" ? "flex items-start gap-3 border-destructive/40 bg-destructive/5 p-4" :
+          announcement.severity === "warning"  ? "flex items-start gap-3 border-amber-500/40 bg-amber-500/5 p-4" :
+                                                  "flex items-start gap-3 border-primary/30 bg-primary/5 p-4"
+        }>
+          <AlertTriangle className={
+            announcement.severity === "critical" ? "h-5 w-5 shrink-0 text-destructive mt-0.5" :
+            announcement.severity === "warning"  ? "h-5 w-5 shrink-0 text-amber-500 mt-0.5" :
+                                                    "h-5 w-5 shrink-0 text-primary mt-0.5"
+          } />
+          <div className="flex-1 text-sm">
+            <p className="font-semibold">{announcement.title}</p>
+            <p className="text-muted-foreground mt-0.5">{announcement.body}</p>
+          </div>
+        </Card>
+      )}
 
       {subState === "suspended" && (
         <Card className="flex items-start gap-3 border-destructive/40 bg-destructive/5 p-4">
