@@ -6,16 +6,16 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 function createSupabaseAdminClient() {
-  // Accept either prefixed or non-prefixed env vars — Vercel sometimes only has VITE_*
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  // URL falls back through 3 sources: prefixed env, VITE_ env, then hardcoded project URL.
+  // The URL is NOT a secret (every browser request exposes it) — only the service_role key is.
+  const SUPABASE_URL =
+    process.env.SUPABASE_URL
+    || process.env.VITE_SUPABASE_URL
+    || "https://excqnzlfjiddvyyjtxpo.supabase.co";
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    const missing = [
-      ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
-      ...(!SUPABASE_SERVICE_ROLE_KEY ? ['SUPABASE_SERVICE_ROLE_KEY'] : []),
-    ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Add them in Vercel → Settings → Environment Variables, then redeploy.`;
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    const message = "Missing SUPABASE_SERVICE_ROLE_KEY env var. Add it in Vercel → Settings → Environment Variables (copy from Supabase → Settings → API → service_role secret), then redeploy.";
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
