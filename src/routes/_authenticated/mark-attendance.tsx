@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
@@ -46,12 +46,12 @@ function MarkAttendancePage() {
     queryFn: async () => (await supabase.from("student_attendance").select("*").eq("class_id", classId).eq("attendance_date", date)).data ?? [],
   });
 
-  useMemo(() => {
+  useEffect(() => {
     if (!existing) return;
     const m: Record<string, Status> = {};
     existing.forEach((r: any) => { m[r.student_id] = r.status; });
     setMarks(m);
-  }, [existing]);
+  }, [existing, classId, date]);
 
   const markAllPresent = () => {
     const m: Record<string, Status> = {};

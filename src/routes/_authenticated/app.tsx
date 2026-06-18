@@ -190,6 +190,17 @@ function SuperAdminHome() {
 }
 
 function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; branchManagerMode?: boolean }) {
+  const { data: announcement } = useQuery({
+    queryKey: ["announcement"],
+    queryFn: async () => {
+      const { data } = await supabase.from("app_settings").select("value").eq("key", "announcement").maybeSingle();
+      const v = (data as any)?.value;
+      if (!v) return null;
+      if (v.expires_at && new Date(v.expires_at) < new Date()) return null;
+      return v as { title: string; body: string; severity: string };
+    },
+  });
+
   const { data: sub } = useQuery({
     queryKey: ["subscription", tenantId],
     enabled: !!tenantId && !branchManagerMode,
@@ -233,6 +244,24 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
         <h1 className="text-3xl font-bold tracking-tight">{branchManagerMode ? "Branch Dashboard" : "Dashboard"}</h1>
         <p className="text-muted-foreground">{branchManagerMode ? "Your branch at a glance." : "Today at a glance."}</p>
       </header>
+
+      {announcement && (
+        <Card className={
+          announcement.severity === "critical" ? "flex items-start gap-3 border-destructive/40 bg-destructive/5 p-4" :
+          announcement.severity === "warning"  ? "flex items-start gap-3 border-amber-500/40 bg-amber-500/5 p-4" :
+                                                  "flex items-start gap-3 border-primary/30 bg-primary/5 p-4"
+        }>
+          <AlertTriangle className={
+            announcement.severity === "critical" ? "h-5 w-5 shrink-0 text-destructive" :
+            announcement.severity === "warning"  ? "h-5 w-5 shrink-0 text-amber-500" :
+                                                    "h-5 w-5 shrink-0 text-primary"
+          } />
+          <div className="flex-1 text-sm">
+            <p className="font-semibold">{announcement.title}</p>
+            <p className="text-muted-foreground mt-0.5">{announcement.body}</p>
+          </div>
+        </Card>
+      )}
 
       {isExpired && (
         <Card className="flex items-center gap-3 border-destructive/40 bg-destructive/5 p-4">
