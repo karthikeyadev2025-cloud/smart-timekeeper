@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, primaryRole } from "@/hooks/useCurrentUser";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles, TrendingUp, AlertTriangle, ShieldAlert, Clock } from "lucide-react";
+import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles, TrendingUp, AlertTriangle, ShieldAlert, Clock, Camera } from "lucide-react";
 import { formatTime12h } from "@/components/ui/time-input";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/app")({
   component: Dashboard,
@@ -407,6 +409,10 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
 }
 
 function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string }) {
+  const { data: me } = useCurrentUser();
+  const qc = useQueryClient();
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
   const today = new Date().toISOString().slice(0, 10);
   const { data: todayRecords } = useQuery({
     queryKey: ["today-records", userId, today],
@@ -477,11 +483,70 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
 
   if (!tenantId) return <NoRoleHome />;
 
+  const firstName = (me?.profile?.full_name ?? "").split(" ")[0] || "there";
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
+  })();
+
+  const onPickAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !userId) return;
+    if (file.size > 2_000_000) { toast.error("Photo must be under 2 MB"); return; }
+    if (!file.type.startsWith("image/")) { toast.error("Please pick an image"); return; }
+    setAvatarUploading(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      const path = `${userId}/avatar-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("tenant-logos").upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("tenant-logos").getPublicUrl(path);
+      const { error: profErr } = await supabase.from("profiles").update({ avatar_url: pub.publicUrl }).eq("id", userId);
+      if (profErr) throw profErr;
+      toast.success("Profile photo updated");
+      qc.invalidateQueries({ queryKey: ["current-user"] });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not upload photo");
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = "";
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <Card className="flex items-center gap-4 p-4 sm:p-5">
+        <div className="relative shrink-0">
+          <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-primary/20 bg-muted">
+            {me?.profile?.avatar_url ? (
+              <img src={me.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xl font-bold text-muted-foreground">
+                {firstName.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+          <label className="absolute -bottom-1 -right-1 cursor-pointer rounded-full bg-primary p-1.5 text-primary-foreground shadow hover:bg-primary/90">
+            <input type="file" accept="image/*" className="hidden" onChange={onPickAvatar} disabled={avatarUploading} />
+            <Camera className="h-3 w-3" />
+          </label>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground">{greeting},</p>
+          <h1 className="truncate text-xl sm:text-2xl font-bold tracking-tight">{firstName} 👋</h1>
+          <p className="text-xs text-muted-foreground">
+            {me?.tenant?.name ?? "Your company"} · {me?.profile?.designation || "Staff"}
+          </p>
+        </div>
+        {me?.tenant?.logo_url && (
+          <img src={me.tenant.logo_url} alt="" className="hidden sm:block h-10 w-10 shrink-0 rounded-lg object-contain" />
+        )}
+      </Card>
+
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Today</h1>
-        <p className="text-muted-foreground">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
+        <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
       </header>
 
       {myShift && (

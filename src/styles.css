@@ -135,3 +135,17 @@
   * { border-color: var(--color-border); }
   body { background-color: var(--color-background); color: var(--color-foreground); font-feature-settings: "cv02","cv03","cv04","cv11"; }
 }
+
+/* Leaflet's own z-index (controls go up to 1000) escapes our Radix Dialog
+   overlay (z-50), making modals like the selfie viewer render visually
+   behind the map's zoom buttons. Cap every Leaflet layer well below our
+   dialog/overlay z-index so dialogs always sit on top. */
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom,
+.leaflet-control {
+  z-index: 10 !important;
+}
+.leaflet-popup-pane {
+  z-index: 15 !important;
+}
