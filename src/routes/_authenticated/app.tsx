@@ -16,15 +16,43 @@ export const Route = createFileRoute("/_authenticated/app")({
 function Dashboard() {
   const { data: user } = useCurrentUser();
   const role = primaryRole(user?.roles ?? []);
+  const isDisabledStaff = role === "staff" && user?.profile && user.profile.is_active === false;
 
   return (
     <AppShell>
-      {role === "super_admin" && <SuperAdminHome />}
-      {role === "client_admin" && <ClientAdminHome tenantId={user?.tenant?.id} />}
-      {role === "branch_manager" && <ClientAdminHome tenantId={user?.tenant?.id} branchManagerMode />}
-      {role === "staff" && <StaffHome userId={user?.userId} tenantId={user?.tenant?.id} />}
-      {!role && <NoRoleHome />}
+      {isDisabledStaff ? (
+        <DisabledAccountNotice />
+      ) : (
+        <>
+          {role === "super_admin" && <SuperAdminHome />}
+          {role === "client_admin" && <ClientAdminHome tenantId={user?.tenant?.id} />}
+          {role === "branch_manager" && <ClientAdminHome tenantId={user?.tenant?.id} branchManagerMode />}
+          {role === "staff" && <StaffHome userId={user?.userId} tenantId={user?.tenant?.id} />}
+          {!role && <NoRoleHome />}
+        </>
+      )}
     </AppShell>
+  );
+}
+
+function DisabledAccountNotice() {
+  return (
+    <div className="mx-auto max-w-2xl">
+      <Card className="p-8 text-center border-destructive/30">
+        <ShieldAlert className="mx-auto h-10 w-10 text-destructive" />
+        <h2 className="mt-4 text-2xl font-bold">Account disabled</h2>
+        <p className="mt-2 text-muted-foreground">
+          Your account has been disabled by your admin. If this is a mistake, please contact them.
+        </p>
+        <Button
+          className="mt-4"
+          variant="outline"
+          onClick={async () => { await supabase.auth.signOut(); window.location.href = "/auth"; }}
+        >
+          Sign out
+        </Button>
+      </Card>
+    </div>
   );
 }
 
@@ -412,6 +440,41 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
   const lastKind = todayRecords?.[todayRecords.length - 1]?.kind;
   const isCheckedIn = lastKind === "check_in" || lastKind === "break_in";
 
+  // Worked hours today: sum of (check_out - check_in) pairs, ongoing session counted to now
+  const workedTodayMinutes = (() => {
+    if (!todayRecords || todayRecords.length === 0) return 0;
+    let total = 0;
+    let openStart: Date | null = null;
+    for (const r of todayRecords) {
+      if (r.kind === "check_in" || r.kind === "break_out") {
+        openStart = new Date(r.occurred_at);
+      } else if ((r.kind === "check_out" || r.kind === "break_in") && openStart) {
+        total += (new Date(r.occurred_at).getTime() - openStart.getTime()) / 60000;
+        openStart = null;
+      }
+    }
+    if (openStart) total += (Date.now() - openStart.getTime()) / 60000;
+    return Math.max(0, Math.round(total));
+  })();
+
+  // This month's worked-days summary
+  const monthStart = new Date(); monthStart.setDate(1);
+  const monthStartStr = monthStart.toISOString().slice(0, 10);
+  const { data: monthRecords } = useQuery({
+    queryKey: ["my-month-records", userId, monthStartStr],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("attendance_records")
+        .select("attendance_date, kind")
+        .eq("user_id", userId!)
+        .eq("kind", "check_in")
+        .gte("attendance_date", monthStartStr);
+      return data ?? [];
+    },
+  });
+  const presentDaysThisMonth = new Set((monthRecords ?? []).map((r) => r.attendance_date)).size;
+
   if (!tenantId) return <NoRoleHome />;
 
   return (
@@ -436,6 +499,20 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
           </div>
         </Card>
       )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="p-4">
+          <p className="text-xs text-muted-foreground">Worked today</p>
+          <p className="mt-1 text-2xl font-bold">
+            {Math.floor(workedTodayMinutes / 60)}h {workedTodayMinutes % 60}m
+          </p>
+          {isCheckedIn && <p className="text-xs text-primary mt-0.5">● Live</p>}
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs text-muted-foreground">Present days this month</p>
+          <p className="mt-1 text-2xl font-bold">{presentDaysThisMonth}</p>
+        </Card>
+      </div>
 
       <Card className="overflow-hidden">
         <div className="bg-gradient-to-br from-primary to-primary-glow p-6 text-primary-foreground">

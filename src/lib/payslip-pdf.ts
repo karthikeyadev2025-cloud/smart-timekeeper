@@ -13,6 +13,8 @@ export type PayslipPdfData = {
   working_days: number | string;
   overtime_hours: number | string;
   deductions: number | string;
+  late_days?: number | string;
+  late_fine?: number | string;
   net_pay: number | string;
   generated_at?: string;
 };
@@ -84,7 +86,12 @@ export function downloadPayslipPdf(payslip: PayslipPdfData, ctx: PayslipContext)
   };
   row("Base salary", inr(payslip.base_salary));
   row("Overtime hours", String(payslip.overtime_hours));
-  row("Deductions (unpaid leave / absences)", "- " + inr(payslip.deductions));
+  const lateFine = Number(payslip.late_fine ?? 0);
+  const absenceOnly = Number(payslip.deductions) - lateFine;
+  row("Deductions (unpaid leave / absences)", "- " + inr(absenceOnly));
+  if (lateFine > 0) {
+    row(`Late check-in fine (${payslip.late_days ?? 0} day${Number(payslip.late_days ?? 0) === 1 ? "" : "s"})`, "- " + inr(lateFine));
+  }
   doc.setDrawColor(220); doc.line(40, y - 6, W - 40, y - 6);
   y += 6;
   doc.setFillColor(238, 242, 255); doc.rect(40, y - 14, W - 80, 36, "F");

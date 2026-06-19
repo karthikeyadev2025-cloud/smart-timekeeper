@@ -346,3 +346,20 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     if (error) throw new Error(`Update failed: ${error.message}`);
     return { ok: true, tenant_id: tenantId };
   });
+
+/* ─────────────── EXPORT TENANT STAFF (super admin) ─────────────── */
+export const exportTenantStaff = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { tenant_id: string }) => data)
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: staff } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name, phone, email, designation, monthly_salary, is_active, is_field_staff, created_at, branches:branch_id(name), user_roles(role)")
+      .eq("tenant_id", data.tenant_id)
+      .order("created_at", { ascending: false });
+
+    return { staff: staff ?? [] };
+  });

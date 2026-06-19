@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { MapPin, ExternalLink, AlertTriangle, RefreshCw } from "lucide-react";
+import { MapPin, ExternalLink, AlertTriangle, RefreshCw, Camera } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -48,6 +49,7 @@ function LiveMapPage() {
   const { data: user } = useCurrentUser();
   const tenantId = user?.tenant?.id;
   const today = new Date().toISOString().slice(0, 10);
+  const [viewingPhoto, setViewingPhoto] = useState<{ path: string; staffName: string; time: string } | null>(null);
 
   const { data: punches, refetch, isFetching } = useQuery({
     queryKey: ["live-map", tenantId, today],
@@ -56,7 +58,7 @@ function LiveMapPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("attendance_records")
-        .select("*, profiles!attendance_records_user_id_fkey(full_name, phone, is_field_staff), office_locations(name)")
+        .select("*, profiles!attendance_records_user_id_fkey(full_name, phone, is_field_staff), office_locations(name), selfie_url")
         .eq("tenant_id", tenantId!)
         .eq("attendance_date", today)
         .order("occurred_at", { ascending: false });
@@ -201,12 +203,26 @@ function LiveMapPage() {
                   </div>
                 </div>
                 {mapUrl && (
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <a href={mapUrl} target="_blank" rel="noreferrer">
                       <Button size="sm" variant="outline" className="gap-1">
                         <ExternalLink className="h-3 w-3" /> Open in Google Maps
                       </Button>
                     </a>
+                    {p.selfie_url && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1"
+                        onClick={() => setViewingPhoto({
+                          path: p.selfie_url,
+                          staffName: p.profiles?.full_name ?? "Unknown",
+                          time: new Date(p.occurred_at).toLocaleString(),
+                        })}
+                      >
+                        <Camera className="h-3 w-3" /> View photo
+                      </Button>
+                    )}
                     <span className="self-center text-xs font-mono text-muted-foreground">
                       {Number(p.latitude).toFixed(5)}, {Number(p.longitude).toFixed(5)}
                     </span>
@@ -220,6 +236,36 @@ function LiveMapPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={!!viewingPhoto} onOpenChange={(v) => !v && setViewingPhoto(null)}>
+        <DialogContent className="max-w-md">
+          {viewingPhoto && (
+            <div className="space-y-3">
+              <div>
+                <p className="font-semibold">{viewingPhoto.staffName}</p>
+                <p className="text-xs text-muted-foreground">{viewingPhoto.time}</p>
+              </div>
+              <SelfieImage path={viewingPhoto.path} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
+}
+
+/** Loads a short-lived signed URL for a selfie from the private bucket and renders it. */
+function SelfieImage({ path }: { path: string }) {
+  const { data: url, isLoading, error } = useQuery({
+    queryKey: ["selfie-url", path],
+    queryFn: async () => {
+      const { data, error } = await supabase.storage.from("attendance-selfies").createSignedUrl(path, 300);
+      if (error) throw error;
+      return data.signedUrl;
+    },
+  });
+
+  if (isLoading) return <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Loading photo…</div>;
+  if (error || !url) return <div className="flex h-64 items-center justify-center text-sm text-destructive">Could not load photo</div>;
+  return <img src={url} alt="Check-in selfie" className="w-full rounded-lg border object-contain max-h-[60vh]" />;
 }

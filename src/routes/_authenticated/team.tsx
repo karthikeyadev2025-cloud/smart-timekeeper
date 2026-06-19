@@ -18,6 +18,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useBranchFilter } from "@/hooks/useBranchFilter";
 import { toast } from "sonner";
 import { createStaff, updateStaff, deleteStaff } from "@/lib/staff.functions";
+import { StaffImportExportDialog } from "@/components/StaffImportExportDialog";
 
 export const Route = createFileRoute("/_authenticated/team")({
   component: TeamPage,
@@ -57,7 +58,11 @@ function TeamPage() {
         .order("created_at", { ascending: false });
       if (branchId !== "all") q = q.eq("branch_id", branchId);
       const { data } = await q;
-      return data ?? [];
+      // Exclude the tenant's client_admin(s) — they manage staff, they aren't staff.
+      // (Keeps branch_manager + staff rows, which is what this page is for.)
+      return (data ?? []).filter((p: any) =>
+        !(p.user_roles ?? []).some((r: any) => r.role === "client_admin")
+      );
     },
   });
 
@@ -89,7 +94,12 @@ function TeamPage() {
             <h1 className="text-3xl font-bold tracking-tight">Staff</h1>
             <p className="text-muted-foreground">{staff?.length ?? 0} members{branchId !== "all" ? ` in selected ${branchLabel.toLowerCase()}` : ""}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <StaffImportExportDialog
+              tenantId={tenantId!}
+              staff={staff ?? []}
+              onDone={() => { qc.invalidateQueries({ queryKey: ["staff"] }); }}
+            />
             <Button variant="outline" className="gap-2" onClick={() => { setInviteMode("branch_manager"); setOpen(true); }}>
               <Shield className="h-4 w-4" /> Invite {branchLabel.toLowerCase()} manager
             </Button>
@@ -162,7 +172,22 @@ function TeamPage() {
                       className="h-4 w-4 cursor-pointer"
                     />
                   </TableCell>
-                  <TableCell><Badge variant={s.is_active ? "default" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge></TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const next = !s.is_active;
+                        if (!confirm(next ? `Re-enable ${s.full_name}?` : `Disable ${s.full_name}? They won't be able to log in or check in, but all their records stay intact.`)) return;
+                        const { error } = await supabase.from("profiles").update({ is_active: next }).eq("id", s.id);
+                        if (error) toast.error(error.message);
+                        else { toast.success(next ? "Staff re-enabled" : "Staff disabled"); qc.invalidateQueries({ queryKey: ["staff"] }); }
+                      }}
+                    >
+                      <Badge variant={s.is_active ? "default" : "secondary"} className="cursor-pointer">
+                        {s.is_active ? "Active" : "Disabled"}
+                      </Badge>
+                    </button>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-0.5">
                       <Button
@@ -432,6 +457,70 @@ function EditStaffForm({
       <DialogFooter>
         <Button type="submit" disabled={loading}>{loading ? "Saving…" : "Save changes"}</Button>
       </DialogFooter>
+
+      <StaffRemarksPanel tenantId={tenantId} userId={staff.id} />
     </form>
+  );
+}
+
+function StaffRemarksPanel({ tenantId, userId }: { tenantId: string; userId: string }) {
+  const qc = useQueryClient();
+  const [remark, setRemark] = useState("");
+  const [posting, setPosting] = useState(false);
+
+  const { data: remarks } = useQuery({
+    queryKey: ["staff-remarks", userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("staff_remarks")
+        .select("id, remark, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      return data ?? [];
+    },
+  });
+
+  const post = async () => {
+    if (!remark.trim()) return;
+    setPosting(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("staff_remarks").insert({
+      tenant_id: tenantId,
+      user_id: userId,
+      remark: remark.trim(),
+      created_by: user?.id ?? null,
+    });
+    setPosting(false);
+    if (error) { toast.error(error.message); return; }
+    setRemark("");
+    qc.invalidateQueries({ queryKey: ["staff-remarks", userId] });
+  };
+
+  return (
+    <div className="border-t pt-3 space-y-2">
+      <Label className="text-xs text-muted-foreground">Remarks (visible at payslip review time)</Label>
+      <div className="flex gap-2">
+        <Input
+          value={remark}
+          onChange={(e) => setRemark(e.target.value)}
+          placeholder="e.g. Came late 3 times this week, spoke to him"
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); post(); } }}
+        />
+        <Button type="button" size="sm" variant="outline" disabled={posting || !remark.trim()} onClick={post}>
+          {posting ? "…" : "Add"}
+        </Button>
+      </div>
+      {(remarks ?? []).length > 0 && (
+        <div className="max-h-32 space-y-1.5 overflow-y-auto rounded-md bg-muted/30 p-2">
+          {remarks!.map((r) => (
+            <div key={r.id} className="text-xs">
+              <span className="text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span>{" "}
+              {r.remark}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

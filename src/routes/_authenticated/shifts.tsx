@@ -27,6 +27,10 @@ type Location = {
 type Shift = {
   id: string; name: string;
   start_time: string; end_time: string; break_minutes: number;
+  grace_minutes?: number;
+  late_fine_type?: "none" | "fixed_per_occurrence" | "per_minute" | "half_day_after_minutes";
+  late_fine_amount?: number;
+  half_day_after_minutes?: number;
 };
 
 function ShiftsLocations() {
@@ -235,6 +239,10 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
   const [start, setStart] = useState(trimTime(initial?.start_time) || "09:00");
   const [end, setEnd] = useState(trimTime(initial?.end_time) || "18:00");
   const [breakMin, setBreakMin] = useState((initial?.break_minutes ?? 60).toString());
+  const [graceMin, setGraceMin] = useState((initial?.grace_minutes ?? 10).toString());
+  const [fineType, setFineType] = useState<NonNullable<Shift["late_fine_type"]>>(initial?.late_fine_type ?? "none");
+  const [fineAmount, setFineAmount] = useState((initial?.late_fine_amount ?? 0).toString());
+  const [halfDayMin, setHalfDayMin] = useState((initial?.half_day_after_minutes ?? 120).toString());
   const [loading, setLoading] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -247,6 +255,10 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
       start_time: start,
       end_time: end,
       break_minutes: Math.max(0, Number(breakMin) || 0),
+      grace_minutes: Math.max(0, Number(graceMin) || 0),
+      late_fine_type: fineType,
+      late_fine_amount: Math.max(0, Number(fineAmount) || 0),
+      half_day_after_minutes: Math.max(1, Number(halfDayMin) || 120),
     };
     const { error } = isEdit
       ? await supabase.from("shifts").update(payload).eq("id", initial!.id)
@@ -257,7 +269,7 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
   };
 
   return (
-    <form onSubmit={submit} className="space-y-3">
+    <form onSubmit={submit} className="space-y-3 max-h-[75vh] overflow-y-auto pr-1">
       <DialogHeader><DialogTitle>{isEdit ? "Edit shift" : "New shift"}</DialogTitle></DialogHeader>
       <div className="space-y-1"><Label>Name</Label><Input value={name} onChange={e => setName(e.target.value)} required placeholder="Morning, Night, etc." /></div>
       <div className="grid grid-cols-2 gap-2">
@@ -265,6 +277,43 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
         <div className="space-y-1"><Label>End</Label><TimeInput12h value={end} onChange={setEnd} required /></div>
       </div>
       <div className="space-y-1"><Label>Break (minutes)</Label><Input type="number" value={breakMin} onChange={e => setBreakMin(e.target.value)} min={0} max={480} /></div>
+
+      <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+        <p className="text-sm font-semibold">Late check-in rules</p>
+        <p className="text-xs text-muted-foreground -mt-2">
+          Staff can check in any time — these rules only affect payroll deductions, never block check-in.
+        </p>
+        <div className="space-y-1">
+          <Label className="text-xs">Grace period (minutes after start time before it's "late")</Label>
+          <Input type="number" value={graceMin} onChange={e => setGraceMin(e.target.value)} min={0} max={180} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Deduction type</Label>
+          <select
+            value={fineType}
+            onChange={e => setFineType(e.target.value as any)}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="none">No deduction</option>
+            <option value="fixed_per_occurrence">Fixed amount per late day</option>
+            <option value="per_minute">Amount per minute late</option>
+            <option value="half_day_after_minutes">Mark half-day if very late</option>
+          </select>
+        </div>
+        {(fineType === "fixed_per_occurrence" || fineType === "per_minute") && (
+          <div className="space-y-1">
+            <Label className="text-xs">{fineType === "fixed_per_occurrence" ? "₹ per late day" : "₹ per minute late"}</Label>
+            <Input type="number" value={fineAmount} onChange={e => setFineAmount(e.target.value)} min={0} step="0.01" />
+          </div>
+        )}
+        {fineType === "half_day_after_minutes" && (
+          <div className="space-y-1">
+            <Label className="text-xs">Minutes late before it counts as half-day</Label>
+            <Input type="number" value={halfDayMin} onChange={e => setHalfDayMin(e.target.value)} min={1} />
+          </div>
+        )}
+      </div>
+
       <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Saving…" : isEdit ? "Save changes" : "Save"}</Button></DialogFooter>
     </form>
   );

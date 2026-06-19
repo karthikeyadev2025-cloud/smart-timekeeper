@@ -181,9 +181,118 @@ export const deleteStaff = createServerFn({ method: "POST" })
       throw new Error("Staff member not found in this company");
     }
 
+    // Never allow deleting a client_admin through the staff-delete endpoint —
+    // admins are managed separately (or by super_admin tooling), not as "staff".
+    const { data: targetRoles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.user_id)
+      .eq("tenant_id", data.tenant_id);
+    if ((targetRoles ?? []).some((r) => r.role === "client_admin")) {
+      throw new Error("Company admins can't be removed from the staff page");
+    }
+
     // Delete the auth user — CASCADE removes profile, user_roles, staff_shifts, etc.
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
     if (error) throw new Error(`Delete failed: ${error.message}`);
 
     return { ok: true };
+  });
+
+/* ─────────────── BULK IMPORT STAFF (Excel upload) ─────────────── */
+
+const bulkRowSchema = z.object({
+  full_name: z.string().trim().min(1).max(100),
+  phone: phoneSchema,
+  designation: z.string().trim().max(100).optional().default(""),
+  monthly_salary: z.coerce.number().min(0).default(0),
+  branch_name: z.string().trim().optional().default(""),
+  shift_name: z.string().trim().optional().default(""),
+  pin: z.string().trim().regex(/^[0-9]{4,8}$/, "PIN must be 4-8 digits").optional(),
+});
+
+const bulkInput = z.object({
+  tenant_id: z.string().uuid(),
+  rows: z.array(bulkRowSchema).min(1).max(500),
+});
+
+export const bulkImportStaff = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => bulkInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const [{ data: isSuper }, { data: isTenantAdmin }] = await Promise.all([
+      supabase.rpc("is_super_admin", { _user_id: userId }),
+      supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
+    ]);
+    if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Pre-fetch branches + shifts once so we can resolve names → ids without
+    // hitting the DB per row
+    const [{ data: branches }, { data: shifts }] = await Promise.all([
+      supabaseAdmin.from("branches").select("id, name").eq("tenant_id", data.tenant_id),
+      supabaseAdmin.from("shifts").select("id, name").eq("tenant_id", data.tenant_id),
+    ]);
+    const branchByName = new Map((branches ?? []).map((b) => [b.name.trim().toLowerCase(), b.id]));
+    const shiftByName = new Map((shifts ?? []).map((s) => [s.name.trim().toLowerCase(), s.id]));
+
+    const results: { row: number; name: string; status: "created" | "failed"; error?: string }[] = [];
+
+    for (let i = 0; i < data.rows.length; i++) {
+      const row = data.rows[i];
+      try {
+        const email = `${row.phone}@${STAFF_EMAIL_DOMAIN}`;
+        const password = row.pin ?? String(Math.floor(1000 + Math.random() * 9000));
+
+        const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: row.full_name, phone: row.phone },
+        });
+        if (createErr || !created.user) throw new Error(createErr?.message ?? "Could not create account");
+        const newUserId = created.user.id;
+
+        const branchId = row.branch_name ? branchByName.get(row.branch_name.trim().toLowerCase()) ?? null : null;
+        const shiftId = row.shift_name ? shiftByName.get(row.shift_name.trim().toLowerCase()) ?? null : null;
+
+        const { error: profErr } = await supabaseAdmin
+          .from("profiles")
+          .update({
+            tenant_id: data.tenant_id,
+            full_name: row.full_name,
+            phone: row.phone,
+            email,
+            designation: row.designation || null,
+            monthly_salary: row.monthly_salary,
+            branch_id: branchId,
+          })
+          .eq("id", newUserId);
+        if (profErr) throw new Error(profErr.message);
+
+        const { error: roleErr } = await supabaseAdmin
+          .from("user_roles")
+          .insert({ user_id: newUserId, role: "staff", tenant_id: data.tenant_id });
+        if (roleErr) throw new Error(roleErr.message);
+
+        if (shiftId) {
+          await supabaseAdmin.from("staff_shifts").insert({
+            tenant_id: data.tenant_id, user_id: newUserId, shift_id: shiftId,
+          });
+        }
+
+        results.push({ row: i + 1, name: row.full_name, status: "created" });
+      } catch (e: any) {
+        results.push({ row: i + 1, name: row.full_name, status: "failed", error: e?.message ?? "Unknown error" });
+      }
+    }
+
+    return {
+      total: data.rows.length,
+      created: results.filter((r) => r.status === "created").length,
+      failed: results.filter((r) => r.status === "failed").length,
+      results,
+    };
   });

@@ -16,13 +16,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle, ShieldCheck, Trash2, BellRing } from "lucide-react";
+import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle, ShieldCheck, Trash2, BellRing, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { BroadcastForm } from "@/components/BroadcastForm";
 import { DeleteTenantDialog } from "@/components/DeleteTenantDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   impersonateUser, setTenantActive, extendSubscription, changeTenantPlan, getTenantDetails,
+  exportTenantStaff,
 } from "@/lib/admin.functions";
 import { TenantPermissionsDialog } from "@/components/TenantPermissionsDialog";
 
@@ -275,16 +277,48 @@ function ChangePlanDialog({ open, onOpenChange, tenant, onDone }: { open: boolea
 
 function TenantDetailsDialog({ open, onOpenChange, tenantId }: { open: boolean; onOpenChange: (v: boolean) => void; tenantId: string }) {
   const fn = useServerFn(getTenantDetails);
+  const exportFn = useServerFn(exportTenantStaff);
+  const [exporting, setExporting] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["tenant-details", tenantId, open],
     enabled: open,
     queryFn: () => fn({ data: { tenant_id: tenantId } }),
   });
 
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const res = await exportFn({ data: { tenant_id: tenantId } });
+      const rows = res.staff.map((s: any) => ({
+        "Full Name": s.full_name ?? "",
+        "Phone": s.phone ?? "",
+        "Email": s.email ?? "",
+        "Designation": s.designation ?? "",
+        "Monthly Salary": s.monthly_salary ?? 0,
+        "Branch": s.branches?.name ?? "",
+        "Role": (s.user_roles ?? []).map((r: any) => r.role).join(", "),
+        "Field Staff": s.is_field_staff ? "Yes" : "No",
+        "Status": s.is_active === false ? "Disabled" : "Active",
+        "Added on": s.created_at ? new Date(s.created_at).toLocaleDateString() : "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Staff");
+      XLSX.writeFile(wb, `${(data?.tenant?.name ?? "company").replace(/\s+/g, "_")}_staff_export.xlsx`);
+      toast.success(`Exported ${rows.length} staff`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>{data?.tenant?.name ?? "Tenant"}</DialogTitle></DialogHeader>
+        <DialogHeader className="flex-row items-center justify-between space-y-0">
+          <DialogTitle>{data?.tenant?.name ?? "Tenant"}</DialogTitle>
+        </DialogHeader>
         {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
         {data && (
           <div className="space-y-4 text-sm">
@@ -293,6 +327,9 @@ function TenantDetailsDialog({ open, onOpenChange, tenantId }: { open: boolean; 
               <Stat label="Branches" value={data.branchCount} />
               <Stat label="Employee limit" value={data.tenant?.employee_limit ?? 0} />
             </div>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={doExport} disabled={exporting}>
+              <Download className="h-3.5 w-3.5" /> {exporting ? "Exporting…" : "Export staff list (Excel)"}
+            </Button>
             <div>
               <p className="mb-1 font-semibold">Admins</p>
               <div className="space-y-1">

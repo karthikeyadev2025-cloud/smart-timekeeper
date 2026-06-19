@@ -151,7 +151,9 @@ function CheckInFlow() {
   const activeBranchId = matchedLocation?.branch_id ?? (user?.profile as any)?.branch_id ?? null;
   const branchWindow = (branchWindows ?? []).find((b) => b.id === activeBranchId) ?? null;
   const windowCheck = checkWindow(nextKind, branchWindow);
-  const windowBlocked = !isFieldStaff && windowCheck.outsideWindow;
+  // Outside the configured window is shown as a heads-up, NOT a hard block —
+  // staff can always check in; admins handle lateness via shift deduction rules instead.
+  const windowOutside = !isFieldStaff && windowCheck.outsideWindow;
 
 
   const getLocation = async () => {
@@ -357,13 +359,14 @@ function CheckInFlow() {
               </div>
             )}
 
-            {windowBlocked && (
+            {windowOutside && (
               <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm space-y-1">
                 <p className="flex items-center gap-1.5 font-semibold text-warning-foreground">
-                  <Clock className="h-4 w-4" /> Outside allowed {nextKind.replace("_", "-")} window
+                  <Clock className="h-4 w-4" /> Outside usual {nextKind.replace("_", "-")} window
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  This {matchedLocation ? "branch" : "branch"} only allows {nextKind.replace("_", "-")} between <strong>{windowCheck.label}</strong>.
+                  Your branch's usual window is <strong>{windowCheck.label}</strong>. You can still {nextKind.replace("_", " ")} —
+                  this may be noted for your admin's records.
                 </p>
               </div>
             )}
@@ -374,7 +377,7 @@ function CheckInFlow() {
               {coords && <Button variant="outline" onClick={getLocation} className="gap-1" disabled={verifying}><RefreshCw className="h-4 w-4" /> Retry</Button>}
               <Button
                 className="flex-1"
-                disabled={!coords || (!matchedLocation && !isFieldStaff) || antiCheat?.suspicious === true || windowBlocked}
+                disabled={!coords || (!matchedLocation && !isFieldStaff) || antiCheat?.suspicious === true}
                 onClick={() => { setStep(2); startCamera(); }}
               >
                 Continue →
