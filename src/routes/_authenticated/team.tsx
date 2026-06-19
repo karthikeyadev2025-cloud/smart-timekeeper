@@ -19,6 +19,7 @@ import { useBranchFilter } from "@/hooks/useBranchFilter";
 import { toast } from "sonner";
 import { createStaff, updateStaff, deleteStaff } from "@/lib/staff.functions";
 import { StaffImportExportDialog } from "@/components/StaffImportExportDialog";
+import { formatTime12h } from "@/components/ui/time-input";
 
 export const Route = createFileRoute("/_authenticated/team")({
   component: TeamPage,
@@ -329,13 +330,19 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
           </SelectContent>
         </Select>
       </div>
-      {!isManager && shifts.length > 0 && (
+      {!isManager && (
         <div className="space-y-1">
           <Label>Shift</Label>
-          <Select value={shiftId} onValueChange={setShiftId}>
-            <SelectTrigger><SelectValue placeholder="Assign a shift (optional)" /></SelectTrigger>
-            <SelectContent>{shifts.map(s => <SelectItem key={s.id} value={s.id}>{s.name} · {s.start_time}–{s.end_time}</SelectItem>)}</SelectContent>
-          </Select>
+          {shifts.length > 0 ? (
+            <Select value={shiftId} onValueChange={setShiftId}>
+              <SelectTrigger><SelectValue placeholder="Assign a shift (optional)" /></SelectTrigger>
+              <SelectContent>{shifts.map(s => <SelectItem key={s.id} value={s.id}>{s.name} · {formatTime12h(s.start_time)}–{formatTime12h(s.end_time)}</SelectItem>)}</SelectContent>
+            </Select>
+          ) : (
+            <p className="rounded-md border border-dashed p-2.5 text-xs text-muted-foreground">
+              No shifts yet — add one in <strong>Shifts & locations</strong> to assign timing here.
+            </p>
+          )}
         </div>
       )}
       <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Adding…" : isManager ? "Invite manager" : "Add staff"}</Button></DialogFooter>
@@ -428,18 +435,23 @@ function EditStaffForm({
         </Select>
       </div>
 
-      {shifts.length > 0 && (
-        <div className="space-y-1">
-          <Label>Shift</Label>
+      <div className="space-y-1">
+        <Label>Shift</Label>
+        {shifts.length > 0 ? (
           <Select value={shiftId || "none"} onValueChange={(v) => setShiftId(v === "none" ? "" : v)}>
             <SelectTrigger><SelectValue placeholder="No shift assigned" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">— No shift —</SelectItem>
-              {shifts.map(s => <SelectItem key={s.id} value={s.id}>{s.name} · {s.start_time}–{s.end_time}</SelectItem>)}
+              {shifts.map(s => <SelectItem key={s.id} value={s.id}>{s.name} · {formatTime12h(s.start_time)}–{formatTime12h(s.end_time)}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
-      )}
+        ) : (
+          <p className="rounded-md border border-dashed p-2.5 text-xs text-muted-foreground">
+            No shifts created yet. Go to <strong>Shifts & locations</strong> to add one
+            (e.g. "Morning 9 AM–6 PM"), then come back here to assign it.
+          </p>
+        )}
+      </div>
 
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" checked={isField} onChange={e => setIsField(e.target.checked)} className="h-4 w-4" />
