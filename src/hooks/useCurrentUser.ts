@@ -15,6 +15,7 @@ export interface CurrentUserData {
     designation: string | null;
     monthly_salary: number | null;
     is_active: boolean;
+    staff_id: string | null;
   } | null;
   roles: AppRole[];
   tenant: {

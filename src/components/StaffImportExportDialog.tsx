@@ -36,6 +36,7 @@ export function StaffImportExportDialog({
 
   const exportCurrentStaff = () => {
     const rows = staff.map((s) => ({
+      "Staff ID": s.staff_id ?? "",
       "Full Name": s.full_name ?? "",
       "Phone": s.phone ?? "",
       "Designation": s.designation ?? "",

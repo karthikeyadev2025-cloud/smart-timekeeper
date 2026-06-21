@@ -735,6 +735,7 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
           <h1 className="truncate text-xl sm:text-2xl font-bold tracking-tight">{firstName} 👋</h1>
           <p className="text-xs text-muted-foreground">
             {me?.tenant?.name ?? "Your company"} · {me?.profile?.designation || "Staff"}
+            {me?.profile?.staff_id && <span className="font-mono"> · {me.profile.staff_id}</span>}
           </p>
         </div>
         {me?.tenant?.logo_url && (

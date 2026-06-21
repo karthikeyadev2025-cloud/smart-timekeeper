@@ -127,6 +127,7 @@ function TeamPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Designation</TableHead>
@@ -140,6 +141,7 @@ function TeamPage() {
             <TableBody>
               {(staff ?? []).map((s) => (
                 <TableRow key={s.id}>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{(s as any).staff_id ?? "—"}</TableCell>
                   <TableCell className="font-medium">{s.full_name ?? "—"}</TableCell>
                   <TableCell className="font-mono">{s.phone ?? "—"}</TableCell>
                   <TableCell>{s.designation ?? "—"}</TableCell>
@@ -211,7 +213,7 @@ function TeamPage() {
                 </TableRow>
               ))}
               {staff?.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -414,7 +416,9 @@ function EditStaffForm({
     <form onSubmit={submit} className="space-y-3">
       <DialogHeader>
         <DialogTitle>Edit staff member</DialogTitle>
-        <p className="text-sm text-muted-foreground font-mono">{staff.phone}</p>
+        <p className="text-sm text-muted-foreground font-mono">
+          {staff.staff_id ? `${staff.staff_id} · ` : ""}{staff.phone}
+        </p>
       </DialogHeader>
 
       <div className="space-y-1"><Label>Full name</Label><Input value={name} onChange={e => setName(e.target.value)} required /></div>

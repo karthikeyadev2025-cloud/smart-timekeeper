@@ -23,6 +23,7 @@ export type PayslipContext = {
   employeeName: string;
   employeeEmail?: string | null;
   companyName?: string | null;
+  staffId?: string | null;
 };
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -49,7 +50,7 @@ export function downloadPayslipPdf(payslip: PayslipPdfData, ctx: PayslipContext)
   doc.setFont("helvetica", "bold").setFontSize(12).text(ctx.companyName ?? "Company", 40, y);
   doc.setFont("helvetica", "normal").setFontSize(10);
   y += 24;
-  doc.text(`Employee: ${ctx.employeeName}`, 40, y);
+  doc.text(`Employee: ${ctx.employeeName}${ctx.staffId ? `  (${ctx.staffId})` : ""}`, 40, y);
   if (ctx.employeeEmail) { y += 14; doc.text(`Email: ${ctx.employeeEmail}`, 40, y); }
   y += 14;
   doc.text(`Generated: ${new Date(payslip.generated_at ?? Date.now()).toLocaleDateString("en-IN")}`, 40, y);

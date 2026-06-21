@@ -39,7 +39,7 @@ function Payroll() {
     queryFn: async () => {
       let q = supabase
         .from("payslips")
-        .select("*, profiles!payslips_user_id_fkey(full_name, branch_id)")
+        .select("*, profiles!payslips_user_id_fkey(full_name, branch_id, staff_id)")
         .eq("tenant_id", tenantId!)
         .eq("period_year", year)
         .eq("period_month", month);
@@ -226,6 +226,7 @@ function Payroll() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>ID</TableHead>
                 <TableHead>Staff</TableHead>
                 <TableHead>Present</TableHead>
                 <TableHead>Paid leave</TableHead>
@@ -240,6 +241,7 @@ function Payroll() {
             <TableBody>
               {(payslips ?? []).map((p: any) => (
                 <TableRow key={p.id}>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{p.profiles?.staff_id ?? "—"}</TableCell>
                   <TableCell className="font-medium">
                     <RemarksIndicator userId={p.user_id} name={p.profiles?.full_name} />
                   </TableCell>
@@ -255,14 +257,14 @@ function Payroll() {
                   <TableCell className="text-destructive">-₹{Number(p.deductions).toFixed(0)}</TableCell>
                   <TableCell className="text-right font-bold">₹{Number(p.net_pay).toLocaleString("en-IN")}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadPayslipPdf(p, { employeeName: p.profiles?.full_name ?? "Employee", companyName: user?.tenant?.name })}>
+                    <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadPayslipPdf(p, { employeeName: p.profiles?.full_name ?? "Employee", companyName: user?.tenant?.name, staffId: p.profiles?.staff_id })}>
                       <Download className="h-4 w-4" /> PDF
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
               {payslips?.length === 0 && (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No payslips for this period{branchId !== "all" ? ` in this ${branchLabel.toLowerCase()}` : ""}. Click "Generate" to create them.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No payslips for this period{branchId !== "all" ? ` in this ${branchLabel.toLowerCase()}` : ""}. Click "Generate" to create them.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

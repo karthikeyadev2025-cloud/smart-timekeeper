@@ -290,6 +290,7 @@ function TenantDetailsDialog({ open, onOpenChange, tenantId }: { open: boolean; 
     try {
       const res = await exportFn({ data: { tenant_id: tenantId } });
       const rows = res.staff.map((s: any) => ({
+        "Staff ID": s.staff_id ?? "",
         "Full Name": s.full_name ?? "",
         "Phone": s.phone ?? "",
         "Email": s.email ?? "",
