@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
 import { detectMockLocation, type AntiCheatResult } from "@/lib/anti-cheat";
+import { useFaceDetection } from "@/hooks/useFaceDetection";
 
 export const Route = createFileRoute("/_authenticated/check-in")({
   component: CheckInFlow,
@@ -80,6 +81,7 @@ function CheckInFlow() {
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [selfieBlob, setSelfieBlob] = useState<Blob | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
+  const [faceWasVerified, setFaceWasVerified] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [antiCheat, setAntiCheat] = useState<AntiCheatResult | null>(null);
@@ -95,6 +97,10 @@ function CheckInFlow() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const autoCapturedRef = useRef(false);
+
+  const { supported: faceDetectSupported, faceDetected, steadyMs } = useFaceDetection(videoRef, step === 2);
+  const FACE_HOLD_MS = 800; // how long a face must be steadily visible before we auto-snap
 
   // staleTime is set high so this stays usable from React Query's in-memory
   // cache if the staff member goes offline after their first load today —
@@ -207,6 +213,7 @@ function CheckInFlow() {
   };
 
   const startCamera = async () => {
+    autoCapturedRef.current = false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
       streamRef.current = stream;
@@ -235,10 +242,27 @@ function CheckInFlow() {
       if (!blob) return;
       setSelfieBlob(blob);
       setSelfiePreview(URL.createObjectURL(blob));
+      // Only true when this capture was the auto-fire after a confirmed,
+      // steadily-held face — not the manual-button fallback path.
+      setFaceWasVerified(faceDetectSupported === true && faceDetected && steadyMs >= FACE_HOLD_MS);
       stopCamera();
       setStep(3);
     }, "image/jpeg", 0.85);
   };
+
+  // Auto-capture the instant a face has been steadily visible for FACE_HOLD_MS.
+  // This is the core anti-cheat measure: staff can't point the camera at a
+  // wall/ceiling/badge and tap a button — there IS no manual capture button
+  // when face detection is supported, so a real face has to be in frame.
+  useEffect(() => {
+    if (step !== 2) return;
+    if (!faceDetectSupported) return; // fallback path handles capture differently
+    if (autoCapturedRef.current) return;
+    if (faceDetected && steadyMs >= FACE_HOLD_MS) {
+      autoCapturedRef.current = true;
+      captureSelfie();
+    }
+  }, [step, faceDetectSupported, faceDetected, steadyMs]);
 
   useEffect(() => () => stopCamera(), []);
 
@@ -281,6 +305,7 @@ function CheckInFlow() {
         enforcement_status: enforcement,
         selfie_url: path,
         is_mock_location: antiCheat?.suspicious ?? false,
+        face_verified: faceWasVerified,
         notes: antiCheat?.suspicious ? `anti-cheat: ${antiCheat.reasons.join("; ")}` : null,
         occurred_at: occurredAtLocal,
         attendance_date: occurredAtLocal.slice(0, 10),
@@ -312,6 +337,7 @@ function CheckInFlow() {
           distance_from_office_m: distance,
           enforcement_status: enforcement,
           is_mock_location: antiCheat?.suspicious ?? false,
+          face_verified: faceWasVerified,
           notes: antiCheat?.suspicious ? `anti-cheat: ${antiCheat.reasons.join("; ")}` : null,
           occurred_at_local: occurredAtLocal,
           selfie_blob: selfieBlob!,
@@ -461,17 +487,50 @@ function CheckInFlow() {
               </div>
               <div>
                 <h2 className="font-semibold">Step 2 · Capture selfie</h2>
-                <p className="text-sm text-muted-foreground">Center your face and snap.</p>
+                <p className="text-sm text-muted-foreground">
+                  {faceDetectSupported === false
+                    ? "Center your face and snap."
+                    : faceDetected
+                      ? "Face detected — hold still…"
+                      : "Position your face inside the circle."}
+                </p>
               </div>
             </div>
 
-            <div className="aspect-square overflow-hidden rounded-lg bg-black">
+            <div className="relative aspect-square overflow-hidden rounded-lg bg-black">
               <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
+
+              {faceDetectSupported && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div
+                    className={`h-[68%] aspect-square rounded-full border-4 transition-colors duration-200 ${
+                      faceDetected ? "border-success shadow-[0_0_0_4px_rgba(34,197,94,0.25)]" : "border-white/50"
+                    }`}
+                  />
+                  {faceDetected && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-success/90 px-3 py-1 text-xs font-medium text-white">
+                      Hold still…
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+
+            {faceDetectSupported === false && (
+              <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400">
+                Your browser can't auto-verify a face is in frame — please make sure your face is clearly visible before capturing. This check-in's photo will still be reviewed by your admin.
+              </p>
+            )}
 
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { stopCamera(); setStep(1); }}>Back</Button>
-              <Button className="flex-1" onClick={captureSelfie}>Capture selfie</Button>
+              {faceDetectSupported === false ? (
+                <Button className="flex-1" onClick={captureSelfie}>Capture selfie</Button>
+              ) : (
+                <Button className="flex-1" disabled variant="secondary">
+                  {faceDetected ? "Capturing automatically…" : "Waiting for your face…"}
+                </Button>
+              )}
             </div>
           </Card>
         )}
@@ -499,7 +558,7 @@ function CheckInFlow() {
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { setSelfieBlob(null); setSelfiePreview(null); setStep(2); startCamera(); }}>Retake</Button>
+              <Button variant="outline" onClick={() => { setSelfieBlob(null); setSelfiePreview(null); setFaceWasVerified(false); setStep(2); startCamera(); }}>Retake</Button>
               <Button className="flex-1" onClick={submitAttendance} disabled={submitting}>{submitting ? "Submitting…" : "Confirm & submit"}</Button>
             </div>
           </Card>

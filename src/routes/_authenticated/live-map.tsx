@@ -49,7 +49,7 @@ function LiveMapPage() {
   const { data: user } = useCurrentUser();
   const tenantId = user?.tenant?.id;
   const today = new Date().toISOString().slice(0, 10);
-  const [viewingPhoto, setViewingPhoto] = useState<{ path: string; staffName: string; time: string } | null>(null);
+  const [viewingPhoto, setViewingPhoto] = useState<{ path: string; staffName: string; time: string; faceVerified?: boolean } | null>(null);
 
   const { data: punches, refetch, isFetching } = useQuery({
     queryKey: ["live-map", tenantId, today],
@@ -212,15 +212,16 @@ function LiveMapPage() {
                     {p.selfie_url && (
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="gap-1"
+                        variant={p.face_verified ? "outline" : "secondary"}
+                        className={`gap-1 ${!p.face_verified ? "border-amber-500/40 text-amber-700 dark:text-amber-400" : ""}`}
                         onClick={() => setViewingPhoto({
                           path: p.selfie_url,
                           staffName: p.profiles?.full_name ?? "Unknown",
                           time: new Date(p.occurred_at).toLocaleString(),
+                          faceVerified: p.face_verified,
                         })}
                       >
-                        <Camera className="h-3 w-3" /> View photo
+                        <Camera className="h-3 w-3" /> View photo {!p.face_verified && "⚠"}
                       </Button>
                     )}
                     <span className="self-center text-xs font-mono text-muted-foreground">
@@ -245,6 +246,12 @@ function LiveMapPage() {
                 <p className="font-semibold">{viewingPhoto.staffName}</p>
                 <p className="text-xs text-muted-foreground">{viewingPhoto.time}</p>
               </div>
+              {viewingPhoto.faceVerified === false && (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Not auto-verified — this device's browser couldn't confirm a face was in frame. Please check the photo manually.
+                </div>
+              )}
               <SelfieImage path={viewingPhoto.path} />
             </div>
           )}

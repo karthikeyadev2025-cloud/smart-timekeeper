@@ -61,6 +61,7 @@ async function uploadOne(item: PendingAttendance): Promise<void> {
     enforcement_status: item.enforcement_status,
     selfie_url: path,
     is_mock_location: item.is_mock_location,
+    face_verified: item.face_verified,
     notes: item.notes,
     // occurred_at and attendance_date default to "now" in the DB — but for
     // offline punches we need the ON-DEVICE timestamp, not whenever the sync

@@ -28,6 +28,7 @@ export type PendingAttendance = {
   distance_from_office_m: number | null;
   enforcement_status: "inside" | "outside_allowed" | "outside_blocked";
   is_mock_location: boolean;
+  face_verified: boolean;
   notes: string | null;
   occurred_at_local: string; // ISO timestamp captured ON DEVICE at the moment of action
   selfie_blob: Blob;
