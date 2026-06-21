@@ -86,6 +86,7 @@ function CheckInFlow() {
   const [verifying, setVerifying] = useState(false);
   const [antiCheat, setAntiCheat] = useState<AntiCheatResult | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [cameraReady, setCameraReady] = useState(false);
 
   useEffect(() => {
     const on = () => setIsOnline(true);
@@ -214,13 +215,41 @@ function CheckInFlow() {
 
   const startCamera = async () => {
     autoCapturedRef.current = false;
+    setCameraReady(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
       streamRef.current = stream;
-      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
+      const video = videoRef.current;
+      if (!video) return;
+
+      // Some Android WebViews (notably MIUI/Xiaomi) will happily decode a
+      // video stream — canvas.drawImage() can pull real frames from it —
+      // while the on-screen <video> element itself paints solid black.
+      // The fix that reliably works across these devices: set the playsInline
+      // attributes BEFORE assigning srcObject (not just in JSX, which can
+      // apply too late on some WebView versions), then explicitly wait for
+      // 'loadedmetadata' before calling play() rather than calling play()
+      // immediately after assigning srcObject.
+      video.setAttribute("playsinline", "true");
+      video.setAttribute("webkit-playsinline", "true");
+      video.muted = true;
+      video.srcObject = stream;
+
+      await new Promise<void>((resolve) => {
+        if (video.readyState >= 1) { resolve(); return; }
+        video.onloadedmetadata = () => resolve();
+      });
+      await video.play();
+      setCameraReady(true);
     } catch (e: any) {
       toast.error("Camera access denied: " + e.message);
     }
+  };
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCameraReady(false);
   };
 
   // Reliable camera start: calling startCamera() directly inside a button's
@@ -238,11 +267,6 @@ function CheckInFlow() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
-
-  const stopCamera = () => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-  };
 
   const captureSelfie = () => {
     const video = videoRef.current;
@@ -514,7 +538,28 @@ function CheckInFlow() {
             </div>
 
             <div className="relative aspect-square overflow-hidden rounded-lg bg-black">
-              <video ref={videoRef} className="h-full w-full object-cover" playsInline muted autoPlay />
+              <video
+                ref={videoRef}
+                className="h-full w-full object-cover"
+                playsInline
+                muted
+                autoPlay
+              />
+
+              {!cameraReady && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 text-white">
+                  <RefreshCw className="h-6 w-6 animate-spin" />
+                  <p className="text-sm">Starting camera…</p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="gap-1.5"
+                    onClick={() => { stopCamera(); startCamera(); }}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Camera stuck? Tap to retry
+                  </Button>
+                </div>
+              )}
 
               {/* Face-guide oval: shown in BOTH paths. When face detection is
                   supported it also turns green + drives auto-capture; when
@@ -545,7 +590,7 @@ function CheckInFlow() {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { stopCamera(); setStep(1); }}>Back</Button>
               {faceDetectSupported === false ? (
-                <Button className="flex-1" onClick={captureSelfie}>Capture selfie</Button>
+                <Button className="flex-1" onClick={captureSelfie} disabled={!cameraReady}>Capture selfie</Button>
               ) : (
                 <Button className="flex-1" disabled variant="secondary">
                   {faceDetected ? "Capturing automatically…" : "Waiting for your face…"}
