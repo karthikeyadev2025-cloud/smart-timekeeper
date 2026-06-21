@@ -223,6 +223,22 @@ function CheckInFlow() {
     }
   };
 
+  // Reliable camera start: calling startCamera() directly inside a button's
+  // onClick (alongside setStep(2)) raced against React's render — the
+  // <video> element for step 2 didn't exist in the DOM yet when
+  // videoRef.current was read, so srcObject silently attached to nothing
+  // and the preview stayed black. Starting it here, once step actually
+  // becomes 2 and the video element is mounted, fixes that race.
+  useEffect(() => {
+    if (step === 2 && !streamRef.current) {
+      startCamera();
+    }
+    if (step !== 2) {
+      stopCamera();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
@@ -471,7 +487,7 @@ function CheckInFlow() {
               <Button
                 className="flex-1"
                 disabled={!coords || (!matchedLocation && !isFieldStaff) || antiCheat?.suspicious === true}
-                onClick={() => { setStep(2); startCamera(); }}
+                onClick={() => setStep(2)}
               >
                 Continue →
               </Button>
@@ -489,7 +505,7 @@ function CheckInFlow() {
                 <h2 className="font-semibold">Step 2 · Capture selfie</h2>
                 <p className="text-sm text-muted-foreground">
                   {faceDetectSupported === false
-                    ? "Center your face and snap."
+                    ? "Position your face inside the circle, then tap to capture."
                     : faceDetected
                       ? "Face detected — hold still…"
                       : "Position your face inside the circle."}
@@ -498,27 +514,31 @@ function CheckInFlow() {
             </div>
 
             <div className="relative aspect-square overflow-hidden rounded-lg bg-black">
-              <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
+              <video ref={videoRef} className="h-full w-full object-cover" playsInline muted autoPlay />
 
-              {faceDetectSupported && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div
-                    className={`h-[68%] aspect-square rounded-full border-4 transition-colors duration-200 ${
-                      faceDetected ? "border-success shadow-[0_0_0_4px_rgba(34,197,94,0.25)]" : "border-white/50"
-                    }`}
-                  />
-                  {faceDetected && (
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-success/90 px-3 py-1 text-xs font-medium text-white">
-                      Hold still…
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Face-guide oval: shown in BOTH paths. When face detection is
+                  supported it also turns green + drives auto-capture; when
+                  unsupported it's still a strong visual cue for correct
+                  framing even though capture stays manual. */}
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div
+                  className={`h-[68%] aspect-square rounded-full border-4 transition-colors duration-200 ${
+                    faceDetectSupported && faceDetected
+                      ? "border-success shadow-[0_0_0_4px_rgba(34,197,94,0.25)]"
+                      : "border-white/60"
+                  }`}
+                />
+                {faceDetectSupported && faceDetected && (
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-success/90 px-3 py-1 text-xs font-medium text-white">
+                    Hold still…
+                  </div>
+                )}
+              </div>
             </div>
 
             {faceDetectSupported === false && (
-              <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400">
-                Your browser can't auto-verify a face is in frame — please make sure your face is clearly visible before capturing. This check-in's photo will still be reviewed by your admin.
+              <p className="rounded-lg border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">
+                Make sure your face is clearly visible in the circle before capturing — your photo is reviewed by your admin.
               </p>
             )}
 
@@ -558,7 +578,7 @@ function CheckInFlow() {
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { setSelfieBlob(null); setSelfiePreview(null); setFaceWasVerified(false); setStep(2); startCamera(); }}>Retake</Button>
+              <Button variant="outline" onClick={() => { setSelfieBlob(null); setSelfiePreview(null); setFaceWasVerified(false); setStep(2); }}>Retake</Button>
               <Button className="flex-1" onClick={submitAttendance} disabled={submitting}>{submitting ? "Submitting…" : "Confirm & submit"}</Button>
             </div>
           </Card>

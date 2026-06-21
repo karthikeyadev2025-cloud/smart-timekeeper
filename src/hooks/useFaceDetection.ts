@@ -27,6 +27,12 @@ export function useFaceDetection(videoRef: React.RefObject<HTMLVideoElement>, ac
       setSupported(false);
       return;
     }
+    // Some browsers expose the constructor behind a flag but throw when
+    // actually used, or silently never resolve detect(). Verifying the
+    // constructor exists is necessary but not sufficient — we confirm it
+    // by attempting to instantiate it; actual detect() failures are caught
+    // per-frame in the polling loop below and won't crash the flow, but if
+    // construction itself throws we know immediately this device can't do it.
     try {
       detectorRef.current = new Ctor({ fastMode: true, maxDetectedFaces: 1 });
       setSupported(true);
