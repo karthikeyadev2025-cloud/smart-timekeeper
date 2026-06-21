@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles, TrendingUp, AlertTriangle, ShieldAlert, Clock, Camera } from "lucide-react";
 import { formatTime12h } from "@/components/ui/time-input";
 import { toast } from "sonner";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/app")({
   component: Dashboard,
@@ -294,6 +295,67 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
     },
   });
 
+  // 7-day attendance trend (count of unique check-ins per day)
+  const { data: weekTrend } = useQuery({
+    queryKey: ["admin-week-trend", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const days: { date: string; label: string }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        days.push({ date: d.toISOString().slice(0, 10), label: d.toLocaleDateString("en-IN", { weekday: "short" }) });
+      }
+      const { data } = await supabase
+        .from("attendance_records")
+        .select("attendance_date, user_id")
+        .eq("tenant_id", tenantId!)
+        .eq("kind", "check_in")
+        .gte("attendance_date", days[0].date);
+      return days.map((d) => ({
+        label: d.label,
+        present: new Set((data ?? []).filter((r) => r.attendance_date === d.date).map((r) => r.user_id)).size,
+      }));
+    },
+  });
+
+  // Staff who haven't checked in today (only meaningful once there's staff)
+  const { data: absentToday } = useQuery({
+    queryKey: ["admin-absent-today", tenantId],
+    enabled: !!tenantId && !branchManagerMode,
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const [{ data: allStaff }, { data: checkedIn }] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, phone").eq("tenant_id", tenantId!).eq("is_active", true),
+        supabase.from("attendance_records").select("user_id").eq("tenant_id", tenantId!).eq("attendance_date", today).eq("kind", "check_in"),
+      ]);
+      const checkedInIds = new Set((checkedIn ?? []).map((r) => r.user_id));
+      return (allStaff ?? []).filter((s) => !checkedInIds.has(s.id));
+    },
+  });
+
+  // Pending leave requests, ready to approve right from the dashboard
+  const { data: pendingLeaveList, refetch: refetchPendingLeaves } = useQuery({
+    queryKey: ["admin-pending-leaves", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("leave_requests")
+        .select("id, start_date, end_date, days, reason, profiles!leave_requests_user_id_fkey(full_name)")
+        .eq("tenant_id", tenantId!)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      return data ?? [];
+    },
+  });
+
+  const quickLeaveAction = async (id: string, status: "approved" | "rejected") => {
+    const { error } = await supabase.from("leave_requests").update({ status }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(status === "approved" ? "Leave approved" : "Leave rejected");
+    refetchPendingLeaves();
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-3 flex-wrap">
@@ -392,19 +454,117 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
         <StatCard icon={CheckCircle2} label="Checked in today" value={stats?.presentToday ?? 0} />
         <StatCard icon={Calendar} label="Pending leave requests" value={stats?.pendingLeaves ?? 0} />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="p-6">
-          <h3 className="font-semibold">Add your first office location</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Set GPS geofence so staff can check in.</p>
-          <Link to="/shifts" className="mt-4 inline-block"><Button>Set up →</Button></Link>
-        </Card>
-        <Card className="p-6">
-          <h3 className="font-semibold">Invite staff</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Add team members to start tracking attendance.</p>
-          <Link to="/team" className="mt-4 inline-block"><Button variant="outline">Manage staff →</Button></Link>
-        </Card>
-      </div>
+
+      {(stats?.staff ?? 0) === 0 ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="p-6">
+            <h3 className="font-semibold">Add your first office location</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Set GPS geofence so staff can check in.</p>
+            <Link to="/shifts" className="mt-4 inline-block"><Button>Set up →</Button></Link>
+          </Card>
+          <Card className="p-6">
+            <h3 className="font-semibold">Invite staff</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Add team members to start tracking attendance.</p>
+            <Link to="/team" className="mt-4 inline-block"><Button variant="outline">Manage staff →</Button></Link>
+          </Card>
+        </div>
+      ) : (
+        <>
+          {/* 7-day attendance trend */}
+          <Card className="p-4 sm:p-6">
+            <h3 className="font-semibold flex items-center gap-2"><TrendingUp className="h-4 w-4" /> This week's attendance</h3>
+            <div className="mt-3 h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={weekTrend ?? []}>
+                  <defs>
+                    <linearGradient id="presentGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#4F46E5" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
+                  <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
+                  <Tooltip />
+                  <Area type="monotone" dataKey="present" stroke="#4F46E5" strokeWidth={2} fill="url(#presentGrad)" name="Checked in" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Pending leave — quick approve/reject */}
+            <Card className="p-4 sm:p-6">
+              <h3 className="font-semibold flex items-center gap-2"><Calendar className="h-4 w-4" /> Pending leave requests</h3>
+              {(pendingLeaveList ?? []).length === 0 ? (
+                <p className="mt-3 text-sm text-muted-foreground">No pending requests. 🎉</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {pendingLeaveList!.map((l: any) => (
+                    <div key={l.id} className="flex items-center justify-between gap-2 rounded-lg border p-2.5 text-sm">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{l.profiles?.full_name ?? "Staff"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(l.start_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                          {l.end_date !== l.start_date ? ` – ${new Date(l.end_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
+                          {" · "}{l.days}d
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => quickLeaveAction(l.id, "approved")}>Approve</Button>
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive" onClick={() => quickLeaveAction(l.id, "rejected")}>Reject</Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Link to="/leaves-admin" className="block pt-1 text-center text-xs text-primary hover:underline">View all →</Link>
+                </div>
+              )}
+            </Card>
+
+            {/* Who hasn't checked in today */}
+            {!branchManagerMode && (
+              <Card className="p-4 sm:p-6">
+                <h3 className="font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Not checked in today</h3>
+                {(absentToday ?? []).length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">Everyone's checked in. ✅</p>
+                ) : (
+                  <div className="mt-3 max-h-48 space-y-1.5 overflow-y-auto">
+                    {absentToday!.slice(0, 10).map((s: any) => (
+                      <div key={s.id} className="flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-1.5 text-sm">
+                        <span className="truncate">{s.full_name}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground font-mono">{s.phone}</span>
+                      </div>
+                    ))}
+                    {absentToday!.length > 10 && (
+                      <p className="pt-1 text-center text-xs text-muted-foreground">+{absentToday!.length - 10} more</p>
+                    )}
+                  </div>
+                )}
+              </Card>
+            )}
+          </div>
+
+          {/* Quick links */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <QuickLink to="/team" icon={Users} label="Staff" />
+            <QuickLink to="/live-map" icon={MapPin} label="Live map" />
+            <QuickLink to="/payroll" icon={Wallet} label="Payroll" />
+            <QuickLink to="/shifts" icon={Clock} label="Shifts" />
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function QuickLink({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
+  return (
+    <Link to={to}>
+      <Card className="flex flex-col items-center gap-1.5 p-3 text-center transition-colors hover:bg-accent">
+        <Icon className="h-5 w-5 text-primary" />
+        <span className="text-xs font-medium">{label}</span>
+      </Card>
+    </Link>
   );
 }
 
@@ -480,6 +640,43 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
     },
   });
   const presentDaysThisMonth = new Set((monthRecords ?? []).map((r) => r.attendance_date)).size;
+
+  // Leave balance summary — quota minus approved leave taken this year
+  const { data: leaveBalance } = useQuery({
+    queryKey: ["my-leave-balance", userId],
+    enabled: !!userId && !!tenantId,
+    queryFn: async () => {
+      const yearStart = `${new Date().getFullYear()}-01-01`;
+      const [{ data: types }, { data: taken }] = await Promise.all([
+        supabase.from("leave_types").select("id, name, annual_quota").eq("tenant_id", tenantId!),
+        supabase.from("leave_requests").select("leave_type_id, days").eq("user_id", userId!).eq("status", "approved").gte("start_date", yearStart),
+      ]);
+      const takenByType = new Map<string, number>();
+      (taken ?? []).forEach((t: any) => takenByType.set(t.leave_type_id, (takenByType.get(t.leave_type_id) ?? 0) + Number(t.days)));
+      return (types ?? []).map((t) => ({
+        name: t.name,
+        quota: t.annual_quota,
+        used: takenByType.get(t.id) ?? 0,
+        remaining: Math.max(0, t.annual_quota - (takenByType.get(t.id) ?? 0)),
+      }));
+    },
+  });
+
+  // Most recent leave request status
+  const { data: recentLeave } = useQuery({
+    queryKey: ["my-recent-leave", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("leave_requests")
+        .select("id, status, start_date, end_date, days")
+        .eq("user_id", userId!)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
 
   if (!tenantId) return <NoRoleHome />;
 
@@ -608,6 +805,45 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
           )}
         </div>
       </Card>
+
+      {/* Recent leave status */}
+      {recentLeave && (
+        <Card className="flex items-center gap-3 p-4">
+          <div className={`rounded-full p-2 ${recentLeave.status === "approved" ? "bg-success/10" : recentLeave.status === "rejected" ? "bg-destructive/10" : "bg-amber-500/10"}`}>
+            <Calendar className={`h-4 w-4 ${recentLeave.status === "approved" ? "text-success" : recentLeave.status === "rejected" ? "text-destructive" : "text-amber-500"}`} />
+          </div>
+          <div className="flex-1 text-sm">
+            <p className="font-medium">
+              Leave {new Date(recentLeave.start_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+              {recentLeave.end_date !== recentLeave.start_date ? ` – ${new Date(recentLeave.end_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
+            </p>
+            <p className="text-xs text-muted-foreground capitalize">{recentLeave.status} · {recentLeave.days} day{Number(recentLeave.days) === 1 ? "" : "s"}</p>
+          </div>
+          <Link to="/my-leaves"><Button size="sm" variant="ghost">View all</Button></Link>
+        </Card>
+      )}
+
+      {/* Leave balance */}
+      {(leaveBalance ?? []).length > 0 && (
+        <Card className="p-4 sm:p-5">
+          <h3 className="font-semibold flex items-center gap-2"><Calendar className="h-4 w-4" /> Leave balance</h3>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {leaveBalance!.map((l) => (
+              <div key={l.name} className="rounded-lg bg-muted/40 p-2.5 text-center">
+                <p className="text-lg font-bold">{l.remaining}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{l.name}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-3 gap-3">
+        <QuickLink to="/my-leaves" icon={Calendar} label="Request leave" />
+        <QuickLink to="/my-attendance" icon={CheckCircle2} label="My attendance" />
+        <QuickLink to="/my-salary" icon={Wallet} label="My payslips" />
+      </div>
     </div>
   );
 }
