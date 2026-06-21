@@ -5,8 +5,10 @@ import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Camera, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, ShieldAlert, Clock } from "lucide-react";
+import { MapPin, Camera, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, ShieldAlert, Clock, WifiOff } from "lucide-react";
 import { formatTime12h } from "@/components/ui/time-input";
+import { queueAttendance } from "@/lib/offline-queue";
+import { syncOfflineQueue } from "@/lib/offline-sync";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
@@ -81,13 +83,28 @@ function CheckInFlow() {
   const [submitting, setSubmitting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [antiCheat, setAntiCheat] = useState<AntiCheatResult | null>(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // staleTime is set high so this stays usable from React Query's in-memory
+  // cache if the staff member goes offline after their first load today —
+  // geofences rarely change intraday, so serving a few-hours-stale list
+  // beats failing the check-in entirely.
   const { data: locations } = useQuery({
     queryKey: ["locations", user?.tenant?.id],
     enabled: !!user?.tenant?.id,
+    staleTime: 6 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase
         .from("office_locations")
@@ -101,6 +118,8 @@ function CheckInFlow() {
   const { data: branchWindows } = useQuery({
     queryKey: ["branch-windows", user?.tenant?.id],
     enabled: !!user?.tenant?.id,
+    staleTime: 6 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase
         .from("branches")
@@ -227,6 +246,21 @@ function CheckInFlow() {
     if (!coords || !selfieBlob || !user?.userId || !user.tenant?.id) return;
     if (!isFieldStaff && !matchedLocation) return;
     setSubmitting(true);
+
+    const distance = matchedLocation
+      ? haversine(coords.latitude, coords.longitude, matchedLocation.latitude, matchedLocation.longitude)
+      : null;
+    const enforcement: "inside" | "outside_allowed" | "outside_blocked" =
+      matchedLocation ? "inside" : isFieldStaff ? "outside_allowed" : "outside_blocked";
+    const occurredAtLocal = new Date().toISOString(); // captured on-device, right now — this is the source of truth for "when"
+
+    // If we're visibly offline, skip straight to queueing — no point burning
+    // a network round-trip we already know will fail.
+    if (!navigator.onLine) {
+      await queueOffline();
+      return;
+    }
+
     try {
       const path = `${user.userId}/${Date.now()}.jpg`;
       const { error: upErr } = await supabase.storage.from("attendance-selfies").upload(path, selfieBlob, {
@@ -234,12 +268,6 @@ function CheckInFlow() {
         upsert: false,
       });
       if (upErr) throw upErr;
-
-      const distance = matchedLocation
-        ? haversine(coords.latitude, coords.longitude, matchedLocation.latitude, matchedLocation.longitude)
-        : null;
-      const enforcement: "inside" | "outside_allowed" | "outside_blocked" =
-        matchedLocation ? "inside" : isFieldStaff ? "outside_allowed" : "outside_blocked";
 
       const { error: insErr } = await supabase.from("attendance_records").insert({
         tenant_id: user.tenant.id,
@@ -254,6 +282,8 @@ function CheckInFlow() {
         selfie_url: path,
         is_mock_location: antiCheat?.suspicious ?? false,
         notes: antiCheat?.suspicious ? `anti-cheat: ${antiCheat.reasons.join("; ")}` : null,
+        occurred_at: occurredAtLocal,
+        attendance_date: occurredAtLocal.slice(0, 10),
       });
       if (insErr) throw insErr;
 
@@ -261,9 +291,39 @@ function CheckInFlow() {
       queryClient.invalidateQueries({ queryKey: ["today-records"] });
       navigate({ to: "/app" });
     } catch (e: any) {
-      toast.error(e.message ?? "Failed to record attendance");
+      // Network/upload failed even though navigator.onLine said we're connected
+      // (flaky signal, captive portal, server hiccup) — queue it instead of
+      // just showing an error and losing the punch.
+      await queueOffline();
     } finally {
       setSubmitting(false);
+    }
+
+    async function queueOffline() {
+      try {
+        await queueAttendance({
+          tenant_id: user!.tenant!.id,
+          user_id: user!.userId,
+          office_location_id: matchedLocation?.id ?? null,
+          kind: nextKind,
+          latitude: coords!.latitude,
+          longitude: coords!.longitude,
+          accuracy_meters: coords!.accuracy ?? null,
+          distance_from_office_m: distance,
+          enforcement_status: enforcement,
+          is_mock_location: antiCheat?.suspicious ?? false,
+          notes: antiCheat?.suspicious ? `anti-cheat: ${antiCheat.reasons.join("; ")}` : null,
+          occurred_at_local: occurredAtLocal,
+          selfie_blob: selfieBlob!,
+        });
+        toast.success(`${nextKind.replace("_", " ")} saved — will sync once you're back online`, { duration: 5000 });
+        queryClient.invalidateQueries({ queryKey: ["today-records"] });
+        navigate({ to: "/app" });
+      } catch (qErr: any) {
+        toast.error("Could not save offline either: " + (qErr?.message ?? "unknown error"));
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -287,6 +347,13 @@ function CheckInFlow() {
           <h1 className="text-2xl font-bold">{nextKind.replace("_", " ").replace(/^\w/, c => c.toUpperCase())}</h1>
           <p className="text-sm text-muted-foreground">3 simple steps to record your attendance.</p>
         </header>
+
+        {!isOnline && (
+          <Card className="flex items-center gap-2.5 border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+            <WifiOff className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>You're offline — your check-in will be saved on this device and synced automatically once you're back online.</span>
+          </Card>
+        )}
 
         {myShift && (
           <Card className="flex items-center gap-3 p-3 border-primary/30 bg-primary/5">

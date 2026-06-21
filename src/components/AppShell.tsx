@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser, primaryRole, type AppRole } from "@/hooks/useCurrentUser";
 import { useSubscriptionState } from "@/hooks/useSubscriptionState";
 import { HeaderBranchSwitcher } from "@/components/HeaderBranchSwitcher";
+import { OfflineSyncBadge } from "@/components/OfflineSyncBadge";
 import { cn } from "@/lib/utils";
 
 type NavItem = { to: string; label: string; icon: typeof MapPin };
@@ -188,6 +189,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Logo size={26} />
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <OfflineSyncBadge />
             <HeaderBranchSwitcher />
             <Sheet>
               <SheetTrigger asChild>
@@ -204,6 +206,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="hidden flex-1 flex-col md:flex">
         <header className="flex items-center justify-end gap-2 border-b border-border bg-background px-6 py-3">
+          <OfflineSyncBadge />
           <HeaderBranchSwitcher />
         </header>
         <main className="flex-1 overflow-y-auto p-8">{children}</main>
