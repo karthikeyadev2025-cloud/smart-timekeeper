@@ -4,30 +4,30 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * Punchly mobile app — Capacitor hybrid wrapper.
  *
  * Strategy: the app is a thin native shell whose WebView loads the live
- * Vercel deployment at https://smartpunch.vercel.app. We do NOT bundle the
- * web build into the APK because we have server functions (TanStack Start
- * createServerFn) that must run on the Vercel Node server.
+ * site at https://punchly.online. We do NOT bundle the web build into
+ * the APK because we have server functions (TanStack Start createServerFn)
+ * that must run on the Vercel Node server.
  *
  * Trade-offs of this approach (acceptable for Punchly):
  *  - Requires internet to do anything (the website already does)
- *  - First load fetches HTML/JS/CSS from Vercel; subsequent loads are cached
+ *  - First load fetches HTML/JS/CSS from the server; subsequent loads are cached
  *  - Native camera + GPS plugins are loaded at runtime via Capacitor.isNativePlatform()
  *
  * To switch to full-offline / static-bundled later, set webDir to the SPA
  * build output and remove `server.url`.
  */
 const config: CapacitorConfig = {
-  appId: "in.mystoreos.punchly",
+  appId: "online.punchly.app",
   appName: "Punchly",
   webDir: "dist-static",
   server: {
     // Hybrid: load the live site. The native shell still has access to
     // Capacitor plugins because the bridge is injected into the WebView.
-    url: "https://smartpunch.vercel.app",
+    url: "https://punchly.online",
     cleartext: false,
     androidScheme: "https",
     // Domains the WebView is allowed to navigate inside (no logout via random link).
-    allowNavigation: ["smartpunch.vercel.app", "*.supabase.co"],
+    allowNavigation: ["punchly.online", "*.punchly.online", "smartpunch.vercel.app", "*.supabase.co"],
   },
   android: {
     allowMixedContent: false,

@@ -3,7 +3,7 @@ import type {} from "@tanstack/react-start";
 import { CITIES } from "@/lib/cities";
 
 // TODO: replace with your project URL once a project name or custom domain is set.
-const BASE_URL = "";
+const BASE_URL = "https://punchly.online";
 
 interface SitemapEntry {
   path: string;
@@ -20,6 +20,9 @@ export const Route = createFileRoute("/sitemap.xml")({
         const entries: SitemapEntry[] = [
           { path: "/", changefreq: "weekly", priority: "1.0", lastmod: today },
           { path: "/auth", changefreq: "monthly", priority: "0.5", lastmod: today },
+          { path: "/privacy", changefreq: "monthly", priority: "0.5", lastmod: today },
+          { path: "/terms", changefreq: "monthly", priority: "0.5", lastmod: today },
+          { path: "/support", changefreq: "monthly", priority: "0.6", lastmod: today },
           ...CITIES.map((c) => ({
             path: `/biometric-attendance/${c.slug}`,
             changefreq: "weekly" as const,

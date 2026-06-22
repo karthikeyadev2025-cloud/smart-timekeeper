@@ -1,4 +1,30 @@
+# Punchly — robots.txt
+# https://punchly.online
+
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /_authenticated/
+Disallow: /webhook/
 
-Sitemap: /sitemap.xml
+# Allow major search & social crawlers
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+Sitemap: https://punchly.online/sitemap.xml
+Host: https://punchly.online

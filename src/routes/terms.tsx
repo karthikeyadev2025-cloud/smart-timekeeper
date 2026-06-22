@@ -5,9 +5,15 @@ export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
       { title: "Terms of Service — Punchly" },
-      { name: "description", content: "Punchly Terms of Service — your rights and responsibilities when using our biometric attendance platform." },
+      { name: "description", content: "Punchly Terms of Service — your rights and responsibilities when using our biometric attendance, payroll and HR platform. Operated by K² Adexos Global Technologies." },
       { name: "robots", content: "index, follow" },
+      { property: "og:title", content: "Terms of Service — Punchly" },
+      { property: "og:description", content: "Read Punchly's Terms of Service: usage, billing, refunds, and legal terms for our attendance & HR platform." },
+      { property: "og:url", content: "https://punchly.online/terms" },
+      { property: "og:image", content: "https://punchly.online/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
+    links: [{ rel: "canonical", href: "https://punchly.online/terms" }],
   }),
   component: TermsPage,
 });
@@ -37,7 +43,7 @@ function TermsPage() {
             <h2 className="text-2xl font-semibold mb-3">1. Acceptance of Terms</h2>
             <p>
               By signing up for or using Punchly ("the Service"), you agree to be bound by these Terms of Service ("Terms").
-              These Terms form a legally binding agreement between you (or the company you represent) and K2 Adexos Global Technologies, Hyderabad, India ("Punchly", "we", "us").
+              These Terms form a legally binding agreement between you (or the company you represent) and K² Adexos Global Technologies, Hyderabad, India ("Punchly", "we", "us").
             </p>
             <p className="mt-3">
               If you are signing up on behalf of a company, you represent that you have the authority to bind that company to these Terms.
@@ -91,7 +97,7 @@ function TermsPage() {
               <li><strong>Monthly plans:</strong> Full refund if requested within 7 days of payment, provided the account has fewer than 10 check-ins recorded.</li>
               <li><strong>Lifetime plans:</strong> Full refund if requested within 14 days of purchase, provided the account has fewer than 10 check-ins recorded.</li>
               <li>No refunds after the eligible period or if significant usage has occurred.</li>
-              <li>To request a refund, email billing@punchly.app with your order ID.</li>
+              <li>To request a refund, email billing@punchly.online with your order ID.</li>
             </ul>
 
             <h3 className="text-lg font-medium mt-4 mb-2">4.4 Price Changes</h3>
@@ -145,7 +151,7 @@ function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold mb-3">8. Intellectual Property</h2>
             <p>
-              All intellectual property in Punchly — including the software, design, branding, and documentation — is owned by K2 Adexos Global Technologies.
+              All intellectual property in Punchly — including the software, design, branding, and documentation — is owned by K² Adexos Global Technologies.
               You are granted a limited, non-exclusive, non-transferable license to use the Service for your internal business operations.
             </p>
             <p className="mt-3">
@@ -195,7 +201,7 @@ function TermsPage() {
               These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in Hyderabad, Telangana.
             </p>
             <p className="mt-3">
-              Before initiating legal proceedings, you agree to attempt to resolve disputes informally by contacting us at legal@punchly.app.
+              Before initiating legal proceedings, you agree to attempt to resolve disputes informally by contacting us at legal@punchly.online.
               We will attempt to resolve disputes within 30 days.
             </p>
           </section>
@@ -211,11 +217,11 @@ function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold mb-3">13. Contact</h2>
             <div className="rounded-lg bg-muted/40 p-4 text-sm">
-              <p><strong>K2 Adexos Global Technologies</strong></p>
+              <p><strong>K² Adexos Global Technologies</strong></p>
               <p>Hyderabad, Telangana — 500001, India</p>
-              <p>General: support@punchly.app</p>
-              <p>Billing: billing@punchly.app</p>
-              <p>Legal: legal@punchly.app</p>
+              <p>General: support@punchly.online</p>
+              <p>Billing: billing@punchly.online</p>
+              <p>Legal: legal@punchly.online</p>
             </div>
           </section>
 

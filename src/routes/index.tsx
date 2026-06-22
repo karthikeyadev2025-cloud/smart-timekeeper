@@ -83,16 +83,21 @@ export const Route = createFileRoute("/")({
       { property: "og:site_name", content: "Punchly" },
       { property: "og:locale", content: "en_IN" },
       { property: "og:locale:alternate", content: "te_IN" },
-      { property: "og:url", content: "/" },
+      { property: "og:url", content: "https://punchly.online/" },
+      { property: "og:image", content: "https://punchly.online/og-image.png" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: "Punchly — Smart Attendance for Indian Businesses" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: SEO_TITLE },
       { name: "twitter:description", content: SEO_DESCRIPTION },
+      { name: "twitter:image", content: "https://punchly.online/og-image.png" },
     ],
     links: [
-      { rel: "canonical", href: "/" },
-      { rel: "alternate", hrefLang: "en-IN", href: "/" },
-      { rel: "alternate", hrefLang: "te-IN", href: "/" },
-      { rel: "alternate", hrefLang: "x-default", href: "/" },
+      { rel: "canonical", href: "https://punchly.online/" },
+      { rel: "alternate", hrefLang: "en-IN", href: "https://punchly.online/" },
+      { rel: "alternate", hrefLang: "te-IN", href: "https://punchly.online/" },
+      { rel: "alternate", hrefLang: "x-default", href: "https://punchly.online/" },
     ],
     scripts: [
       {
@@ -491,6 +496,7 @@ function Landing() {
             <div className="flex gap-6">
               <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
+              <Link to="/support" className="hover:text-foreground transition-colors">Support</Link>
             </div>
             <p>© {new Date().getFullYear()} {BRAND.name}. All rights reserved.</p>
           </div>

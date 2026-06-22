@@ -5,9 +5,15 @@ export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
       { title: "Privacy Policy — Punchly" },
-      { name: "description", content: "Punchly Privacy Policy — how we collect, use, and protect your data in compliance with the Digital Personal Data Protection Act 2023." },
+      { name: "description", content: "Punchly Privacy Policy — how we collect, use, and protect your data in compliance with India's Digital Personal Data Protection Act 2023. Operated by K² Adexos Global Technologies." },
       { name: "robots", content: "index, follow" },
+      { property: "og:title", content: "Privacy Policy — Punchly" },
+      { property: "og:description", content: "How Punchly handles your data: encrypted storage, DPDP-compliant, no third-party sharing." },
+      { property: "og:url", content: "https://punchly.online/privacy" },
+      { property: "og:image", content: "https://punchly.online/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
+    links: [{ rel: "canonical", href: "https://punchly.online/privacy" }],
   }),
   component: PrivacyPage,
 });
@@ -36,12 +42,12 @@ function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-semibold mb-3">1. Who We Are</h2>
             <p>
-              Punchly is a biometric attendance management platform operated by K2 Adexos Global Technologies, Hyderabad, Telangana, India.
+              Punchly is a biometric attendance management platform operated by K² Adexos Global Technologies, Hyderabad, Telangana, India.
               We provide GPS + selfie-based attendance tracking, payroll management, leave management, and shift scheduling for businesses and schools
               across Andhra Pradesh and Telangana.
             </p>
             <p className="mt-3">
-              <strong>Contact:</strong> support@punchly.app | K2 Adexos Global Technologies, Hyderabad, Telangana — 500001
+              <strong>Contact:</strong> support@punchly.online | K² Adexos Global Technologies, Hyderabad, Telangana — 500001
             </p>
           </section>
 
@@ -140,7 +146,7 @@ function PrivacyPage() {
               <li><strong>Right to withdraw consent:</strong> Withdraw consent for biometric data collection at any time</li>
               <li><strong>Right to nominate:</strong> Nominate another person to exercise your rights in case of incapacity</li>
             </ul>
-            <p className="mt-3">To exercise any of these rights, email us at: <strong>privacy@punchly.app</strong> with subject "Data Rights Request".</p>
+            <p className="mt-3">To exercise any of these rights, email us at: <strong>privacy@punchly.online</strong> with subject "Data Rights Request".</p>
             <p className="mt-2">We will respond within 72 hours and fulfil the request within 30 days.</p>
           </section>
 
@@ -202,9 +208,9 @@ function PrivacyPage() {
             </p>
             <div className="mt-3 rounded-lg bg-muted/40 p-4 text-sm">
               <p><strong>Grievance Officer:</strong> Karthikeya</p>
-              <p><strong>Organization:</strong> K2 Adexos Global Technologies</p>
+              <p><strong>Organization:</strong> K² Adexos Global Technologies</p>
               <p><strong>Address:</strong> Hyderabad, Telangana — 500001, India</p>
-              <p><strong>Email:</strong> grievance@punchly.app</p>
+              <p><strong>Email:</strong> grievance@punchly.online</p>
               <p><strong>Response time:</strong> Within 72 hours acknowledgement, resolved within 30 days</p>
             </div>
             <p className="mt-3">
@@ -216,10 +222,10 @@ function PrivacyPage() {
             <h2 className="text-2xl font-semibold mb-3">14. Contact Us</h2>
             <div className="rounded-lg bg-muted/40 p-4 text-sm">
               <p><strong>Punchly Privacy Team</strong></p>
-              <p>K2 Adexos Global Technologies</p>
+              <p>K² Adexos Global Technologies</p>
               <p>Hyderabad, Telangana — 500001</p>
-              <p>Email: privacy@punchly.app</p>
-              <p>Website: https://smartpunch.vercel.app</p>
+              <p>Email: privacy@punchly.online</p>
+              <p>Website: https://punchly.online</p>
             </div>
           </section>
 

@@ -1,4 +1,4 @@
-package in.mystoreos.punchly;
+package online.punchly.app;
 
 import com.getcapacitor.BridgeActivity;
 
