@@ -12,7 +12,25 @@ export type GpsReading = {
   timestamp: number;
 };
 
-export function takeReading(): Promise<GpsReading> {
+export async function takeReading(): Promise<GpsReading> {
+  // In native app: use Capacitor Geolocation (much better accuracy on Android).
+  // The dynamic import means web bundles don't pull in the plugin code.
+  const cap = typeof window !== "undefined" ? (window as any).Capacitor : null;
+  if (cap?.isNativePlatform?.()) {
+    const { Geolocation } = await import("@capacitor/geolocation");
+    const p = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    return {
+      latitude: p.coords.latitude,
+      longitude: p.coords.longitude,
+      accuracy: p.coords.accuracy ?? null,
+      speed: p.coords.speed ?? null,
+      altitude: p.coords.altitude ?? null,
+      altitudeAccuracy: p.coords.altitudeAccuracy ?? null,
+      heading: p.coords.heading ?? null,
+      timestamp: p.timestamp,
+    };
+  }
+
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error("Geolocation not supported"));
     navigator.geolocation.getCurrentPosition(

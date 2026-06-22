@@ -38,3 +38,17 @@ package-lock.json
 .env
 .env.local
 .vercel/
+
+# Capacitor / Android / iOS build outputs
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/.cxx/
+android/app/release/
+ios/App/build/
+ios/App/Pods/
+ios/App/DerivedData/
+*.keystore
+*.jks
