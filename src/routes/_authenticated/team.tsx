@@ -231,11 +231,11 @@ function TeamPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-0.5">
-                      <Link to="/team/$staffId" params={{ staffId: s.id }}>
-                        <Button size="sm" variant="ghost" title="View full profile">
+                      <Button size="sm" variant="ghost" asChild title="View full profile">
+                        <Link to="/team/$staffId" params={{ staffId: s.id }}>
                           <UserRound className="h-4 w-4" />
-                        </Button>
-                      </Link>
+                        </Link>
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
