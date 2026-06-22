@@ -340,7 +340,7 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
     queryFn: async () => {
       const { data } = await supabase
         .from("leave_requests")
-        .select("id, start_date, end_date, days, reason, profiles!leave_requests_user_id_fkey(full_name)")
+        .select("id, start_date, end_date, days, reason, profiles!leave_requests_user_id_fkey_profiles(full_name)")
         .eq("tenant_id", tenantId!)
         .eq("status", "pending")
         .order("created_at", { ascending: false })

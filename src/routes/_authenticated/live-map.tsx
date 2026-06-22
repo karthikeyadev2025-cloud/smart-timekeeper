@@ -58,7 +58,7 @@ function LiveMapPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("attendance_records")
-        .select("*, profiles!attendance_records_user_id_fkey(full_name, phone, is_field_staff), office_locations(name), selfie_url")
+        .select("*, profiles!attendance_records_user_id_fkey_profiles(full_name, phone, is_field_staff), office_locations(name), selfie_url")
         .eq("tenant_id", tenantId!)
         .eq("attendance_date", today)
         .order("occurred_at", { ascending: false });

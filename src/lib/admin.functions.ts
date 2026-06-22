@@ -357,7 +357,7 @@ export const exportTenantStaff = createServerFn({ method: "GET" })
 
     const { data: staff } = await supabaseAdmin
       .from("profiles")
-      .select("staff_id, full_name, phone, email, designation, monthly_salary, is_active, is_field_staff, created_at, branches:branch_id(name), user_roles(role)")
+      .select("staff_id, full_name, phone, email, designation, monthly_salary, is_active, is_field_staff, created_at, branches:branch_id(name), user_roles!user_roles_user_id_fkey_profiles(role)")
       .eq("tenant_id", data.tenant_id)
       .order("created_at", { ascending: false });
 

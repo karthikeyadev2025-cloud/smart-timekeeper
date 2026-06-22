@@ -45,7 +45,7 @@ function Payroll() {
     queryFn: async () => {
       let q = supabase
         .from("payslips")
-        .select("*, profiles!payslips_user_id_fkey(full_name, branch_id, staff_id, bank_account_number, bank_ifsc, bank_name, upi_id)")
+        .select("*, profiles!payslips_user_id_fkey_profiles(full_name, branch_id, staff_id, bank_account_number, bank_ifsc, bank_name, upi_id)")
         .eq("tenant_id", tenantId!)
         .eq("period_year", year)
         .eq("period_month", month);
@@ -183,7 +183,7 @@ function Payroll() {
     const monthEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     let q = supabase
       .from("attendance_records")
-      .select("attendance_date, occurred_at, kind, latitude, longitude, enforcement_status, branch_id, profiles!attendance_records_user_id_fkey(full_name, email)")
+      .select("attendance_date, occurred_at, kind, latitude, longitude, enforcement_status, branch_id, profiles!attendance_records_user_id_fkey_profiles(full_name, email)")
       .eq("tenant_id", tenantId)
       .gte("attendance_date", monthStart)
       .lte("attendance_date", monthEnd)

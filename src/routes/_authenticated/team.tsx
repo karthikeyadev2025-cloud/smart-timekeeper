@@ -55,7 +55,7 @@ function TeamPage() {
     queryFn: async () => {
       let q = supabase
         .from("profiles")
-        .select("*, user_roles(role)")
+        .select("*, user_roles!user_roles_user_id_fkey_profiles(role)")
         .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
       if (branchId !== "all") q = q.eq("branch_id", branchId);

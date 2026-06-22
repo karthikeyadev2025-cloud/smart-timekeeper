@@ -30,7 +30,7 @@ function LeavesAdmin() {
     queryFn: async () => {
       let q = supabase
         .from("leave_requests")
-        .select("*, profiles!leave_requests_user_id_fkey(full_name, email)")
+        .select("*, profiles!leave_requests_user_id_fkey_profiles(full_name, email)")
         .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
       if (branchId !== "all") q = q.eq("branch_id", branchId);
