@@ -228,9 +228,11 @@ export const deleteStaff = createServerFn({ method: "POST" })
   });
 
 /* ─────────────── SELF-SERVICE: STAFF UPDATE OWN PROFILE ───────────────
-   Lets a staff member fill in their own personal/emergency/bank details.
+   Lets a staff member fill in their own personal/emergency details.
    Deliberately excludes designation, monthly_salary, branch_id, is_active,
-   role — those stay admin-only (set via updateStaff above). */
+   role (admin-only via updateStaff) AND bank/UPI details (those now go
+   through the requestBankChange → admin-approval flow to prevent
+   salary-redirect fraud). */
 
 const selfUpdateInput = z.object({
   date_of_birth: z.string().trim().max(10).nullable().optional(),
@@ -240,11 +242,6 @@ const selfUpdateInput = z.object({
   emergency_contact_phone: z.string().trim().max(20).nullable().optional(),
   id_proof_type: z.enum(["aadhaar", "pan", "voter_id", "driving_license", "other"]).nullable().optional(),
   id_proof_number: z.string().trim().max(50).nullable().optional(),
-  bank_account_holder: z.string().trim().max(100).nullable().optional(),
-  bank_account_number: z.string().trim().max(30).nullable().optional(),
-  bank_ifsc: z.string().trim().max(15).nullable().optional(),
-  bank_name: z.string().trim().max(100).nullable().optional(),
-  upi_id: z.string().trim().max(100).nullable().optional(),
 });
 
 export const updateMyProfile = createServerFn({ method: "POST" })
@@ -262,11 +259,6 @@ export const updateMyProfile = createServerFn({ method: "POST" })
     if (data.emergency_contact_phone !== undefined) update.emergency_contact_phone = data.emergency_contact_phone || null;
     if (data.id_proof_type !== undefined) update.id_proof_type = data.id_proof_type;
     if (data.id_proof_number !== undefined) update.id_proof_number = data.id_proof_number || null;
-    if (data.bank_account_holder !== undefined) update.bank_account_holder = data.bank_account_holder || null;
-    if (data.bank_account_number !== undefined) update.bank_account_number = data.bank_account_number || null;
-    if (data.bank_ifsc !== undefined) update.bank_ifsc = data.bank_ifsc ? data.bank_ifsc.toUpperCase() : null;
-    if (data.bank_name !== undefined) update.bank_name = data.bank_name || null;
-    if (data.upi_id !== undefined) update.upi_id = data.upi_id || null;
 
     if (Object.keys(update).length === 0) return { ok: true };
 

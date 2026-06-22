@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Phone, Shield, MessageCircle, Pencil, Trash2, UserRound, UserCheck, MapPinned, Wallet } from "lucide-react";
+import { UserPlus, Phone, Shield, MessageCircle, Pencil, Trash2, UserRound, UserCheck, MapPinned, Wallet, Sparkles } from "lucide-react";
 import { openWhatsapp } from "@/lib/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -165,6 +165,7 @@ function TeamPage() {
                 <TableHead>Designation</TableHead>
                 <TableHead>Branch</TableHead>
                 <TableHead>Salary</TableHead>
+                <TableHead>Profile</TableHead>
                 <TableHead>Field</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -206,6 +207,22 @@ function TeamPage() {
                     </Select>
                   </TableCell>
                   <TableCell>{s.monthly_salary ? `₹${Number(s.monthly_salary).toLocaleString("en-IN")}` : "—"}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const pct = Math.round((((s as any).profile_completion ?? 0) / 10) * 100);
+                      const isRecent = (s as any).updated_at && (Date.now() - new Date((s as any).updated_at).getTime()) < 7 * 24 * 60 * 60 * 1000;
+                      const color = pct >= 80 ? "bg-success" : pct >= 50 ? "bg-amber-500" : "bg-muted-foreground/40";
+                      return (
+                        <div className="flex items-center gap-2 min-w-[110px]">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                            <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs tabular-nums text-muted-foreground">{pct}%</span>
+                          {isRecent && <Badge variant="outline" className="h-5 gap-0.5 border-success/40 px-1.5 text-[10px] text-success" title={`Updated ${new Date((s as any).updated_at).toLocaleDateString()}`}><Sparkles className="h-2.5 w-2.5" /> new</Badge>}
+                        </div>
+                      );
+                    })()}
+                  </TableCell>
                   <TableCell>
                     <input
                       type="checkbox"
@@ -264,7 +281,7 @@ function TeamPage() {
                 </TableRow>
               ))}
               {staff?.length === 0 && (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

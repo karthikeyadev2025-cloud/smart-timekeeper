@@ -69,6 +69,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
       { to: "/leave-types", label: "Leave types", icon: Calendar },
       { to: "/payroll", label: "Payroll", icon: Wallet },
+      { to: "/bank-approvals", label: "Bank approvals", icon: ShieldAlert },
       { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
     ];
   }
@@ -79,6 +80,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/live-map", label: "Live map", icon: Map },
       { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
       { to: "/payroll", label: "Payroll", icon: Wallet },
+      { to: "/bank-approvals", label: "Bank approvals", icon: ShieldAlert },
       { to: "/my-attendance", label: "My attendance", icon: Calendar },
       { to: "/my-leaves", label: "My leaves", icon: Calendar },
       { to: "/my-profile", label: "My profile", icon: UserRound },

@@ -10,11 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarHeart, IdCard, Landmark, Save, ShieldCheck } from "lucide-react";
+import { CalendarHeart, IdCard, Landmark, Save, ShieldCheck, ShieldAlert, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
 import { updateMyProfile } from "@/lib/staff.functions";
+import { requestBankChange } from "@/lib/bank-change.functions";
 
 export const Route = createFileRoute("/_authenticated/my-profile")({
   component: MyProfile,
@@ -22,7 +24,7 @@ export const Route = createFileRoute("/_authenticated/my-profile")({
 
 const FIELDS = [
   "date_of_birth", "gender", "address", "emergency_contact_name", "emergency_contact_phone",
-  "id_proof_type", "id_proof_number", "bank_account_holder", "bank_account_number", "bank_ifsc", "bank_name",
+  "id_proof_type", "id_proof_number", "bank_account_number",
 ] as const;
 
 function MyProfile() {
@@ -62,11 +64,6 @@ function MyProfile() {
           emergency_contact_phone: get("emergency_contact_phone") || null,
           id_proof_type: (get("id_proof_type") || null) as any,
           id_proof_number: get("id_proof_number") || null,
-          bank_account_holder: get("bank_account_holder") || null,
-          bank_account_number: get("bank_account_number") || null,
-          bank_ifsc: get("bank_ifsc") || null,
-          bank_name: get("bank_name") || null,
-          upi_id: get("upi_id") || null,
         },
       });
       toast.success("Profile saved");
@@ -163,19 +160,7 @@ function MyProfile() {
             </div>
           </Card>
 
-          <Card className="p-5 space-y-4">
-            <h3 className="flex items-center gap-2 font-semibold"><Landmark className="h-4 w-4" /> Bank account for salary</h3>
-            <p className="text-xs text-muted-foreground">Your employer uses this to pay your salary by bank transfer.</p>
-            <div className="space-y-3">
-              <div className="space-y-1"><Label>Account holder name</Label><Input value={get("bank_account_holder")} onChange={(e) => set("bank_account_holder")(e.target.value)} placeholder="As per bank passbook" /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Account number</Label><Input value={get("bank_account_number")} onChange={(e) => set("bank_account_number")(e.target.value.replace(/[^0-9]/g, ""))} className="font-mono" /></div>
-                <div className="space-y-1"><Label>IFSC code</Label><Input value={get("bank_ifsc")} onChange={(e) => set("bank_ifsc")(e.target.value.toUpperCase())} className="font-mono" maxLength={11} placeholder="SBIN0001234" /></div>
-              </div>
-              <div className="space-y-1"><Label>Bank name & branch</Label><Input value={get("bank_name")} onChange={(e) => set("bank_name")(e.target.value)} /></div>
-              <div className="space-y-1"><Label>UPI ID (optional)</Label><Input value={get("upi_id")} onChange={(e) => set("upi_id")(e.target.value)} className="font-mono" placeholder="name@upi" /></div>
-            </div>
-          </Card>
+          <MyBankCard tenantId={user?.tenant?.id} profile={profile as any} />
         </div>
 
         <Button onClick={save} disabled={saving} className="gap-2" size="lg">
@@ -183,5 +168,131 @@ function MyProfile() {
         </Button>
       </div>
     </AppShell>
+  );
+}
+
+/* ───────────────────────── BANK CARD WITH APPROVAL FLOW ───────────────────────── */
+
+function MyBankCard({ tenantId, profile }: { tenantId: string | undefined; profile: any }) {
+  const qc = useQueryClient();
+  const requestFn = useServerFn(requestBankChange);
+  const [editing, setEditing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    bank_account_holder: profile?.bank_account_holder ?? "",
+    bank_account_number: profile?.bank_account_number ?? "",
+    bank_ifsc: profile?.bank_ifsc ?? "",
+    bank_name: profile?.bank_name ?? "",
+    upi_id: profile?.upi_id ?? "",
+  });
+
+  const { data: pending } = useQuery({
+    queryKey: ["my-bank-request", profile?.id],
+    enabled: !!profile?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("pending_bank_changes")
+        .select("*")
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const submit = async () => {
+    if (!tenantId) return;
+    setSubmitting(true);
+    try {
+      await requestFn({
+        data: {
+          tenant_id: tenantId,
+          bank_account_holder: form.bank_account_holder || null,
+          bank_account_number: form.bank_account_number || null,
+          bank_ifsc: form.bank_ifsc || null,
+          bank_name: form.bank_name || null,
+          upi_id: form.upi_id || null,
+        },
+      });
+      toast.success("Sent for admin approval");
+      qc.invalidateQueries({ queryKey: ["my-bank-request", profile?.id] });
+      setEditing(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not submit");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const isPending = pending?.status === "pending";
+  const wasRejected = pending?.status === "rejected" && new Date(pending.reviewed_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const hasBank = !!profile?.bank_account_number;
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-2 font-semibold"><Landmark className="h-4 w-4" /> Bank account for salary</h3>
+        {isPending && <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" /> Pending approval</Badge>}
+        {!isPending && hasBank && <Badge className="gap-1"><CheckCircle2 className="h-3 w-3" /> Active</Badge>}
+      </div>
+
+      {wasRejected && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-xs">
+          <p className="flex items-center gap-1 font-medium text-destructive"><XCircle className="h-3 w-3" /> Last change was rejected</p>
+          {pending?.reject_reason && <p className="mt-0.5 text-muted-foreground">{pending.reject_reason}</p>}
+        </div>
+      )}
+
+      <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+        <p className="text-xs text-muted-foreground">Current bank on file (used for salary)</p>
+        {hasBank ? (
+          <>
+            <p><span className="text-muted-foreground">A/c holder:</span> {profile.bank_account_holder || "—"}</p>
+            <p><span className="text-muted-foreground">A/c no:</span> <span className="font-mono">{profile.bank_account_number}</span></p>
+            <p><span className="text-muted-foreground">IFSC:</span> <span className="font-mono">{profile.bank_ifsc || "—"}</span></p>
+            <p><span className="text-muted-foreground">Bank:</span> {profile.bank_name || "—"}</p>
+            {profile.upi_id && <p><span className="text-muted-foreground">UPI:</span> <span className="font-mono">{profile.upi_id}</span></p>}
+          </>
+        ) : (
+          <p className="text-muted-foreground">No bank account on file yet.</p>
+        )}
+      </div>
+
+      {!editing && !isPending && (
+        <Button variant="outline" size="sm" className="gap-2" onClick={() => setEditing(true)}>
+          <ShieldAlert className="h-4 w-4" /> {hasBank ? "Change bank details" : "Add bank details"}
+        </Button>
+      )}
+
+      {editing && (
+        <div className="space-y-3 rounded-md border-2 border-dashed border-primary/40 p-3">
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+            <span>For your protection, bank changes need admin approval before your next salary uses the new account.</span>
+          </p>
+          <div className="space-y-1"><Label>Account holder name</Label><Input value={form.bank_account_holder} onChange={(e) => setForm((f) => ({ ...f, bank_account_holder: e.target.value }))} placeholder="As per bank passbook" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Account number</Label><Input value={form.bank_account_number} onChange={(e) => setForm((f) => ({ ...f, bank_account_number: e.target.value.replace(/[^0-9]/g, "") }))} className="font-mono" /></div>
+            <div className="space-y-1"><Label>IFSC code</Label><Input value={form.bank_ifsc} onChange={(e) => setForm((f) => ({ ...f, bank_ifsc: e.target.value.toUpperCase() }))} className="font-mono" maxLength={11} placeholder="SBIN0001234" /></div>
+          </div>
+          <div className="space-y-1"><Label>Bank name & branch</Label><Input value={form.bank_name} onChange={(e) => setForm((f) => ({ ...f, bank_name: e.target.value }))} /></div>
+          <div className="space-y-1"><Label>UPI ID (optional)</Label><Input value={form.upi_id} onChange={(e) => setForm((f) => ({ ...f, upi_id: e.target.value }))} className="font-mono" placeholder="name@upi" /></div>
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" disabled={submitting} onClick={submit}>{submitting ? "Submitting…" : "Send for approval"}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {isPending && pending && (
+        <div className="rounded-md border bg-amber-50 dark:bg-amber-950/20 p-3 text-xs space-y-1">
+          <p className="font-medium text-amber-900 dark:text-amber-200">Requested change (awaiting approval)</p>
+          <p><span className="text-muted-foreground">A/c no:</span> <span className="font-mono">{pending.bank_account_number || "—"}</span></p>
+          <p><span className="text-muted-foreground">IFSC:</span> <span className="font-mono">{pending.bank_ifsc || "—"}</span></p>
+          <p><span className="text-muted-foreground">Bank:</span> {pending.bank_name || "—"}</p>
+        </div>
+      )}
+    </Card>
   );
 }
