@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Phone, Shield, MessageCircle, Pencil, Trash2, UserRound } from "lucide-react";
+import { UserPlus, Phone, Shield, MessageCircle, Pencil, Trash2, UserRound, UserCheck, MapPinned, Wallet } from "lucide-react";
 import { openWhatsapp } from "@/lib/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -123,6 +124,36 @@ function TeamPage() {
           </div>
         </header>
 
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-primary/10 p-2"><UserRound className="h-4 w-4 text-primary" /></div>
+              <div><p className="text-2xl font-bold leading-none">{staff?.length ?? 0}</p><p className="text-xs text-muted-foreground">Total staff</p></div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-success/10 p-2"><UserCheck className="h-4 w-4 text-success" /></div>
+              <div><p className="text-2xl font-bold leading-none">{(staff ?? []).filter((s: any) => s.is_active).length}</p><p className="text-xs text-muted-foreground">Active</p></div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-blue-500/10 p-2"><MapPinned className="h-4 w-4 text-blue-600 dark:text-blue-400" /></div>
+              <div><p className="text-2xl font-bold leading-none">{(staff ?? []).filter((s: any) => s.is_field_staff).length}</p><p className="text-xs text-muted-foreground">Field staff</p></div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-amber-500/10 p-2"><Wallet className="h-4 w-4 text-amber-600 dark:text-amber-400" /></div>
+              <div>
+                <p className="text-2xl font-bold leading-none">₹{(staff ?? []).reduce((a: number, s: any) => a + Number(s.monthly_salary ?? 0), 0).toLocaleString("en-IN")}</p>
+                <p className="text-xs text-muted-foreground">Monthly payroll</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
         <Card className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -142,7 +173,14 @@ function TeamPage() {
               {(staff ?? []).map((s) => (
                 <TableRow key={s.id}>
                   <TableCell className="font-mono text-xs text-muted-foreground">{(s as any).staff_id ?? "—"}</TableCell>
-                  <TableCell className="font-medium">{s.full_name ?? "—"}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link to="/team/$staffId" params={{ staffId: s.id }} className="flex items-center gap-2 hover:underline">
+                      <Avatar className="h-7 w-7">
+                        <AvatarFallback className="text-xs">{(s.full_name ?? "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      {s.full_name ?? "—"}
+                    </Link>
+                  </TableCell>
                   <TableCell className="font-mono">{s.phone ?? "—"}</TableCell>
                   <TableCell>{s.designation ?? "—"}</TableCell>
                   <TableCell>

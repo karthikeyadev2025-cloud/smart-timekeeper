@@ -23,6 +23,7 @@ import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedPinResetsRouteImport } from './routes/_authenticated/pin-resets'
 import { Route as AuthenticatedPayrollRouteImport } from './routes/_authenticated/payroll'
 import { Route as AuthenticatedMySalaryRouteImport } from './routes/_authenticated/my-salary'
+import { Route as AuthenticatedMyProfileRouteImport } from './routes/_authenticated/my-profile'
 import { Route as AuthenticatedMyLeavesRouteImport } from './routes/_authenticated/my-leaves'
 import { Route as AuthenticatedMyAttendanceRouteImport } from './routes/_authenticated/my-attendance'
 import { Route as AuthenticatedMarkAttendanceRouteImport } from './routes/_authenticated/mark-attendance'
@@ -106,6 +107,11 @@ const AuthenticatedPayrollRoute = AuthenticatedPayrollRouteImport.update({
 const AuthenticatedMySalaryRoute = AuthenticatedMySalaryRouteImport.update({
   id: '/my-salary',
   path: '/my-salary',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMyProfileRoute = AuthenticatedMyProfileRouteImport.update({
+  id: '/my-profile',
+  path: '/my-profile',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedMyLeavesRoute = AuthenticatedMyLeavesRouteImport.update({
@@ -208,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/mark-attendance': typeof AuthenticatedMarkAttendanceRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/my-leaves': typeof AuthenticatedMyLeavesRoute
+  '/my-profile': typeof AuthenticatedMyProfileRoute
   '/my-salary': typeof AuthenticatedMySalaryRoute
   '/payroll': typeof AuthenticatedPayrollRoute
   '/pin-resets': typeof AuthenticatedPinResetsRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByTo {
   '/mark-attendance': typeof AuthenticatedMarkAttendanceRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/my-leaves': typeof AuthenticatedMyLeavesRoute
+  '/my-profile': typeof AuthenticatedMyProfileRoute
   '/my-salary': typeof AuthenticatedMySalaryRoute
   '/payroll': typeof AuthenticatedPayrollRoute
   '/pin-resets': typeof AuthenticatedPinResetsRoute
@@ -270,6 +278,7 @@ export interface FileRoutesById {
   '/_authenticated/mark-attendance': typeof AuthenticatedMarkAttendanceRoute
   '/_authenticated/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/_authenticated/my-leaves': typeof AuthenticatedMyLeavesRoute
+  '/_authenticated/my-profile': typeof AuthenticatedMyProfileRoute
   '/_authenticated/my-salary': typeof AuthenticatedMySalaryRoute
   '/_authenticated/payroll': typeof AuthenticatedPayrollRoute
   '/_authenticated/pin-resets': typeof AuthenticatedPinResetsRoute
@@ -302,6 +311,7 @@ export interface FileRouteTypes {
     | '/mark-attendance'
     | '/my-attendance'
     | '/my-leaves'
+    | '/my-profile'
     | '/my-salary'
     | '/payroll'
     | '/pin-resets'
@@ -332,6 +342,7 @@ export interface FileRouteTypes {
     | '/mark-attendance'
     | '/my-attendance'
     | '/my-leaves'
+    | '/my-profile'
     | '/my-salary'
     | '/payroll'
     | '/pin-resets'
@@ -363,6 +374,7 @@ export interface FileRouteTypes {
     | '/_authenticated/mark-attendance'
     | '/_authenticated/my-attendance'
     | '/_authenticated/my-leaves'
+    | '/_authenticated/my-profile'
     | '/_authenticated/my-salary'
     | '/_authenticated/payroll'
     | '/_authenticated/pin-resets'
@@ -482,6 +494,13 @@ declare module '@tanstack/react-router' {
       path: '/my-salary'
       fullPath: '/my-salary'
       preLoaderRoute: typeof AuthenticatedMySalaryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/my-profile': {
+      id: '/_authenticated/my-profile'
+      path: '/my-profile'
+      fullPath: '/my-profile'
+      preLoaderRoute: typeof AuthenticatedMyProfileRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/my-leaves': {
@@ -618,6 +637,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMarkAttendanceRoute: typeof AuthenticatedMarkAttendanceRoute
   AuthenticatedMyAttendanceRoute: typeof AuthenticatedMyAttendanceRoute
   AuthenticatedMyLeavesRoute: typeof AuthenticatedMyLeavesRoute
+  AuthenticatedMyProfileRoute: typeof AuthenticatedMyProfileRoute
   AuthenticatedMySalaryRoute: typeof AuthenticatedMySalaryRoute
   AuthenticatedPayrollRoute: typeof AuthenticatedPayrollRoute
   AuthenticatedPinResetsRoute: typeof AuthenticatedPinResetsRoute
@@ -642,6 +662,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMarkAttendanceRoute: AuthenticatedMarkAttendanceRoute,
   AuthenticatedMyAttendanceRoute: AuthenticatedMyAttendanceRoute,
   AuthenticatedMyLeavesRoute: AuthenticatedMyLeavesRoute,
+  AuthenticatedMyProfileRoute: AuthenticatedMyProfileRoute,
   AuthenticatedMySalaryRoute: AuthenticatedMySalaryRoute,
   AuthenticatedPayrollRoute: AuthenticatedPayrollRoute,
   AuthenticatedPinResetsRoute: AuthenticatedPinResetsRoute,

@@ -19,6 +19,7 @@ import {
   TrendingUp,
   ShieldAlert,
   Paintbrush,
+  UserRound,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/payroll", label: "Payroll", icon: Wallet },
       { to: "/my-attendance", label: "My attendance", icon: Calendar },
       { to: "/my-leaves", label: "My leaves", icon: Calendar },
+      { to: "/my-profile", label: "My profile", icon: UserRound },
     ];
   }
   // staff
@@ -88,6 +90,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/app", label: "Today", icon: LayoutDashboard },
       { to: "/mark-attendance", label: "Mark class", icon: ClipboardCheck },
       { to: "/my-leaves", label: "Leaves", icon: Calendar },
+      { to: "/my-profile", label: "My profile", icon: UserRound },
     ];
   }
   return [
@@ -96,6 +99,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
     { to: "/my-attendance", label: "My attendance", icon: Calendar },
     { to: "/my-leaves", label: "Leaves", icon: Calendar },
     { to: "/my-salary", label: "Salary", icon: Wallet },
+    { to: "/my-profile", label: "My profile", icon: UserRound },
   ];
 }
 

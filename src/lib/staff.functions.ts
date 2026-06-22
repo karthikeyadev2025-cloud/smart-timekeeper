@@ -227,6 +227,55 @@ export const deleteStaff = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/* ─────────────── SELF-SERVICE: STAFF UPDATE OWN PROFILE ───────────────
+   Lets a staff member fill in their own personal/emergency/bank details.
+   Deliberately excludes designation, monthly_salary, branch_id, is_active,
+   role — those stay admin-only (set via updateStaff above). */
+
+const selfUpdateInput = z.object({
+  date_of_birth: z.string().trim().max(10).nullable().optional(),
+  gender: z.enum(["male", "female", "other"]).nullable().optional(),
+  address: z.string().trim().max(500).nullable().optional(),
+  emergency_contact_name: z.string().trim().max(100).nullable().optional(),
+  emergency_contact_phone: z.string().trim().max(20).nullable().optional(),
+  id_proof_type: z.enum(["aadhaar", "pan", "voter_id", "driving_license", "other"]).nullable().optional(),
+  id_proof_number: z.string().trim().max(50).nullable().optional(),
+  bank_account_holder: z.string().trim().max(100).nullable().optional(),
+  bank_account_number: z.string().trim().max(30).nullable().optional(),
+  bank_ifsc: z.string().trim().max(15).nullable().optional(),
+  bank_name: z.string().trim().max(100).nullable().optional(),
+  upi_id: z.string().trim().max(100).nullable().optional(),
+});
+
+export const updateMyProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => selfUpdateInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const update: Record<string, unknown> = {};
+    if (data.date_of_birth !== undefined) update.date_of_birth = data.date_of_birth || null;
+    if (data.gender !== undefined) update.gender = data.gender;
+    if (data.address !== undefined) update.address = data.address || null;
+    if (data.emergency_contact_name !== undefined) update.emergency_contact_name = data.emergency_contact_name || null;
+    if (data.emergency_contact_phone !== undefined) update.emergency_contact_phone = data.emergency_contact_phone || null;
+    if (data.id_proof_type !== undefined) update.id_proof_type = data.id_proof_type;
+    if (data.id_proof_number !== undefined) update.id_proof_number = data.id_proof_number || null;
+    if (data.bank_account_holder !== undefined) update.bank_account_holder = data.bank_account_holder || null;
+    if (data.bank_account_number !== undefined) update.bank_account_number = data.bank_account_number || null;
+    if (data.bank_ifsc !== undefined) update.bank_ifsc = data.bank_ifsc ? data.bank_ifsc.toUpperCase() : null;
+    if (data.bank_name !== undefined) update.bank_name = data.bank_name || null;
+    if (data.upi_id !== undefined) update.upi_id = data.upi_id || null;
+
+    if (Object.keys(update).length === 0) return { ok: true };
+
+    const { error } = await supabaseAdmin.from("profiles").update(update).eq("id", userId);
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
 /* ─────────────── BULK IMPORT STAFF (Excel upload) ─────────────── */
 
 const bulkRowSchema = z.object({
