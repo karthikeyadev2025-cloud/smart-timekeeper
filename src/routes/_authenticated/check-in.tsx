@@ -337,6 +337,7 @@ function CheckInFlow() {
         tenant_id: user.tenant.id,
         user_id: user.userId,
         office_location_id: matchedLocation?.id ?? null,
+        branch_id: activeBranchId,
         kind: nextKind,
         latitude: coords.latitude,
         longitude: coords.longitude,

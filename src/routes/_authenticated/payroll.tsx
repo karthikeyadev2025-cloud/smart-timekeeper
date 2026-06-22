@@ -181,28 +181,43 @@ function Payroll() {
     const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const monthEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+    // If a specific branch is selected, first get the user_ids in that branch.
+    // Filtering attendance.branch_id directly doesn't work for historical rows
+    // (older attendance was inserted before branch_id was tracked there).
+    let userIds: string[] | null = null;
+    if (branchId !== "all") {
+      const { data: staffInBranch } = await supabase
+        .from("profiles").select("id").eq("tenant_id", tenantId).eq("branch_id", branchId);
+      userIds = (staffInBranch ?? []).map((s: any) => s.id);
+      if (userIds.length === 0) { toast.error("No staff in selected branch"); return; }
+    }
+
     let q = supabase
       .from("attendance_records")
-      .select("attendance_date, occurred_at, kind, latitude, longitude, enforcement_status, branch_id, profiles!attendance_records_user_id_fkey_profiles(full_name, email)")
+      .select("attendance_date, occurred_at, kind, latitude, longitude, enforcement_status, branch_id, profiles!attendance_records_user_id_fkey_profiles(full_name, email, staff_id)")
       .eq("tenant_id", tenantId)
       .gte("attendance_date", monthStart)
       .lte("attendance_date", monthEnd)
       .order("occurred_at");
-    if (branchId !== "all") q = q.eq("branch_id", branchId);
+    if (userIds) q = q.in("user_id", userIds);
+
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
     if (!data?.length) { toast.error("No attendance in this period"); return; }
     const rows = data.map((r: any) => ({
+      staff_id: r.profiles?.staff_id ?? "",
+      employee: r.profiles?.full_name ?? "",
       date: r.attendance_date,
       time: new Date(r.occurred_at).toLocaleTimeString(),
-      employee: r.profiles?.full_name ?? "",
-      email: r.profiles?.email ?? "",
       action: r.kind,
       status: r.enforcement_status ?? "",
       latitude: r.latitude ?? "",
       longitude: r.longitude ?? "",
+      email: r.profiles?.email ?? "",
     }));
     downloadCsv(`attendance_${year}-${String(month).padStart(2,"0")}_${branchSuffix()}.csv`, rows);
+    toast.success(`Exported ${rows.length} rows`);
   };
 
   if (!tenantId) return <AppShell><Card className="p-6">You need a company first.</Card></AppShell>;
