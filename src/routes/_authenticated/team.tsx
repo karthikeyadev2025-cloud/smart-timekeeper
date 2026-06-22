@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Phone, Shield, MessageCircle, Pencil, Trash2 } from "lucide-react";
+import { UserPlus, Phone, Shield, MessageCircle, Pencil, Trash2, UserRound } from "lucide-react";
 import { openWhatsapp } from "@/lib/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -193,6 +193,11 @@ function TeamPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-0.5">
+                      <Link to="/team/$staffId" params={{ staffId: s.id }}>
+                        <Button size="sm" variant="ghost" title="View full profile">
+                          <UserRound className="h-4 w-4" />
+                        </Button>
+                      </Link>
                       <Button
                         size="sm"
                         variant="ghost"

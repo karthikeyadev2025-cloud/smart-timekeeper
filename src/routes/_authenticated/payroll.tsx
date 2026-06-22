@@ -3,12 +3,17 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Sparkles, Download, FileSpreadsheet, MessageSquareText } from "lucide-react";
+import { Sparkles, Download, FileSpreadsheet, MessageSquareText, Wallet } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useServerFn } from "@tanstack/react-start";
+import { recordSalaryPayment } from "@/lib/payments.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useBranchFilter } from "@/hooks/useBranchFilter";
@@ -32,6 +37,7 @@ function Payroll() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [generating, setGenerating] = useState(false);
+  const [payFor, setPayFor] = useState<any | null>(null);
 
   const { data: payslips } = useQuery({
     queryKey: ["payslips", tenantId, year, month, branchId],
@@ -39,7 +45,7 @@ function Payroll() {
     queryFn: async () => {
       let q = supabase
         .from("payslips")
-        .select("*, profiles!payslips_user_id_fkey(full_name, branch_id, staff_id)")
+        .select("*, profiles!payslips_user_id_fkey(full_name, branch_id, staff_id, bank_account_number, bank_ifsc, bank_name, upi_id)")
         .eq("tenant_id", tenantId!)
         .eq("period_year", year)
         .eq("period_month", month);
@@ -235,6 +241,7 @@ function Payroll() {
                 <TableHead>Base</TableHead>
                 <TableHead>Deductions</TableHead>
                 <TableHead className="text-right">Net pay</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Payslip</TableHead>
               </TableRow>
             </TableHeader>
@@ -256,21 +263,134 @@ function Payroll() {
                   <TableCell>₹{Number(p.base_salary).toLocaleString("en-IN")}</TableCell>
                   <TableCell className="text-destructive">-₹{Number(p.deductions).toFixed(0)}</TableCell>
                   <TableCell className="text-right font-bold">₹{Number(p.net_pay).toLocaleString("en-IN")}</TableCell>
+                  <TableCell>
+                    <button type="button" onClick={() => p.payment_status !== "paid" && setPayFor(p)} title={p.payment_status === "paid" ? "Fully paid" : "Click to record a payment"}>
+                      <Badge variant={p.payment_status === "paid" ? "default" : p.payment_status === "partial" ? "secondary" : "outline"} className={p.payment_status !== "paid" ? "cursor-pointer" : ""}>
+                        {p.payment_status === "paid" ? "Paid" : p.payment_status === "partial" ? `Partial (₹${Number(p.amount_paid ?? 0).toLocaleString("en-IN")})` : "Unpaid"}
+                      </Badge>
+                    </button>
+                  </TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadPayslipPdf(p, { employeeName: p.profiles?.full_name ?? "Employee", companyName: user?.tenant?.name, staffId: p.profiles?.staff_id })}>
-                      <Download className="h-4 w-4" /> PDF
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      {p.payment_status !== "paid" && (
+                        <Button size="sm" variant="outline" className="gap-1" onClick={() => setPayFor(p)}>
+                          <Wallet className="h-4 w-4" /> Pay
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadPayslipPdf(p, { employeeName: p.profiles?.full_name ?? "Employee", companyName: user?.tenant?.name, staffId: p.profiles?.staff_id })}>
+                        <Download className="h-4 w-4" /> PDF
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
               {payslips?.length === 0 && (
-                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No payslips for this period{branchId !== "all" ? ` in this ${branchLabel.toLowerCase()}` : ""}. Click "Generate" to create them.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No payslips for this period{branchId !== "all" ? ` in this ${branchLabel.toLowerCase()}` : ""}. Click "Generate" to create them.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </Card>
+
+        <Dialog open={!!payFor} onOpenChange={(v) => !v && setPayFor(null)}>
+          <DialogContent>
+            {payFor && (
+              <PayrollPaymentForm
+                tenantId={tenantId!}
+                payslip={payFor}
+                onDone={() => { setPayFor(null); qc.invalidateQueries({ queryKey: ["payslips"] }); }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AppShell>
+  );
+}
+
+function PayrollPaymentForm({ tenantId, payslip, onDone }: { tenantId: string; payslip: any; onDone: () => void }) {
+  const recordFn = useServerFn(recordSalaryPayment);
+  const balance = Number(payslip.net_pay) - Number(payslip.amount_paid ?? 0);
+  const bank = payslip.profiles;
+  const [amount, setAmount] = useState(balance.toString());
+  const [method, setMethod] = useState<"cash" | "bank_transfer" | "upi" | "cheque" | "other">(
+    bank?.bank_account_number ? "bank_transfer" : "cash",
+  );
+  const [reference, setReference] = useState("");
+  const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = Number(amount);
+    if (!amt || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    if (amt > balance + 0.01) { toast.error(`Amount exceeds remaining balance (₹${balance.toFixed(0)})`); return; }
+    setLoading(true);
+    try {
+      await recordFn({
+        data: {
+          tenant_id: tenantId,
+          payslip_id: payslip.id,
+          user_id: payslip.user_id,
+          amount: amt,
+          method,
+          reference: reference.trim() || null,
+          note: note.trim() || null,
+        },
+      });
+      toast.success("Payment recorded");
+      onDone();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not record payment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      <DialogHeader>
+        <DialogTitle>Record salary payment</DialogTitle>
+        <p className="text-sm text-muted-foreground">
+          {payslip.profiles?.full_name} · Balance due: <strong>₹{balance.toLocaleString("en-IN")}</strong>
+        </p>
+      </DialogHeader>
+
+      {bank?.bank_account_number && (
+        <div className="rounded-md bg-muted/50 p-2.5 text-xs space-y-0.5">
+          <p><span className="text-muted-foreground">A/c:</span> <span className="font-mono">{bank.bank_account_number}</span> · {bank.bank_ifsc}</p>
+          {bank.bank_name && <p className="text-muted-foreground">{bank.bank_name}</p>}
+          {bank.upi_id && <p><span className="text-muted-foreground">UPI:</span> <span className="font-mono">{bank.upi_id}</span></p>}
+        </div>
+      )}
+      {!bank?.bank_account_number && (
+        <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">
+          No bank details on file — add them from the staff's profile page to see account info here.
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1"><Label>Amount (₹)</Label><Input type="number" min={0.01} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required /></div>
+        <div className="space-y-1">
+          <Label>Method</Label>
+          <Select value={method} onValueChange={(v) => setMethod(v as any)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+              <SelectItem value="upi">UPI</SelectItem>
+              <SelectItem value="cash">Cash</SelectItem>
+              <SelectItem value="cheque">Cheque</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="space-y-1"><Label>Reference (txn ID / cheque no.)</Label><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Optional" className="font-mono" /></div>
+      <div className="space-y-1"><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" /></div>
+
+      <DialogFooter>
+        <Button type="submit" disabled={loading} className="gap-2"><Wallet className="h-4 w-4" /> {loading ? "Saving…" : `Mark ₹${amount || 0} paid`}</Button>
+      </DialogFooter>
+    </form>
   );
 }
 

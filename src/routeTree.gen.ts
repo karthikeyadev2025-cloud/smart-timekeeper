@@ -37,6 +37,7 @@ import { Route as AuthenticatedBranchesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedTeamStaffIdRouteImport } from './routes/_authenticated/team.$staffId'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -180,6 +181,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTeamStaffIdRoute =
+  AuthenticatedTeamStaffIdRouteImport.update({
+    id: '/$staffId',
+    path: '/$staffId',
+    getParentRoute: () => AuthenticatedTeamRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -207,8 +214,9 @@ export interface FileRoutesByFullPath {
   '/plans': typeof AuthenticatedPlansRoute
   '/revenue': typeof AuthenticatedRevenueRoute
   '/shifts': typeof AuthenticatedShiftsRoute
-  '/team': typeof AuthenticatedTeamRoute
+  '/team': typeof AuthenticatedTeamRouteWithChildren
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
+  '/team/$staffId': typeof AuthenticatedTeamStaffIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -236,8 +244,9 @@ export interface FileRoutesByTo {
   '/plans': typeof AuthenticatedPlansRoute
   '/revenue': typeof AuthenticatedRevenueRoute
   '/shifts': typeof AuthenticatedShiftsRoute
-  '/team': typeof AuthenticatedTeamRoute
+  '/team': typeof AuthenticatedTeamRouteWithChildren
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
+  '/team/$staffId': typeof AuthenticatedTeamStaffIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -267,8 +276,9 @@ export interface FileRoutesById {
   '/_authenticated/plans': typeof AuthenticatedPlansRoute
   '/_authenticated/revenue': typeof AuthenticatedRevenueRoute
   '/_authenticated/shifts': typeof AuthenticatedShiftsRoute
-  '/_authenticated/team': typeof AuthenticatedTeamRoute
+  '/_authenticated/team': typeof AuthenticatedTeamRouteWithChildren
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
+  '/_authenticated/team/$staffId': typeof AuthenticatedTeamStaffIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/team'
     | '/biometric-attendance/$city'
+    | '/team/$staffId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -329,6 +340,7 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/team'
     | '/biometric-attendance/$city'
+    | '/team/$staffId'
   id:
     | '__root__'
     | '/'
@@ -359,6 +371,7 @@ export interface FileRouteTypes {
     | '/_authenticated/shifts'
     | '/_authenticated/team'
     | '/biometric-attendance/$city'
+    | '/_authenticated/team/$staffId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -569,8 +582,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/team/$staffId': {
+      id: '/_authenticated/team/$staffId'
+      path: '/$staffId'
+      fullPath: '/team/$staffId'
+      preLoaderRoute: typeof AuthenticatedTeamStaffIdRouteImport
+      parentRoute: typeof AuthenticatedTeamRoute
+    }
   }
 }
+
+interface AuthenticatedTeamRouteChildren {
+  AuthenticatedTeamStaffIdRoute: typeof AuthenticatedTeamStaffIdRoute
+}
+
+const AuthenticatedTeamRouteChildren: AuthenticatedTeamRouteChildren = {
+  AuthenticatedTeamStaffIdRoute: AuthenticatedTeamStaffIdRoute,
+}
+
+const AuthenticatedTeamRouteWithChildren =
+  AuthenticatedTeamRoute._addFileChildren(AuthenticatedTeamRouteChildren)
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
@@ -593,7 +624,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
   AuthenticatedRevenueRoute: typeof AuthenticatedRevenueRoute
   AuthenticatedShiftsRoute: typeof AuthenticatedShiftsRoute
-  AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
+  AuthenticatedTeamRoute: typeof AuthenticatedTeamRouteWithChildren
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -617,7 +648,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPlansRoute: AuthenticatedPlansRoute,
   AuthenticatedRevenueRoute: AuthenticatedRevenueRoute,
   AuthenticatedShiftsRoute: AuthenticatedShiftsRoute,
-  AuthenticatedTeamRoute: AuthenticatedTeamRoute,
+  AuthenticatedTeamRoute: AuthenticatedTeamRouteWithChildren,
 }
 
 const AuthenticatedRouteRouteWithChildren =

@@ -91,6 +91,21 @@ const updateInput = z.object({
   branch_id: z.string().uuid().nullable().optional(),
   is_field_staff: z.boolean().optional(),
   new_password: z.string().min(4).max(72).optional().nullable(),
+  // Personal details
+  date_of_birth: z.string().trim().max(10).nullable().optional(),
+  gender: z.enum(["male", "female", "other"]).nullable().optional(),
+  date_of_joining: z.string().trim().max(10).nullable().optional(),
+  address: z.string().trim().max(500).nullable().optional(),
+  emergency_contact_name: z.string().trim().max(100).nullable().optional(),
+  emergency_contact_phone: z.string().trim().max(20).nullable().optional(),
+  id_proof_type: z.enum(["aadhaar", "pan", "voter_id", "driving_license", "other"]).nullable().optional(),
+  id_proof_number: z.string().trim().max(50).nullable().optional(),
+  // Bank / account details for salary payment
+  bank_account_holder: z.string().trim().max(100).nullable().optional(),
+  bank_account_number: z.string().trim().max(30).nullable().optional(),
+  bank_ifsc: z.string().trim().max(15).nullable().optional(),
+  bank_name: z.string().trim().max(100).nullable().optional(),
+  upi_id: z.string().trim().max(100).nullable().optional(),
 });
 
 export const updateStaff = createServerFn({ method: "POST" })
@@ -113,6 +128,19 @@ export const updateStaff = createServerFn({ method: "POST" })
     if (data.monthly_salary !== undefined) profileUpdate.monthly_salary = data.monthly_salary;
     if (data.branch_id !== undefined) profileUpdate.branch_id = data.branch_id ?? null;
     if (data.is_field_staff !== undefined) profileUpdate.is_field_staff = data.is_field_staff;
+    if (data.date_of_birth !== undefined) profileUpdate.date_of_birth = data.date_of_birth || null;
+    if (data.gender !== undefined) profileUpdate.gender = data.gender;
+    if (data.date_of_joining !== undefined) profileUpdate.date_of_joining = data.date_of_joining || null;
+    if (data.address !== undefined) profileUpdate.address = data.address || null;
+    if (data.emergency_contact_name !== undefined) profileUpdate.emergency_contact_name = data.emergency_contact_name || null;
+    if (data.emergency_contact_phone !== undefined) profileUpdate.emergency_contact_phone = data.emergency_contact_phone || null;
+    if (data.id_proof_type !== undefined) profileUpdate.id_proof_type = data.id_proof_type;
+    if (data.id_proof_number !== undefined) profileUpdate.id_proof_number = data.id_proof_number || null;
+    if (data.bank_account_holder !== undefined) profileUpdate.bank_account_holder = data.bank_account_holder || null;
+    if (data.bank_account_number !== undefined) profileUpdate.bank_account_number = data.bank_account_number || null;
+    if (data.bank_ifsc !== undefined) profileUpdate.bank_ifsc = data.bank_ifsc ? data.bank_ifsc.toUpperCase() : null;
+    if (data.bank_name !== undefined) profileUpdate.bank_name = data.bank_name || null;
+    if (data.upi_id !== undefined) profileUpdate.upi_id = data.upi_id || null;
 
     if (Object.keys(profileUpdate).length > 0) {
       const { error } = await supabaseAdmin
