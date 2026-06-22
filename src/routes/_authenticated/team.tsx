@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -29,6 +29,7 @@ export const Route = createFileRoute("/_authenticated/team")({
 function TeamPage() {
   const { data: user } = useCurrentUser();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const tenantId = user?.tenant?.id;
   const tenantType = (user?.tenant as any)?.tenant_type ?? "business";
   const branchLabel = tenantType === "school" ? "Campus" : "Branch";
@@ -174,12 +175,16 @@ function TeamPage() {
                 <TableRow key={s.id}>
                   <TableCell className="font-mono text-xs text-muted-foreground">{(s as any).staff_id ?? "—"}</TableCell>
                   <TableCell className="font-medium">
-                    <Link to="/team/$staffId" params={{ staffId: s.id }} className="flex items-center gap-2 hover:underline">
+                    <button
+                      type="button"
+                      onClick={() => navigate({ to: "/team/$staffId", params: { staffId: s.id } })}
+                      className="flex items-center gap-2 hover:underline text-left"
+                    >
                       <Avatar className="h-7 w-7">
                         <AvatarFallback className="text-xs">{(s.full_name ?? "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}</AvatarFallback>
                       </Avatar>
                       {s.full_name ?? "—"}
-                    </Link>
+                    </button>
                   </TableCell>
                   <TableCell className="font-mono">{s.phone ?? "—"}</TableCell>
                   <TableCell>{s.designation ?? "—"}</TableCell>
@@ -231,10 +236,13 @@ function TeamPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-0.5">
-                      <Button size="sm" variant="ghost" asChild title="View full profile">
-                        <Link to="/team/$staffId" params={{ staffId: s.id }}>
-                          <UserRound className="h-4 w-4" />
-                        </Link>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="View full profile"
+                        onClick={() => navigate({ to: "/team/$staffId", params: { staffId: s.id } })}
+                      >
+                        <UserRound className="h-4 w-4" />
                       </Button>
                       <Button
                         size="sm"
