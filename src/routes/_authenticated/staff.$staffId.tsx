@@ -26,7 +26,7 @@ import { updateStaff } from "@/lib/staff.functions";
 import { recordSalaryPayment, deleteSalaryPayment } from "@/lib/payments.functions";
 import { downloadPayslipPdf } from "@/lib/payslip-pdf";
 
-export const Route = createFileRoute("/_authenticated/team/$staffId")({
+export const Route = createFileRoute("/_authenticated/staff/$staffId")({
   component: StaffDetailsPage,
 });
 

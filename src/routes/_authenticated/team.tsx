@@ -177,7 +177,7 @@ function TeamPage() {
                   <TableCell className="font-medium">
                     <button
                       type="button"
-                      onClick={() => navigate({ to: "/team/$staffId", params: { staffId: s.id } })}
+                      onClick={() => navigate({ to: "/staff/$staffId", params: { staffId: s.id } })}
                       className="flex items-center gap-2 hover:underline text-left"
                     >
                       <Avatar className="h-7 w-7">
@@ -240,7 +240,7 @@ function TeamPage() {
                         size="sm"
                         variant="ghost"
                         title="View full profile"
-                        onClick={() => navigate({ to: "/team/$staffId", params: { staffId: s.id } })}
+                        onClick={() => navigate({ to: "/staff/$staffId", params: { staffId: s.id } })}
                       >
                         <UserRound className="h-4 w-4" />
                       </Button>
