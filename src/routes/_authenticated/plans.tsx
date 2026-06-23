@@ -151,6 +151,7 @@ function PlanForm({ initial, onDone }: { initial: Plan | null; onDone: () => voi
   const [description, setDescription] = useState(initial?.description ?? "");
   const [price, setPrice] = useState(String(initial?.price_inr ?? ""));
   const [billing, setBilling] = useState(initial?.billing ?? "monthly");
+  const [billingMonths, setBillingMonths] = useState(String((initial as any)?.billing_period_months ?? ""));
   const [limit, setLimit] = useState(String(initial?.employee_limit ?? ""));
   const [featuresText, setFeaturesText] = useState((initial?.features ?? []).join("\n"));
   const [displayOrder, setDisplayOrder] = useState(String(initial?.display_order ?? "0"));
@@ -167,6 +168,9 @@ function PlanForm({ initial, onDone }: { initial: Plan | null; onDone: () => voi
       description: description.trim() || null,
       price_inr: Number(price),
       billing,
+      // Explicit duration. Blank = derive from billing enum (back-compat).
+      // 36 = 3-year plan, 6 = 6-month plan, etc.
+      billing_period_months: billingMonths.trim() === "" ? null : Number(billingMonths),
       employee_limit: limit ? Number(limit) : null,
       features: featuresText.split("\n").map(s => s.trim()).filter(Boolean),
       display_order: Number(displayOrder) || 0,
@@ -217,6 +221,17 @@ function PlanForm({ initial, onDone }: { initial: Plan | null; onDone: () => voi
               <SelectItem value="lifetime">Lifetime</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-1">
+          <Label>Custom duration (months)</Label>
+          <Input
+            type="number"
+            min="1"
+            value={billingMonths}
+            onChange={e => setBillingMonths(e.target.value)}
+            placeholder="e.g. 36 for 3-year, 6 for 6-month"
+          />
+          <p className="text-[10px] text-muted-foreground">Leave blank to use the billing type's default (1 / 12 / lifetime).</p>
         </div>
         <div className="space-y-1">
           <Label>Employee limit</Label>

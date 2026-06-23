@@ -210,6 +210,19 @@ function PromoBanner() {
   );
 }
 
+function formatBillingLabel(months: number | null | undefined, billing?: string): string {
+  // Prefer explicit billing_period_months; fall back to legacy enum.
+  if (months == null) {
+    if (billing === "monthly") return "/mo";
+    if (billing === "yearly") return "/yr";
+    return "once";
+  }
+  if (months === 1) return "/mo";
+  if (months === 12) return "/yr";
+  if (months % 12 === 0) return `/${months / 12} yrs`;
+  return `/${months} mo`;
+}
+
 /* ─────────────── PLANS GRID ─────────────── */
 function PlansGrid({
   billing, onBillingChange, tenantId, onCheckout,
@@ -273,7 +286,7 @@ function PlansGrid({
               <div className="mt-3 flex items-baseline gap-1">
                 <span className="text-3xl font-bold tracking-tight">₹{Number(p.price_inr).toLocaleString("en-IN")}</span>
                 <span className="text-xs text-muted-foreground">
-                  {p.billing === "monthly" ? "/mo" : p.billing === "yearly" ? "/yr" : "once"}
+                  {formatBillingLabel(p.billing_period_months, p.billing)}
                 </span>
               </div>
 

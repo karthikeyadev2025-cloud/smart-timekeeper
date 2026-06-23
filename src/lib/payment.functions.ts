@@ -131,13 +131,18 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     const plan = ord.plans;
     if (!plan) throw new Error("Plan not found on order");
 
-    // Calculate expiry from BILLING TYPE on the plan — the source of truth
+    // Calculate expiry from billing_period_months if set (custom plan duration),
+    // else fall back to the legacy enum. Lifetime plans pass NULL months and
+    // therefore get NULL expiry.
+    const months = plan.billing_period_months;
     const expiresAt =
-      plan.billing === "lifetime"
-        ? null
-        : plan.billing === "monthly"
-        ? new Date(Date.now() + 30 * 86400000).toISOString()
-        : new Date(Date.now() + 365 * 86400000).toISOString();
+      months == null
+        ? plan.billing === "lifetime"
+          ? null
+          : plan.billing === "monthly"
+          ? new Date(Date.now() + 30 * 86400000).toISOString()
+          : new Date(Date.now() + 365 * 86400000).toISOString()
+        : new Date(Date.now() + months * 30 * 86400000).toISOString();
 
     // Upsert subscription (one per tenant — we update if it exists)
     const { data: existingSub } = await supabaseAdmin

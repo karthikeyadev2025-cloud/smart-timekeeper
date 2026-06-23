@@ -388,7 +388,9 @@ function PromotionsEditor() {
   const { data: plans } = useQuery({
     queryKey: ["plans-for-promo"],
     queryFn: async () => {
-      const { data } = await supabase.from("plans").select("id, name, price_inr, billing").eq("is_active", true).order("display_order");
+      // Super admin sees ALL plans (the FOR ALL policy allows it). The
+      // /promotions tab is super-admin-only so this is safe.
+      const { data } = await supabase.from("plans").select("id, name, price_inr, billing, billing_period_months, is_active").order("display_order");
       return data ?? [];
     },
   });
@@ -399,17 +401,34 @@ function PromotionsEditor() {
 
   const save = async () => {
     if (!form?.id) return;
-    const { error } = await supabase.from("promotions").update({
-      title: form.title,
-      banner_text: form.banner_text,
-      cta_text: form.cta_text,
-      max_claims: Number(form.max_claims) || 0,
-      ends_at: form.ends_at || null,
-      is_active: !!form.is_active,
-      highlight_plan_id: form.highlight_plan_id || null,
-    }).eq("id", form.id);
-    if (error) toast.error(error.message);
-    else { toast.success("Promotion updated"); refetch(); }
+    const { data: updated, error } = await supabase
+      .from("promotions")
+      .update({
+        title: form.title,
+        banner_text: form.banner_text,
+        cta_text: form.cta_text,
+        max_claims: Number(form.max_claims) || 0,
+        ends_at: form.ends_at || null,
+        is_active: !!form.is_active,
+        highlight_plan_id: form.highlight_plan_id || null,
+      })
+      .eq("id", form.id)
+      .select()                       // force PostgREST to return the updated row
+      .maybeSingle();
+
+    if (error) {
+      toast.error(`Save failed: ${error.message}`);
+      console.error("[promotions] save error:", error);
+      return;
+    }
+    if (!updated) {
+      // RLS hid the row from the response (probably because is_active was
+      // flipped to false). The row was still written though.
+      toast.success("Promotion updated (now inactive — banner hidden from landing)");
+    } else {
+      toast.success("Promotion updated");
+    }
+    refetch();
   };
 
   if (!promo?.row || !form) {
@@ -506,9 +525,15 @@ function PromotionsEditor() {
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
             <option value="">— no highlight —</option>
-            {(plans ?? []).map((p: any) => (
-              <option key={p.id} value={p.id}>{p.name} (₹{p.price_inr} {p.billing})</option>
-            ))}
+            {(plans ?? []).map((p: any) => {
+              const months = p.billing_period_months;
+              const dur = months == null ? "lifetime" : months === 1 ? "monthly" : months === 12 ? "yearly" : months % 12 === 0 ? `${months / 12} years` : `${months} months`;
+              return (
+                <option key={p.id} value={p.id}>
+                  {p.name} — ₹{p.price_inr} ({dur}){p.is_active === false ? " · inactive" : ""}
+                </option>
+              );
+            })}
           </select>
           <p className="text-xs text-muted-foreground">The matching plan card on the price sheet gets an "Lifetime free · X of Y left" badge.</p>
         </div>
