@@ -460,7 +460,7 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
               Renew any plan and full access returns instantly.
             </p>
           </div>
-          <Link to="/"><Button size="sm">Renew now</Button></Link>
+          <Link to="/billing"><Button size="sm">Renew now</Button></Link>
         </Card>
       )}
 
@@ -473,7 +473,7 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
               Pick a plan now to keep things running. Your data stays put either way.
             </p>
           </div>
-          <Link to="/"><Button size="sm">Pick a plan</Button></Link>
+          <Link to="/billing"><Button size="sm">Pick a plan</Button></Link>
         </Card>
       )}
 
@@ -487,7 +487,7 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
               Pick a plan whenever you're ready — no rush.
             </p>
           </div>
-          <Link to="/"><Button size="sm" variant="outline">See plans</Button></Link>
+          <Link to="/billing"><Button size="sm" variant="outline">See plans</Button></Link>
         </Card>
       )}
 
@@ -498,7 +498,7 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
             <span className="font-semibold">Subscription expires in {expiresInDays} day{expiresInDays === 1 ? "" : "s"}.</span>{" "}
             Renew now to avoid any disruption.
           </div>
-          <Link to="/"><Button size="sm" variant="outline">Renew</Button></Link>
+          <Link to="/billing"><Button size="sm" variant="outline">Renew</Button></Link>
         </Card>
       )}
       <DashboardHero

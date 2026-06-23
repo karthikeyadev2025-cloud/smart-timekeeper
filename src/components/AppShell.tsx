@@ -20,6 +20,7 @@ import {
   ShieldAlert,
   Paintbrush,
   UserRound,
+  Receipt,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
         { to: "/mark-attendance", label: "Mark attendance", icon: ClipboardCheck },
         { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
         { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
+        { to: "/billing", label: "Billing", icon: Receipt },
       ];
     }
     return [
@@ -71,6 +73,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/payroll", label: "Payroll", icon: Wallet },
       { to: "/bank-approvals", label: "Bank approvals", icon: ShieldAlert },
       { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
+      { to: "/billing", label: "Billing", icon: Receipt },
     ];
   }
   if (role === "branch_manager") {

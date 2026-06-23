@@ -103,7 +103,8 @@ VALUES (
   'lifetime-first-50',
   'Lifetime Free - First 50',
   '🎉 Limited launch offer: First 50 companies get lifetime free access. No card needed.',
-  'Claim free lifetime'
+  'Claim free lifetime',
+  50
 )
 ON CONFLICT (slug) DO NOTHING;
 
