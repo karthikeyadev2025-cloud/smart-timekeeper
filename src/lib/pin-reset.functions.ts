@@ -12,6 +12,21 @@ export const requestPinReset = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Cheap rate limit: don't accept more than 1 reset request per phone per hour.
+    // Stops abusers spamming the admin's queue and slows phone-enumeration.
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { data: recent } = await supabaseAdmin
+      .from("pin_reset_requests")
+      .select("id")
+      .eq("phone", data.phone)
+      .gte("created_at", oneHourAgo)
+      .maybeSingle();
+    if (recent) {
+      // Still return success — don't reveal whether the phone is registered
+      // or whether a request already exists.
+      return { ok: true };
+    }
+
     // Look up the staff profile by phone (may not exist; we still record request)
     const { data: profile } = await supabaseAdmin
       .from("profiles")
@@ -89,17 +104,22 @@ export const resolvePinReset = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Find the user by phone if not linked
+    // Find the user by phone if not linked. CRITICAL: filter by tenant_id so
+    // a Company A admin can't accidentally (or maliciously) reset the PIN of
+    // a Company B user who happens to share the same phone number.
     let targetUserId = req.user_id;
     if (!targetUserId) {
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("phone", req.phone)
-        .maybeSingle();
+      let q = supabaseAdmin.from("profiles").select("id").eq("phone", req.phone);
+      // Tenant admins are restricted to their own tenant. Super admins skip the filter
+      // because pin-reset requests without an explicit tenant_id can occur for
+      // users not yet linked to a tenant (rare but possible).
+      if (!isSuper && req.tenant_id) {
+        q = q.eq("tenant_id", req.tenant_id);
+      }
+      const { data: profile } = await q.maybeSingle();
       targetUserId = profile?.id ?? null;
     }
-    if (!targetUserId) throw new Error("No staff account found for this phone");
+    if (!targetUserId) throw new Error("No staff account found for this phone in your tenant");
 
     const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
       password: data.new_pin,
@@ -110,7 +130,10 @@ export const resolvePinReset = createServerFn({ method: "POST" })
       .from("pin_reset_requests")
       .update({
         status: "resolved",
-        new_pin_preview: data.new_pin,
+        // Store only the LAST 2 digits as a preview so the admin can verify they
+        // told the right user the right PIN. The full PIN is shown once in the
+        // response below and never persisted to the DB.
+        new_pin_preview: `**${data.new_pin.slice(-2)}`,
         resolved_by: userId,
         resolved_at: new Date().toISOString(),
       })
