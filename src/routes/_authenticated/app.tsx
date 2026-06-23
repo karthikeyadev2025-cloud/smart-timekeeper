@@ -1262,122 +1262,203 @@ function IrregularStaffWidget({
   const totalAbsenceEvents = summary.reduce((a, s) => a + (s.days_absent ?? 0), 0);
 
   return (
-    <Card className="p-4 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-primary" /> Attendance insights
-          </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Who's been irregular over the last {windowDays} days</p>
-        </div>
-        <div className="flex gap-1 rounded-md border bg-muted/30 p-0.5 text-xs">
-          {[7, 14, 30].map((d) => (
-            <button
-              key={d}
-              onClick={() => setWindowDays(d as 7 | 14 | 30)}
-              className={`rounded px-2 py-1 transition-colors ${windowDays === d ? "bg-background font-medium shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              {d}d
-            </button>
-          ))}
+    <Card className="overflow-hidden p-0">
+      {/* Gradient header — same look as DashboardHero so the dashboard reads as one design */}
+      <div className="border-b bg-gradient-to-br from-primary/8 via-primary/4 to-transparent p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-primary/10 p-2.5">
+              <TrendingUp className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-base">Attendance insights</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Who's been irregular over the last {windowDays} days</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 rounded-full border bg-background p-1 text-xs shadow-sm">
+            {[7, 14, 30].map((d) => (
+              <button
+                key={d}
+                onClick={() => setWindowDays(d as 7 | 14 | 30)}
+                className={`rounded-full px-3 py-1 transition-all ${windowDays === d ? "bg-primary text-primary-foreground font-medium shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Sparkline trend */}
-      {trend && trend.length > 0 && (
-        <div className="mt-4 rounded-lg border bg-muted/20 p-3">
-          <div className="flex items-center justify-between mb-2 text-xs">
-            <span className="text-muted-foreground">14-day trend</span>
-            <span className="text-muted-foreground">Avg {avgAttendance}% present</span>
+      <div className="p-5 space-y-5">
+        {/* Sparkline trend */}
+        {trend && trend.length > 0 && (
+          <div className="overflow-hidden rounded-xl border bg-gradient-to-br from-primary/[0.03] to-transparent">
+            <div className="flex items-center justify-between border-b border-border/50 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                <span className="text-xs font-medium">14-day trend</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-muted-foreground">Avg <strong className="text-foreground tabular-nums">{avgAttendance}%</strong></span>
+              </div>
+            </div>
+            <div style={{ height: 70 }} className="px-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trend} margin={{ top: 6, right: 4, bottom: 0, left: 4 }}>
+                  <defs>
+                    <linearGradient id="trendgrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.55} />
+                      <stop offset="100%" stopColor="#4F46E5" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    cursor={{ stroke: "#4F46E5", strokeWidth: 1, strokeDasharray: "3 3", opacity: 0.4 }}
+                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, padding: "6px 10px" }}
+                    formatter={(value: any, name: string) => [<span key="v"><strong>{value}</strong> {name === "present_count" ? "present" : "absent"}</span>, ""]}
+                    labelStyle={{ fontWeight: 600, fontSize: 11 }}
+                  />
+                  <Area type="monotone" dataKey="present_count" stroke="#4F46E5" strokeWidth={2.5} fill="url(#trendgrad)" dot={false} activeDot={{ r: 4, fill: "#4F46E5", stroke: "#fff", strokeWidth: 2 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div style={{ height: 60 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trend} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
-                <defs>
-                  <linearGradient id="trendgrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.6} />
-                    <stop offset="100%" stopColor="#4F46E5" stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <Tooltip
-                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                  formatter={(value: any, name: string) => [`${value} ${name === "present_count" ? "present" : "absent"}`, ""]}
-                  labelFormatter={(l) => l}
-                />
-                <Area type="monotone" dataKey="present_count" stroke="#4F46E5" strokeWidth={2} fill="url(#trendgrad)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* Summary pills */}
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-2">
-          <p className="text-xl font-bold leading-none text-destructive">{critical.length}</p>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Critical</p>
+        {/* Stat tiles */}
+        <div className="grid grid-cols-3 gap-2.5">
+          <BucketTile
+            icon={AlertTriangle}
+            count={critical.length}
+            label="Critical"
+            sub={critical.length > 0 ? `missed ${Math.ceil(windowDays * 0.5)}+ days` : "none"}
+            tint="destructive"
+          />
+          <BucketTile
+            icon={Clock}
+            count={irregular.length}
+            label="Irregular"
+            sub={irregular.length > 0 ? "2+ absent days" : "none"}
+            tint="amber"
+          />
+          <BucketTile
+            icon={CheckCircle2}
+            count={regular.length}
+            label="Regular"
+            sub="< 2 absences"
+            tint="success"
+          />
         </div>
-        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2">
-          <p className="text-xl font-bold leading-none text-amber-600">{irregular.length}</p>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Irregular</p>
+
+        {/* Lists */}
+        <div className="max-h-96 space-y-4 overflow-y-auto pr-1">
+          {critical.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                <p className="text-[10px] font-bold uppercase tracking-wider text-destructive">Critical — needs immediate follow-up</p>
+              </div>
+              <div className="space-y-1.5">
+                {critical.map((s) => <IrregularRow key={s.staff_user_id} staff={s} tenantName={tenantName} severity="critical" />)}
+              </div>
+            </div>
+          )}
+          {irregular.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Irregular — check in with them</p>
+              </div>
+              <div className="space-y-1.5">
+                {irregular.map((s) => <IrregularRow key={s.staff_user_id} staff={s} tenantName={tenantName} severity="warning" />)}
+              </div>
+            </div>
+          )}
+          {summary.length === 0 && (
+            <div className="py-12 text-center">
+              <div className="mx-auto mb-2 inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Users className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">No active staff to analyse yet</p>
+            </div>
+          )}
+          {summary.length > 0 && critical.length === 0 && irregular.length === 0 && (
+            <div className="py-10 text-center">
+              <div className="mx-auto mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
+                <CheckCircle2 className="h-7 w-7 text-success" />
+              </div>
+              <p className="font-semibold text-success">Everyone's regular!</p>
+              <p className="text-xs text-muted-foreground mt-1">No one has missed 2+ days in the last {windowDays} days</p>
+            </div>
+          )}
         </div>
-        <div className="rounded-lg border border-success/20 bg-success/5 p-2">
-          <p className="text-xl font-bold leading-none text-success">{regular.length}</p>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Regular</p>
-        </div>
+
+        {/* Footer summary */}
+        {totalAbsenceEvents > 0 && (
+          <div className="flex items-center justify-between border-t pt-3 text-xs">
+            <span className="text-muted-foreground">Total team absence days</span>
+            <span className="font-bold tabular-nums">{totalAbsenceEvents}</span>
+          </div>
+        )}
       </div>
-
-      {/* Lists */}
-      <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
-        {critical.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive">
-              Critical — missed {Math.ceil(windowDays * 0.5)}+ days
-            </p>
-            {critical.map((s) => <IrregularRow key={s.staff_user_id} staff={s} tenantName={tenantName} severity="critical" />)}
-          </div>
-        )}
-        {irregular.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">
-              Irregular — 2 or more absent days
-            </p>
-            {irregular.map((s) => <IrregularRow key={s.staff_user_id} staff={s} tenantName={tenantName} severity="warning" />)}
-          </div>
-        )}
-        {summary.length === 0 && (
-          <p className="py-6 text-center text-sm text-muted-foreground">No active staff to analyse yet.</p>
-        )}
-        {summary.length > 0 && critical.length === 0 && irregular.length === 0 && (
-          <p className="py-6 text-center text-sm text-success">Everyone's regular in the last {windowDays} days 🎉</p>
-        )}
-      </div>
-
-      {totalAbsenceEvents > 0 && (
-        <p className="mt-3 text-[11px] text-muted-foreground border-t pt-3">
-          Total absence days across the team: <strong className="text-foreground">{totalAbsenceEvents}</strong>
-        </p>
-      )}
     </Card>
+  );
+}
+
+function BucketTile({
+  icon: Icon, count, label, sub, tint,
+}: {
+  icon: typeof Building2; count: number; label: string; sub?: string;
+  tint: "destructive" | "amber" | "success";
+}) {
+  const tintMap = {
+    destructive: { ring: "border-destructive/20 bg-destructive/5", text: "text-destructive", icon: "bg-destructive/10 text-destructive" },
+    amber: { ring: "border-amber-500/20 bg-amber-500/5", text: "text-amber-600 dark:text-amber-400", icon: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+    success: { ring: "border-success/20 bg-success/5", text: "text-success", icon: "bg-success/10 text-success" },
+  };
+  const t = tintMap[tint];
+  return (
+    <div className={`rounded-xl border ${t.ring} p-3 transition-transform hover:scale-[1.02]`}>
+      <div className={`mb-2 inline-flex h-7 w-7 items-center justify-center rounded-md ${t.icon}`}>
+        <Icon className="h-3.5 w-3.5" />
+      </div>
+      <p className={`text-2xl font-bold leading-none tabular-nums ${t.text}`}>{count}</p>
+      <p className="text-[11px] font-medium mt-1">{label}</p>
+      {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
+    </div>
   );
 }
 
 function IrregularRow({ staff, tenantName, severity }: { staff: any; tenantName?: string; severity: "critical" | "warning" }) {
   const colorClasses = severity === "critical"
-    ? "border-destructive/20 bg-destructive/5 hover:bg-destructive/10"
-    : "border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10";
+    ? "border-destructive/15 bg-destructive/[0.03] hover:border-destructive/30 hover:bg-destructive/[0.06]"
+    : "border-amber-500/15 bg-amber-500/[0.03] hover:border-amber-500/30 hover:bg-amber-500/[0.06]";
+  const numColor = severity === "critical" ? "text-destructive" : "text-amber-600 dark:text-amber-400";
+  const barColor = severity === "critical" ? "bg-destructive" : "bg-amber-500";
 
   const daysSinceLast = staff.last_checkin_date
     ? Math.floor((Date.now() - new Date(staff.last_checkin_date).getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
+  const initials = (staff.full_name ?? "?").split(" ").map((p: string) => p[0]).slice(0, 2).join("").toUpperCase();
+  const pct = Number(staff.attendance_pct ?? 0);
+
   return (
-    <div className={`flex items-center gap-2 rounded-lg border ${colorClasses} px-2.5 py-2 text-sm transition-colors`}>
-      <Link to="/staff/$staffId" params={{ staffId: staff.staff_user_id }} className="min-w-0 flex-1">
+    <div className={`group flex items-center gap-3 rounded-xl border ${colorClasses} px-3 py-2.5 text-sm transition-all`}>
+      {/* Avatar */}
+      <Link to="/staff/$staffId" params={{ staffId: staff.staff_user_id }} className="shrink-0">
+        <div className={`flex h-9 w-9 items-center justify-center rounded-full font-semibold text-xs ${severity === "critical" ? "bg-destructive/15 text-destructive" : "bg-amber-500/15 text-amber-600 dark:text-amber-400"}`}>
+          {initials}
+        </div>
+      </Link>
+
+      {/* Name + meta + progress */}
+      <Link to="/staff/$staffId" params={{ staffId: staff.staff_user_id }} className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-1.5">
-          <p className="truncate font-medium">{staff.full_name}</p>
+          <p className="truncate font-medium group-hover:underline">{staff.full_name}</p>
           {staff.is_field_staff && (
-            <span title="Field staff"><MapPinned className="h-3 w-3 shrink-0 text-blue-600" /></span>
+            <span title="Field staff" className="rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 dark:text-blue-400 flex items-center gap-0.5">
+              <MapPinned className="h-2.5 w-2.5" /> field
+            </span>
           )}
         </div>
         <p className="truncate text-[11px] text-muted-foreground">
@@ -1385,28 +1466,40 @@ function IrregularRow({ staff, tenantName, severity }: { staff: any; tenantName?
           {staff.designation || "Staff"}
           {staff.branch_name && ` · ${staff.branch_name}`}
         </p>
+        {/* Mini progress bar */}
+        <div className="flex items-center gap-2 max-w-[160px]">
+          <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+            <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+          </div>
+          <span className="text-[10px] text-muted-foreground tabular-nums">{pct}%</span>
+        </div>
       </Link>
 
+      {/* Days fraction + last seen */}
       <div className="shrink-0 text-right">
-        <p className={`text-base font-bold leading-none ${severity === "critical" ? "text-destructive" : "text-amber-600"}`}>
-          {staff.days_present}/{staff.days_window}
+        <p className={`text-lg font-bold leading-none tabular-nums ${numColor}`}>
+          {staff.days_present}<span className="text-xs text-muted-foreground">/{staff.days_window}</span>
         </p>
-        <p className="text-[10px] text-muted-foreground mt-0.5">
-          {staff.attendance_pct}% present
-          {staff.days_on_leave > 0 && ` · ${staff.days_on_leave}d leave`}
-        </p>
+        {staff.days_on_leave > 0 && (
+          <p className="text-[10px] text-muted-foreground mt-0.5">{staff.days_on_leave}d on leave</p>
+        )}
         {daysSinceLast !== null && daysSinceLast >= 1 && (
-          <p className="text-[10px] text-muted-foreground">Last seen {daysSinceLast}d ago</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Last seen {daysSinceLast}d ago</p>
         )}
         {daysSinceLast === null && (
-          <p className="text-[10px] text-destructive">Never checked in</p>
+          <p className="text-[10px] font-medium text-destructive mt-0.5">Never punched in</p>
         )}
       </div>
 
-      <div className="shrink-0 flex items-center gap-0.5">
+      {/* Action buttons */}
+      <div className="shrink-0 flex items-center gap-1">
         {staff.phone && (
           <>
-            <a href={`tel:${staff.phone}`} className="rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground" title={`Call ${staff.phone}`}>
+            <a
+              href={`tel:${staff.phone}`}
+              className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-background hover:text-primary"
+              title={`Call ${staff.phone}`}
+            >
               <PhoneIcon className="h-3.5 w-3.5" />
             </a>
             <button
@@ -1414,7 +1507,7 @@ function IrregularRow({ staff, tenantName, severity }: { staff: any; tenantName?
                 e.stopPropagation();
                 openWhatsapp(staff.phone, `Hi ${staff.full_name ?? "there"}, I noticed your attendance has been irregular recently (${staff.days_present}/${staff.days_window} days). Is everything alright? — ${tenantName ?? "Your team"}`);
               }}
-              className="rounded p-1.5 text-success hover:bg-background"
+              className="rounded-full p-2 text-success transition-colors hover:bg-success/10"
               title="Send WhatsApp message"
             >
               <MessageCircle className="h-3.5 w-3.5" />
