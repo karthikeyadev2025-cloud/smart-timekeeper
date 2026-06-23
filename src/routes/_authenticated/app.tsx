@@ -284,13 +284,34 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
       : null;
 
   const isSuspended = subState === "suspended";
-  const { data: stats } = useQuery({
-    queryKey: ["admin-stats", tenantId],
+  // Admin user IDs in this tenant — they aren't real staff, exclude from
+  // staff lists, absent rosters, etc. Cached because role assignments rarely change.
+  const { data: adminUserIds } = useQuery({
+    queryKey: ["tenant-admin-ids", tenantId],
     enabled: !!tenantId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      // user_roles is tenant-scoped via tenant_id, role values: client_admin / branch_manager / super_admin.
+      const { data } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("tenant_id", tenantId!)
+        .in("role", ["client_admin", "branch_manager", "super_admin"]);
+      return new Set((data ?? []).map((r: any) => r.user_id));
+    },
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ["admin-stats", tenantId, adminUserIds?.size ?? 0],
+    enabled: !!tenantId && !!adminUserIds,
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
+      const adminIds = Array.from(adminUserIds ?? []);
+      // Build a "not in admin ids" filter for the staff count
+      let staffQ = supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!).eq("is_active", true);
+      if (adminIds.length > 0) staffQ = staffQ.not("id", "in", `(${adminIds.join(",")})`);
       const [staff, present, pending] = await Promise.all([
-        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!),
+        staffQ,
         supabase.from("attendance_records").select("user_id", { count: "exact", head: true }).eq("tenant_id", tenantId!).eq("attendance_date", today).eq("kind", "check_in"),
         supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!).eq("status", "pending"),
       ]);
@@ -323,8 +344,8 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
 
   // Staff who haven't checked in today (with leave + branch context)
   const { data: absentToday } = useQuery({
-    queryKey: ["admin-absent-today", tenantId, branchManagerMode, user?.userId],
-    enabled: !!tenantId,
+    queryKey: ["admin-absent-today", tenantId, branchManagerMode, user?.userId, adminUserIds?.size ?? 0],
+    enabled: !!tenantId && !!adminUserIds,
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
       // Branch managers only see staff in their own branch
@@ -349,8 +370,10 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
       ]);
       const checkedInIds = new Set((checkedIn ?? []).map((r) => r.user_id));
       const onLeaveMap = new Map((onLeave ?? []).map((l: any) => [l.user_id, l.leave_types?.name ?? "Leave"]));
-      // Exclude staff who already checked in. Bucket the rest as "on leave" vs "absent".
-      const notIn = (allStaff ?? []).filter((s: any) => !checkedInIds.has(s.id));
+      // Exclude admin/manager profiles (they're not real staff) AND staff who already checked in.
+      const notIn = (allStaff ?? [])
+        .filter((s: any) => !adminUserIds!.has(s.id))
+        .filter((s: any) => !checkedInIds.has(s.id));
       return notIn.map((s: any) => ({
         ...s,
         leave_reason: onLeaveMap.get(s.id) ?? null,
