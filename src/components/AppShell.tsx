@@ -146,6 +146,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         {(role === "client_admin" || role === "branch_manager") && user?.tenant?.id && (
           <SubscriptionPill tenantId={user.tenant.id} />
         )}
+        {/* Branch switcher — visible inside the side menu on mobile (it's hidden
+            from the small header to avoid overlap with the logo) */}
+        <div className="mt-3 md:hidden">
+          <HeaderBranchSwitcher />
+        </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {items.map((it) => {
@@ -199,17 +204,17 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex w-full flex-col md:hidden">
-        <header className="flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-3">
-          <div className="min-w-0 flex-1">
-            <Logo size={26} />
+        <header className="flex items-center justify-between gap-1 border-b border-border bg-background px-2 py-2">
+          <div className="min-w-0 flex-shrink overflow-hidden">
+            <Logo size={22} />
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
             <NotificationBell />
             <OfflineSyncBadge />
-            <HeaderBranchSwitcher />
+            {/* Branch switcher is hidden on phones — it's also in the side menu */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-72 p-0">
                 <SidebarContent />
