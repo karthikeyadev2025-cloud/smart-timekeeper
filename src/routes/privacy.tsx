@@ -115,10 +115,10 @@ function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-semibold mb-3">5. Data Storage & Security</h2>
             <ul className="list-disc pl-6 space-y-2">
-              <li><strong>Storage:</strong> Data is stored on Supabase (PostgreSQL database) with encryption at rest (AES-256)</li>
-              <li><strong>Location:</strong> Data is stored on servers located in India (Supabase India region)</li>
-              <li><strong>Access control:</strong> Row-Level Security (RLS) ensures each company can only access its own employees' data</li>
-              <li><strong>Selfie photos:</strong> Stored in encrypted Supabase Storage. Not processed by facial recognition systems</li>
+              <li><strong>Storage:</strong> Data is stored in a managed PostgreSQL database with encryption at rest (AES-256)</li>
+              <li><strong>Location:</strong> All data is hosted on servers located in India</li>
+              <li><strong>Access control:</strong> Row-Level Security ensures each company can only access its own employees' data</li>
+              <li><strong>Selfie photos:</strong> Stored in encrypted private storage. Not processed by facial recognition systems</li>
               <li><strong>Transmission:</strong> All data is transmitted over HTTPS (TLS 1.3)</li>
               <li><strong>Access:</strong> Only your employer's designated admins can access your attendance records</li>
             </ul>
@@ -155,9 +155,7 @@ function PrivacyPage() {
             <p>We share your data only in the following circumstances:</p>
             <ul className="list-disc pl-6 space-y-2 mt-3">
               <li><strong>Your employer:</strong> Attendance, leave, and payroll data is shared with your employer's designated admin. This is the core purpose of the platform.</li>
-              <li><strong>Supabase (Infrastructure):</strong> Our cloud database provider. They process data on our behalf under a Data Processing Agreement.</li>
-              <li><strong>Vercel (Hosting):</strong> Our web hosting provider. They serve the app but do not process personal data.</li>
-              <li><strong>Razorpay (Payments):</strong> Payment details for subscription billing. Punchly does NOT store card details.</li>
+              <li><strong>Sub-processors:</strong> Trusted infrastructure and payment providers may process data on our behalf strictly to operate the service. They are bound by Data Processing Agreements and cannot use your data for any other purpose.</li>
               <li><strong>Legal requirements:</strong> When required by Indian courts or government authorities.</li>
             </ul>
             <p className="mt-3 font-medium">We NEVER sell your personal data. We do NOT share biometric data with third parties.</p>

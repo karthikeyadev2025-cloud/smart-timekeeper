@@ -87,7 +87,7 @@ function TermsPage() {
             <h3 className="text-lg font-medium mt-4 mb-2">4.2 Payment</h3>
             <ul className="list-disc pl-6 space-y-1">
               <li>All prices are in Indian Rupees (INR) inclusive of applicable taxes</li>
-              <li>Payments are processed securely through Razorpay</li>
+              <li>Payments are processed securely through a PCI-DSS compliant payment gateway</li>
               <li>We do not store your card details on our servers</li>
               <li>GST of 18% is applicable on all plans as per Indian tax law</li>
             </ul>
@@ -143,7 +143,7 @@ function TermsPage() {
             <ul className="list-disc pl-6 space-y-2">
               <li><strong>Standard plans:</strong> We target 99% uptime but do not guarantee it. Scheduled maintenance will be communicated in advance.</li>
               <li><strong>Enterprise plans:</strong> 99.5% uptime SLA with priority support.</li>
-              <li>We are not liable for downtime caused by third-party services (Supabase, Vercel, Razorpay, internet providers).</li>
+              <li>We are not liable for downtime caused by upstream infrastructure providers, payment gateways, or internet service providers.</li>
               <li>Force majeure events (natural disasters, government orders, cyberattacks) are excluded from SLA calculations.</li>
             </ul>
           </section>

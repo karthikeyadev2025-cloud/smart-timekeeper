@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Logo } from "@/components/Logo";
 import { Card } from "@/components/ui/card";
-import { Mail, ShieldQuestion, Trash2, RefreshCw, BookOpen } from "lucide-react";
+import { Mail, ShieldQuestion, Trash2, BookOpen } from "lucide-react";
 
 export const Route = createFileRoute("/support")({
   head: () => ({
@@ -100,7 +100,7 @@ function SupportPage() {
               Yes. From the <strong>Payroll page → Export Attendance CSV</strong>, you can download any month's full attendance with check-in/out times, locations, and selfie URLs. Payslips download as PDF individually.
             </FaqItem>
             <FaqItem q="Is my company data safe?">
-              All data is encrypted at rest in Supabase (Mumbai region) and encrypted in transit via HTTPS. Each company's data is isolated by tenant_id with row-level security. Bank-account changes by staff require admin approval before they take effect — preventing salary-redirect fraud. We comply with India's DPDP Act 2023.
+              All data is encrypted at rest in our database (hosted in India) and encrypted in transit via HTTPS. Each company's data is isolated with row-level security so no other company can see yours. Bank-account changes by staff require admin approval before they take effect — preventing salary-redirect fraud. We comply with India's DPDP Act 2023.
             </FaqItem>
             <FaqItem q="How do I delete my account?">
               Email <a className="text-primary hover:underline" href="mailto:support@punchly.online?subject=Delete%20my%20account">support@punchly.online</a> with the subject "Delete my account" from the email registered on your Punchly account. We will delete all your personal data within 7 working days (subject to your employer's legal obligation to retain attendance records for tax/labour audits, in which case attendance rows are retained but personal identifiers are removed).
@@ -109,15 +109,6 @@ function SupportPage() {
               Open <strong>Settings → Plan → Cancel subscription</strong>. Your plan stays active until the end of the current billing period, then auto-downgrades to the free tier. You don't lose any data.
             </FaqItem>
           </div>
-        </section>
-
-        <section className="border-t pt-8">
-          <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2"><RefreshCw className="h-5 w-5 text-primary" /> Service status</h2>
-          <p className="text-sm text-muted-foreground">
-            Punchly is hosted on Vercel (web) + Supabase (database, Mumbai region). For real-time outage status, check
-            {" "}<a href="https://www.vercel-status.com" target="_blank" rel="noopener" className="text-primary hover:underline">vercel-status.com</a>
-            {" "}and{" "}<a href="https://status.supabase.com" target="_blank" rel="noopener" className="text-primary hover:underline">status.supabase.com</a>.
-          </p>
         </section>
 
         <footer className="mt-16 border-t pt-8 text-sm text-muted-foreground">
