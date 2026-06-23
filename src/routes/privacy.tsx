@@ -210,7 +210,7 @@ function PrivacyPage() {
               <p><strong>Grievance Officer:</strong> Karthikeya</p>
               <p><strong>Organization:</strong> K² Adexos Global Technologies</p>
               <p><strong>Address:</strong> Hyderabad, Telangana — 500001, India</p>
-              <p><strong>Email:</strong> grievance@punchly.online</p>
+              <p><strong>Email:</strong> support@punchly.online</p>
               <p><strong>Response time:</strong> Within 72 hours acknowledgement, resolved within 30 days</p>
             </div>
             <p className="mt-3">

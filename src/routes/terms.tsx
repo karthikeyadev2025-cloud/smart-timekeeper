@@ -97,7 +97,7 @@ function TermsPage() {
               <li><strong>Monthly plans:</strong> Full refund if requested within 7 days of payment, provided the account has fewer than 10 check-ins recorded.</li>
               <li><strong>Lifetime plans:</strong> Full refund if requested within 14 days of purchase, provided the account has fewer than 10 check-ins recorded.</li>
               <li>No refunds after the eligible period or if significant usage has occurred.</li>
-              <li>To request a refund, email billing@punchly.online with your order ID.</li>
+              <li>To request a refund, email support@punchly.online with your order ID.</li>
             </ul>
 
             <h3 className="text-lg font-medium mt-4 mb-2">4.4 Price Changes</h3>
@@ -219,9 +219,7 @@ function TermsPage() {
             <div className="rounded-lg bg-muted/40 p-4 text-sm">
               <p><strong>K² Adexos Global Technologies</strong></p>
               <p>Hyderabad, Telangana — 500001, India</p>
-              <p>General: support@punchly.online</p>
-              <p>Billing: billing@punchly.online</p>
-              <p>Legal: support@punchly.online</p>
+              <p className="mt-2">For all enquiries — general, billing, legal — email: <a href="mailto:support@punchly.online" className="text-primary hover:underline">support@punchly.online</a></p>
             </div>
           </section>
 
