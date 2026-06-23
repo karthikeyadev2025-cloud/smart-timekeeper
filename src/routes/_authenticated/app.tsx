@@ -623,6 +623,9 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
             </Card>
           </div>
 
+          {/* Irregularity + trend section */}
+          <IrregularStaffWidget tenantId={tenantId} branchManagerMode={branchManagerMode} userBranchId={user?.profile?.branch_id} tenantName={user?.tenant?.name} />
+
           {/* Quick links */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <QuickLink to="/team" icon={Users} label="Staff" />
@@ -983,6 +986,228 @@ function AbsentRow({ staff, tenantName }: { staff: any; tenantName?: string }) {
                 openWhatsapp(staff.phone, `Hi ${staff.full_name ?? "there"}, you haven't checked in yet today. Is everything okay? — ${tenantName ?? "Your team"}`);
               }}
               className="rounded p-1.5 text-success hover:bg-success/10"
+              title="Send WhatsApp message"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── IRREGULAR STAFF — last 7 days ───────────────
+ * Shows attendance % per staff member over a sliding window (7 / 14 / 30 days),
+ * sorted by worst first. Helps admins spot habitual offenders quickly. */
+function IrregularStaffWidget({
+  tenantId, branchManagerMode, userBranchId, tenantName,
+}: {
+  tenantId?: string; branchManagerMode?: boolean; userBranchId?: string | null; tenantName?: string;
+}) {
+  const [windowDays, setWindowDays] = useState<7 | 14 | 30>(7);
+  const branchFilter = branchManagerMode && userBranchId ? userBranchId : null;
+
+  const { data: summary, isLoading } = useQuery({
+    queryKey: ["attendance-summary", tenantId, branchFilter, windowDays],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("staff_attendance_summary", {
+        _tenant_id: tenantId!,
+        _branch_id: branchFilter,
+        _days: windowDays,
+      });
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  const { data: trend } = useQuery({
+    queryKey: ["attendance-trend", tenantId, branchFilter],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("daily_attendance_trend", {
+        _tenant_id: tenantId!,
+        _branch_id: branchFilter,
+        _days: 14,
+      });
+      if (error) throw error;
+      return (data as any[]).map((d) => ({
+        ...d,
+        label: new Date(d.attendance_date).toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }),
+      }));
+    },
+  });
+
+  if (isLoading || !summary) {
+    return <Card className="p-4 sm:p-6"><p className="text-sm text-muted-foreground">Loading attendance insights…</p></Card>;
+  }
+
+  // Bucket the staff so admins can see urgent → low concern at a glance
+  const critical = summary.filter((s) => s.days_absent >= Math.ceil(windowDays * 0.5)); // missed half or more
+  const irregular = summary.filter((s) => s.days_absent >= 2 && s.days_absent < Math.ceil(windowDays * 0.5));
+  const regular = summary.filter((s) => s.days_absent < 2);
+
+  // Aggregate stats
+  const avgAttendance = summary.length
+    ? Math.round(summary.reduce((a, s) => a + Number(s.attendance_pct ?? 0), 0) / summary.length)
+    : 0;
+  const totalAbsenceEvents = summary.reduce((a, s) => a + (s.days_absent ?? 0), 0);
+
+  return (
+    <Card className="p-4 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-semibold flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" /> Attendance insights
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Who's been irregular over the last {windowDays} days</p>
+        </div>
+        <div className="flex gap-1 rounded-md border bg-muted/30 p-0.5 text-xs">
+          {[7, 14, 30].map((d) => (
+            <button
+              key={d}
+              onClick={() => setWindowDays(d as 7 | 14 | 30)}
+              className={`rounded px-2 py-1 transition-colors ${windowDays === d ? "bg-background font-medium shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sparkline trend */}
+      {trend && trend.length > 0 && (
+        <div className="mt-4 rounded-lg border bg-muted/20 p-3">
+          <div className="flex items-center justify-between mb-2 text-xs">
+            <span className="text-muted-foreground">14-day trend</span>
+            <span className="text-muted-foreground">Avg {avgAttendance}% present</span>
+          </div>
+          <div style={{ height: 60 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trend} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="trendgrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.6} />
+                    <stop offset="100%" stopColor="#4F46E5" stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
+                <Tooltip
+                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                  formatter={(value: any, name: string) => [`${value} ${name === "present_count" ? "present" : "absent"}`, ""]}
+                  labelFormatter={(l) => l}
+                />
+                <Area type="monotone" dataKey="present_count" stroke="#4F46E5" strokeWidth={2} fill="url(#trendgrad)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Summary pills */}
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-2">
+          <p className="text-xl font-bold leading-none text-destructive">{critical.length}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Critical</p>
+        </div>
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2">
+          <p className="text-xl font-bold leading-none text-amber-600">{irregular.length}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Irregular</p>
+        </div>
+        <div className="rounded-lg border border-success/20 bg-success/5 p-2">
+          <p className="text-xl font-bold leading-none text-success">{regular.length}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Regular</p>
+        </div>
+      </div>
+
+      {/* Lists */}
+      <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
+        {critical.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive">
+              Critical — missed {Math.ceil(windowDays * 0.5)}+ days
+            </p>
+            {critical.map((s) => <IrregularRow key={s.user_id} staff={s} tenantName={tenantName} severity="critical" />)}
+          </div>
+        )}
+        {irregular.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">
+              Irregular — 2 or more absent days
+            </p>
+            {irregular.map((s) => <IrregularRow key={s.user_id} staff={s} tenantName={tenantName} severity="warning" />)}
+          </div>
+        )}
+        {summary.length === 0 && (
+          <p className="py-6 text-center text-sm text-muted-foreground">No active staff to analyse yet.</p>
+        )}
+        {summary.length > 0 && critical.length === 0 && irregular.length === 0 && (
+          <p className="py-6 text-center text-sm text-success">Everyone's regular in the last {windowDays} days 🎉</p>
+        )}
+      </div>
+
+      {totalAbsenceEvents > 0 && (
+        <p className="mt-3 text-[11px] text-muted-foreground border-t pt-3">
+          Total absence days across the team: <strong className="text-foreground">{totalAbsenceEvents}</strong>
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function IrregularRow({ staff, tenantName, severity }: { staff: any; tenantName?: string; severity: "critical" | "warning" }) {
+  const colorClasses = severity === "critical"
+    ? "border-destructive/20 bg-destructive/5 hover:bg-destructive/10"
+    : "border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10";
+
+  const daysSinceLast = staff.last_checkin_date
+    ? Math.floor((Date.now() - new Date(staff.last_checkin_date).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  return (
+    <div className={`flex items-center gap-2 rounded-lg border ${colorClasses} px-2.5 py-2 text-sm transition-colors`}>
+      <Link to="/staff/$staffId" params={{ staffId: staff.user_id }} className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <p className="truncate font-medium">{staff.full_name}</p>
+          {staff.is_field_staff && (
+            <span title="Field staff"><MapPinned className="h-3 w-3 shrink-0 text-blue-600" /></span>
+          )}
+        </div>
+        <p className="truncate text-[11px] text-muted-foreground">
+          {staff.staff_id && <span className="font-mono">{staff.staff_id} · </span>}
+          {staff.designation || "Staff"}
+          {staff.branch_name && ` · ${staff.branch_name}`}
+        </p>
+      </Link>
+
+      <div className="shrink-0 text-right">
+        <p className={`text-base font-bold leading-none ${severity === "critical" ? "text-destructive" : "text-amber-600"}`}>
+          {staff.days_present}/{staff.days_window}
+        </p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">
+          {staff.attendance_pct}% present
+          {staff.days_on_leave > 0 && ` · ${staff.days_on_leave}d leave`}
+        </p>
+        {daysSinceLast !== null && daysSinceLast >= 1 && (
+          <p className="text-[10px] text-muted-foreground">Last seen {daysSinceLast}d ago</p>
+        )}
+        {daysSinceLast === null && (
+          <p className="text-[10px] text-destructive">Never checked in</p>
+        )}
+      </div>
+
+      <div className="shrink-0 flex items-center gap-0.5">
+        {staff.phone && (
+          <>
+            <a href={`tel:${staff.phone}`} className="rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground" title={`Call ${staff.phone}`}>
+              <PhoneIcon className="h-3.5 w-3.5" />
+            </a>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openWhatsapp(staff.phone, `Hi ${staff.full_name ?? "there"}, I noticed your attendance has been irregular recently (${staff.days_present}/${staff.days_window} days). Is everything alright? — ${tenantName ?? "Your team"}`);
+              }}
+              className="rounded p-1.5 text-success hover:bg-background"
               title="Send WhatsApp message"
             >
               <MessageCircle className="h-3.5 w-3.5" />
