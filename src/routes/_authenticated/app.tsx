@@ -501,11 +501,13 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
           <Link to="/"><Button size="sm" variant="outline">Renew</Button></Link>
         </Card>
       )}
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard icon={Users} label="Total staff" value={stats?.staff ?? 0} />
-        <StatCard icon={CheckCircle2} label="Checked in today" value={stats?.presentToday ?? 0} />
-        <StatCard icon={Calendar} label="Pending leave requests" value={stats?.pendingLeaves ?? 0} />
-      </div>
+      <DashboardHero
+        totalStaff={stats?.staff ?? 0}
+        presentToday={stats?.presentToday ?? 0}
+        pendingLeaves={stats?.pendingLeaves ?? 0}
+        tenantName={user?.tenant?.name}
+        branchManagerMode={branchManagerMode}
+      />
 
       {(stats?.staff ?? 0) === 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -523,22 +525,51 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
       ) : (
         <>
           {/* 7-day attendance trend */}
-          <Card className="p-4 sm:p-6">
-            <h3 className="font-semibold flex items-center gap-2"><TrendingUp className="h-4 w-4" /> This week's attendance</h3>
-            <div className="mt-3 h-48">
+          <Card className="overflow-hidden p-0">
+            <div className="border-b bg-gradient-to-br from-primary/5 to-transparent p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" /> This week's attendance</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Daily check-ins over the last 7 days</p>
+                </div>
+                {weekTrend && weekTrend.length > 0 && (() => {
+                  const peak = Math.max(...weekTrend.map((d: any) => d.present));
+                  const avg = Math.round(weekTrend.reduce((a: number, d: any) => a + d.present, 0) / weekTrend.length);
+                  return (
+                    <div className="flex gap-3 text-xs">
+                      <div className="text-center">
+                        <p className="text-lg font-bold leading-none text-primary">{avg}</p>
+                        <p className="text-muted-foreground text-[10px] uppercase tracking-wider mt-0.5">Avg</p>
+                      </div>
+                      <div className="h-8 w-px bg-border self-center" />
+                      <div className="text-center">
+                        <p className="text-lg font-bold leading-none text-success">{peak}</p>
+                        <p className="text-muted-foreground text-[10px] uppercase tracking-wider mt-0.5">Peak</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            <div className="h-44 p-3">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={weekTrend ?? []}>
+                <AreaChart data={weekTrend ?? []} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
                   <defs>
                     <linearGradient id="presentGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.3} />
+                      <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.5} />
                       <stop offset="100%" stopColor="#4F46E5" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                  <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="present" stroke="#4F46E5" strokeWidth={2} fill="url(#presentGrad)" name="Checked in" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                  <XAxis dataKey="label" fontSize={11} tickLine={false} axisLine={false} dy={4} />
+                  <YAxis fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
+                  <Tooltip
+                    cursor={{ fill: "var(--muted)", opacity: 0.3 }}
+                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, padding: "8px 12px" }}
+                    formatter={(value: any) => [<span key="v"><strong>{value}</strong> checked in</span>, ""]}
+                    labelStyle={{ fontWeight: 600, marginBottom: 2 }}
+                  />
+                  <Area type="monotone" dataKey="present" stroke="#4F46E5" strokeWidth={2.5} fill="url(#presentGrad)" name="Checked in" dot={{ fill: "#4F46E5", r: 3, strokeWidth: 0 }} activeDot={{ r: 5, fill: "#4F46E5", stroke: "#fff", strokeWidth: 2 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -653,10 +684,10 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
 
           {/* Quick links */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <QuickLink to="/team" icon={Users} label="Staff" />
-            <QuickLink to="/live-map" icon={MapPin} label="Live map" />
-            <QuickLink to="/payroll" icon={Wallet} label="Payroll" />
-            <QuickLink to="/shifts" icon={Clock} label="Shifts" />
+            <QuickLink to="/team" icon={Users} label="Staff" color="primary" />
+            <QuickLink to="/live-map" icon={MapPin} label="Live map" color="blue" />
+            <QuickLink to="/payroll" icon={Wallet} label="Payroll" color="success" />
+            <QuickLink to="/shifts" icon={Clock} label="Shifts" color="amber" />
           </div>
         </>
       )}
@@ -664,12 +695,20 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
   );
 }
 
-function QuickLink({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
+function QuickLink({ to, icon: Icon, label, color = "primary" }: { to: string; icon: any; label: string; color?: "primary" | "success" | "amber" | "blue" }) {
+  const colorMap = {
+    primary: "from-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 text-primary border-primary/20",
+    success: "from-success/10 to-success/5 hover:from-success/20 hover:to-success/10 text-success border-success/20",
+    amber: "from-amber-500/10 to-amber-500/5 hover:from-amber-500/20 hover:to-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    blue: "from-blue-500/10 to-blue-500/5 hover:from-blue-500/20 hover:to-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  };
   return (
-    <Link to={to}>
-      <Card className="flex flex-col items-center gap-1.5 p-3 text-center transition-colors hover:bg-accent">
-        <Icon className="h-5 w-5 text-primary" />
-        <span className="text-xs font-medium">{label}</span>
+    <Link to={to} className="group">
+      <Card className={`flex flex-col items-center gap-2 border bg-gradient-to-br p-4 text-center transition-all hover:scale-[1.02] hover:shadow-md ${colorMap[color]}`}>
+        <div className="rounded-lg bg-background/60 p-2">
+          <Icon className="h-5 w-5" />
+        </div>
+        <span className="text-xs font-semibold text-foreground">{label}</span>
       </Card>
     </Link>
   );
@@ -954,6 +993,134 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
       </div>
     </div>
   );
+}
+
+/* ─────────────── DASHBOARD HERO — at-a-glance status ─────────────── */
+function DashboardHero({
+  totalStaff, presentToday, pendingLeaves, tenantName, branchManagerMode,
+}: {
+  totalStaff: number; presentToday: number; pendingLeaves: number; tenantName?: string; branchManagerMode?: boolean;
+}) {
+  const pct = totalStaff > 0 ? Math.round((presentToday / totalStaff) * 100) : 0;
+  const absent = Math.max(totalStaff - presentToday, 0);
+  // Indigo for healthy, amber for warning, red for critical
+  const ringColor = pct >= 80 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#ef4444";
+  const ringStatus = pct >= 80 ? "Great turnout" : pct >= 50 ? "Some absences" : "Low attendance";
+  const ringEmoji = pct >= 80 ? "🎉" : pct >= 50 ? "📊" : "⚠️";
+
+  // SVG ring math: circumference = 2 * π * radius
+  const radius = 52;
+  const stroke = 10;
+  const circ = 2 * Math.PI * radius;
+  const dash = (pct / 100) * circ;
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
+  const dateStr = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
+
+  return (
+    <Card className="overflow-hidden border-primary/20 p-0">
+      <div className="bg-gradient-to-br from-primary via-primary to-primary/80 p-5 text-primary-foreground sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs opacity-80">{dateStr}</p>
+            <h2 className="mt-0.5 text-xl font-bold sm:text-2xl">{greeting}{tenantName ? `, ${tenantName.split(" ")[0]}` : ""}!</h2>
+          </div>
+          <Badge variant="outline" className="border-white/30 bg-white/10 text-white backdrop-blur-sm gap-1.5">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
+            Live
+          </Badge>
+        </div>
+      </div>
+
+      <div className="grid gap-4 p-5 sm:grid-cols-[auto_1fr] sm:gap-6 sm:p-6">
+        {/* Ring chart on the left */}
+        <div className="flex items-center justify-center">
+          <div className="relative">
+            <svg width={140} height={140} viewBox="0 0 140 140" className="-rotate-90">
+              <circle cx={70} cy={70} r={radius} stroke="var(--muted)" strokeWidth={stroke} fill="none" opacity={0.4} />
+              <circle
+                cx={70} cy={70} r={radius}
+                stroke={ringColor}
+                strokeWidth={stroke}
+                fill="none"
+                strokeDasharray={`${dash} ${circ}`}
+                strokeLinecap="round"
+                className="transition-all duration-700 ease-out"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <p className="text-3xl font-bold leading-none tabular-nums" style={{ color: ringColor }}>{pct}%</p>
+              <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">Today</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats grid on the right */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <HeroStat
+            icon={Users}
+            value={totalStaff}
+            label={branchManagerMode ? "Branch staff" : "Total staff"}
+            tint="primary"
+          />
+          <HeroStat
+            icon={CheckCircle2}
+            value={presentToday}
+            label="Present"
+            tint="success"
+            sub={pct > 0 ? `${pct}%` : undefined}
+          />
+          <HeroStat
+            icon={AlertTriangle}
+            value={absent}
+            label="Absent"
+            tint={absent > totalStaff / 2 ? "destructive" : "amber"}
+          />
+          <HeroStat
+            icon={Calendar}
+            value={pendingLeaves}
+            label="Pending"
+            tint={pendingLeaves > 0 ? "amber" : "muted"}
+            isLink={pendingLeaves > 0 ? "/leaves-admin" : undefined}
+          />
+          <div className="col-span-2 flex items-center justify-center rounded-lg bg-muted/30 p-3">
+            <p className="text-center text-xs text-muted-foreground">
+              <span className="mr-1.5 text-base">{ringEmoji}</span>
+              {ringStatus}
+            </p>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function HeroStat({
+  icon: Icon, value, label, sub, tint = "primary", isLink,
+}: {
+  icon: typeof Building2; value: string | number; label: string; sub?: string;
+  tint?: "primary" | "success" | "amber" | "destructive" | "muted"; isLink?: string;
+}) {
+  const tintMap = {
+    primary: "bg-primary/10 text-primary",
+    success: "bg-success/10 text-success",
+    amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    destructive: "bg-destructive/10 text-destructive",
+    muted: "bg-muted text-muted-foreground",
+  };
+  const content = (
+    <div className={`rounded-lg border bg-card p-3 transition-colors ${isLink ? "hover:bg-accent cursor-pointer" : ""}`}>
+      <div className={`mb-2 inline-flex h-7 w-7 items-center justify-center rounded-md ${tintMap[tint]}`}>
+        <Icon className="h-3.5 w-3.5" />
+      </div>
+      <p className="text-2xl font-bold leading-none tabular-nums">{value}</p>
+      <div className="mt-1 flex items-baseline gap-1">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        {sub && <p className="text-[10px] text-muted-foreground">· {sub}</p>}
+      </div>
+    </div>
+  );
+  return isLink ? <Link to={isLink}>{content}</Link> : content;
 }
 
 function StatCard({ icon: Icon, label, value, sub }: { icon: typeof Building2; label: string; value: string | number; sub?: string }) {
