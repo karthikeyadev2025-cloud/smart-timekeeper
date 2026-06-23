@@ -23,6 +23,8 @@ import {
   Receipt,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { NotificationBell } from "@/components/NotificationBell";
+import { usePushSubscription } from "@/lib/push";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -118,6 +120,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const tenantType = (user?.tenant as any)?.tenant_type ?? "business";
   const items = role ? buildNav(role, tenantType) : [];
 
+  // Register for push notifications in the background.
+  // Silent no-op on web; on Android prompts for permission and stores the FCM token.
+  usePushSubscription(user?.userId);
+
   const handleSignOut = async () => {
     await queryClient.cancelQueries();
     queryClient.clear();
@@ -198,6 +204,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Logo size={26} />
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <NotificationBell />
             <OfflineSyncBadge />
             <HeaderBranchSwitcher />
             <Sheet>
@@ -215,6 +222,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="hidden flex-1 flex-col md:flex">
         <header className="flex items-center justify-end gap-2 border-b border-border bg-background px-6 py-3">
+          <NotificationBell />
           <OfflineSyncBadge />
           <HeaderBranchSwitcher />
         </header>
