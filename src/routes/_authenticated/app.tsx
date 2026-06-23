@@ -222,6 +222,8 @@ function SuperAdminHome() {
 }
 
 function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; branchManagerMode?: boolean }) {
+  const { data: user } = useCurrentUser();
+
   const { data: sub } = useQuery({
     queryKey: ["subscription", tenantId],
     enabled: !!tenantId && !branchManagerMode,
