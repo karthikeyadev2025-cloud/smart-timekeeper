@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, primaryRole } from "@/hooks/useCurrentUser";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles, TrendingUp, AlertTriangle, ShieldAlert, Clock, Camera } from "lucide-react";
+import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles, TrendingUp, AlertTriangle, ShieldAlert, Clock, Camera, MessageCircle, Phone as PhoneIcon, MapPinned } from "lucide-react";
+import { openWhatsapp } from "@/lib/whatsapp";
 import { formatTime12h } from "@/components/ui/time-input";
 import { toast } from "sonner";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
@@ -318,18 +319,44 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
     },
   });
 
-  // Staff who haven't checked in today (only meaningful once there's staff)
+  // Staff who haven't checked in today (with leave + branch context)
   const { data: absentToday } = useQuery({
-    queryKey: ["admin-absent-today", tenantId],
-    enabled: !!tenantId && !branchManagerMode,
+    queryKey: ["admin-absent-today", tenantId, branchManagerMode, user?.userId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
-      const [{ data: allStaff }, { data: checkedIn }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, phone").eq("tenant_id", tenantId!).eq("is_active", true),
+      // Branch managers only see staff in their own branch
+      let staffQ = supabase
+        .from("profiles")
+        .select("id, full_name, phone, is_field_staff, designation, staff_id, branch_id, branches:branch_id(name)")
+        .eq("tenant_id", tenantId!)
+        .eq("is_active", true);
+      if (branchManagerMode && user?.profile?.branch_id) {
+        staffQ = staffQ.eq("branch_id", user.profile.branch_id);
+      }
+      const [{ data: allStaff }, { data: checkedIn }, { data: onLeave }] = await Promise.all([
+        staffQ,
         supabase.from("attendance_records").select("user_id").eq("tenant_id", tenantId!).eq("attendance_date", today).eq("kind", "check_in"),
+        supabase
+          .from("leave_requests")
+          .select("user_id, leave_types:leave_type_id(name)")
+          .eq("tenant_id", tenantId!)
+          .eq("status", "approved")
+          .lte("start_date", today)
+          .gte("end_date", today),
       ]);
       const checkedInIds = new Set((checkedIn ?? []).map((r) => r.user_id));
-      return (allStaff ?? []).filter((s) => !checkedInIds.has(s.id));
+      const onLeaveMap = new Map((onLeave ?? []).map((l: any) => [l.user_id, l.leave_types?.name ?? "Leave"]));
+      // Exclude staff who already checked in. Bucket the rest as "on leave" vs "absent".
+      const notIn = (allStaff ?? []).filter((s: any) => !checkedInIds.has(s.id));
+      return notIn.map((s: any) => ({
+        ...s,
+        leave_reason: onLeaveMap.get(s.id) ?? null,
+      })).sort((a: any, b: any) => {
+        // Show truly absent (no leave) before on-leave
+        if (!!a.leave_reason !== !!b.leave_reason) return a.leave_reason ? 1 : -1;
+        return (a.full_name ?? "").localeCompare(b.full_name ?? "");
+      });
     },
   });
 
@@ -522,26 +549,78 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
             </Card>
 
             {/* Who hasn't checked in today */}
-            {!branchManagerMode && (
-              <Card className="p-4 sm:p-6">
-                <h3 className="font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Not checked in today</h3>
-                {(absentToday ?? []).length === 0 ? (
-                  <p className="mt-3 text-sm text-muted-foreground">Everyone's checked in. ✅</p>
-                ) : (
-                  <div className="mt-3 max-h-48 space-y-1.5 overflow-y-auto">
-                    {absentToday!.slice(0, 10).map((s: any) => (
-                      <div key={s.id} className="flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-1.5 text-sm">
-                        <span className="truncate">{s.full_name}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground font-mono">{s.phone}</span>
+            <Card className="p-4 sm:p-6">
+              {(() => {
+                const absentList = absentToday ?? [];
+                const trulyAbsent = absentList.filter((s: any) => !s.leave_reason);
+                const onLeave = absentList.filter((s: any) => s.leave_reason);
+                const total = (stats?.staff ?? 0);
+                const present = (stats?.presentToday ?? 0);
+                const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+                return (
+                  <>
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        Not checked in today
+                      </h3>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold leading-none">{trulyAbsent.length}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">absent</p>
                       </div>
-                    ))}
-                    {absentToday!.length > 10 && (
-                      <p className="pt-1 text-center text-xs text-muted-foreground">+{absentToday!.length - 10} more</p>
+                    </div>
+
+                    {total > 0 && (
+                      <div className="mt-3 space-y-1">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Attendance today</span>
+                          <span><strong className="text-foreground">{present}</strong>/{total} present · {pct}%</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                          <div className={`h-full transition-all ${pct >= 80 ? "bg-success" : pct >= 50 ? "bg-amber-500" : "bg-destructive"}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
                     )}
-                  </div>
-                )}
-              </Card>
-            )}
+
+                    {absentList.length === 0 ? (
+                      <p className="mt-4 text-sm text-muted-foreground">Everyone's checked in. ✅</p>
+                    ) : (
+                      <div className="mt-4 max-h-72 space-y-3 overflow-y-auto pr-1">
+                        {/* Actually absent — needs follow-up */}
+                        {trulyAbsent.length > 0 && (
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive">Absent — no leave on file</p>
+                            {trulyAbsent.slice(0, 8).map((s: any) => (
+                              <AbsentRow key={s.id} staff={s} tenantName={user?.tenant?.name} />
+                            ))}
+                            {trulyAbsent.length > 8 && (
+                              <p className="pt-0.5 text-center text-xs text-muted-foreground">+{trulyAbsent.length - 8} more</p>
+                            )}
+                          </div>
+                        )}
+                        {/* Approved-leave bucket */}
+                        {onLeave.length > 0 && (
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">On approved leave ({onLeave.length})</p>
+                            {onLeave.slice(0, 5).map((s: any) => (
+                              <div key={s.id} className="flex items-center justify-between rounded-lg bg-muted/30 px-2.5 py-1.5 text-sm">
+                                <div className="min-w-0">
+                                  <p className="truncate">{s.full_name}</p>
+                                  <p className="truncate text-xs text-muted-foreground">{s.leave_reason}</p>
+                                </div>
+                              </div>
+                            ))}
+                            {onLeave.length > 5 && (
+                              <p className="pt-0.5 text-center text-xs text-muted-foreground">+{onLeave.length - 5} more on leave</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </Card>
           </div>
 
           {/* Quick links */}
@@ -863,5 +942,54 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: typeof Building2; l
         </div>
       </div>
     </Card>
+  );
+}
+
+function AbsentRow({ staff, tenantName }: { staff: any; tenantName?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-destructive/10 bg-destructive/5 px-2.5 py-1.5 text-sm">
+      <Link
+        to="/staff/$staffId"
+        params={{ staffId: staff.id }}
+        className="min-w-0 flex-1 hover:underline"
+      >
+        <div className="flex items-center gap-1.5">
+          <p className="truncate font-medium">{staff.full_name}</p>
+          {staff.is_field_staff && (
+            <span title="Field staff — works outside office">
+              <MapPinned className="h-3 w-3 shrink-0 text-blue-600" />
+            </span>
+          )}
+        </div>
+        <p className="truncate text-[11px] text-muted-foreground">
+          {staff.staff_id && <span className="font-mono">{staff.staff_id} · </span>}
+          {staff.designation || "Staff"}
+          {staff.branches?.name && ` · ${staff.branches.name}`}
+        </p>
+      </Link>
+      <div className="flex shrink-0 items-center gap-0.5">
+        {staff.phone && (
+          <>
+            <a
+              href={`tel:${staff.phone}`}
+              className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              title={`Call ${staff.phone}`}
+            >
+              <PhoneIcon className="h-3.5 w-3.5" />
+            </a>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openWhatsapp(staff.phone, `Hi ${staff.full_name ?? "there"}, you haven't checked in yet today. Is everything okay? — ${tenantName ?? "Your team"}`);
+              }}
+              className="rounded p-1.5 text-success hover:bg-success/10"
+              title="Send WhatsApp message"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
