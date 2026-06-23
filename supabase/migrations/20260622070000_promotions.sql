@@ -102,8 +102,8 @@ INSERT INTO public.promotions (slug, title, banner_text, cta_text, max_claims)
 VALUES (
   'lifetime-first-50',
   'Lifetime Free - First 50',
-  '🎉 Limited launch offer: First 50 companies get lifetime free access. No card needed.',
-  'Claim free lifetime',
+  '🎉 Launch offer: Sign up now and get lifetime free access — automatic for the first 50 companies.',
+  'Sign up free',
   50
 )
 ON CONFLICT (slug) DO NOTHING;

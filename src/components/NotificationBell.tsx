@@ -54,23 +54,32 @@ export function NotificationBell() {
 
   const unreadCount = notifications.filter((n: any) => !n.read_at).length;
 
-  // Realtime subscription — instant updates when a new notification is inserted
+  // Realtime subscription — instant updates when a new notification is inserted.
+  // Supabase reuses channels by topic name, so a previous instance lingering in
+  // SUBSCRIBED state would reject any new .on() calls. We use a unique topic
+  // (timestamp-suffixed) and explicitly tear it down on cleanup.
   useEffect(() => {
     if (!user?.userId) return;
-    let channel: any = null;
+    const topic = `notif:${user.userId}:${Date.now()}`;
+    const channel = supabase.channel(topic);
+    let removed = false;
+
     try {
-      channel = supabase
-        .channel(`notif:${user.userId}`)
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.userId}` },
-          () => qc.invalidateQueries({ queryKey: ["notifications", user.userId] }),
-        )
-        .subscribe();
+      channel.on(
+        "postgres_changes" as any,
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.userId}` },
+        () => qc.invalidateQueries({ queryKey: ["notifications", user.userId] }),
+      );
+      channel.subscribe();
     } catch (e) {
       console.warn("[notifications] realtime subscribe failed:", e);
     }
-    return () => { if (channel) try { supabase.removeChannel(channel); } catch {} };
+
+    return () => {
+      if (removed) return;
+      removed = true;
+      try { supabase.removeChannel(channel); } catch {}
+    };
   }, [user?.userId, qc]);
 
   const markAllRead = async () => {
