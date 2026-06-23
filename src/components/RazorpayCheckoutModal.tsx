@@ -60,7 +60,7 @@ export function RazorpayCheckoutModal({
       await loadRazorpayScript();
 
       // 2. Create order on our backend
-      const order = await createRazorpayOrder({ plan_id: planId, tenant_id: tenantId });
+      const order = await createRazorpayOrder({ data: { plan_id: planId, tenant_id: tenantId } });
 
       // 3. Open Razorpay checkout
       await new Promise<void>((resolve, reject) => {
@@ -87,9 +87,11 @@ export function RazorpayCheckoutModal({
             setStatus("verifying");
             try {
               const result = await verifyRazorpayPayment({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
+                data: {
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                },
               });
               toast.success(`🎉 Payment successful! ${result.plan_name} is now active.`);
               onSuccess?.(result as { plan_name: string; expires_at: string | null });
