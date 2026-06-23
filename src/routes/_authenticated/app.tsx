@@ -1144,7 +1144,7 @@ function IrregularStaffWidget({
             <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive">
               Critical — missed {Math.ceil(windowDays * 0.5)}+ days
             </p>
-            {critical.map((s) => <IrregularRow key={s.user_id} staff={s} tenantName={tenantName} severity="critical" />)}
+            {critical.map((s) => <IrregularRow key={s.staff_user_id} staff={s} tenantName={tenantName} severity="critical" />)}
           </div>
         )}
         {irregular.length > 0 && (
@@ -1152,7 +1152,7 @@ function IrregularStaffWidget({
             <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">
               Irregular — 2 or more absent days
             </p>
-            {irregular.map((s) => <IrregularRow key={s.user_id} staff={s} tenantName={tenantName} severity="warning" />)}
+            {irregular.map((s) => <IrregularRow key={s.staff_user_id} staff={s} tenantName={tenantName} severity="warning" />)}
           </div>
         )}
         {summary.length === 0 && (
@@ -1183,7 +1183,7 @@ function IrregularRow({ staff, tenantName, severity }: { staff: any; tenantName?
 
   return (
     <div className={`flex items-center gap-2 rounded-lg border ${colorClasses} px-2.5 py-2 text-sm transition-colors`}>
-      <Link to="/staff/$staffId" params={{ staffId: staff.user_id }} className="min-w-0 flex-1">
+      <Link to="/staff/$staffId" params={{ staffId: staff.staff_user_id }} className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p className="truncate font-medium">{staff.full_name}</p>
           {staff.is_field_staff && (
