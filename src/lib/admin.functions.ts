@@ -117,7 +117,7 @@ export const getTenantDetails = createServerFn({ method: "GET" })
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id),
       supabaseAdmin.from("branches").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id),
       supabaseAdmin.from("payments").select("*").eq("tenant_id", data.tenant_id).order("created_at", { ascending: false }).limit(5),
-      supabaseAdmin.from("user_roles").select("user_id, profiles!inner(full_name, email)").eq("tenant_id", data.tenant_id).eq("role", "client_admin"),
+      supabaseAdmin.from("user_roles").select("user_id, profiles!user_roles_user_id_fkey_profiles(full_name, email)").eq("tenant_id", data.tenant_id).eq("role", "client_admin").not("profiles", "is", null),
     ]);
     return {
       tenant: tenant.data,
