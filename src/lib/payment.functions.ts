@@ -75,6 +75,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
 
 // ─── Verify Payment After Checkout ──────────────────────────────────────────
 export const verifyRazorpayPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])     // ← was unauthenticated; now requires login
   .inputValidator(
     (data: {
       razorpay_order_id: string;
@@ -82,7 +83,8 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       razorpay_signature: string;
     }) => data
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keySecret) throw new Error("Razorpay not configured");
 
@@ -90,27 +92,46 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     const { createHmac } = await import("crypto");
     const body = `${data.razorpay_order_id}|${data.razorpay_payment_id}`;
     const expectedSig = createHmac("sha256", keySecret).update(body).digest("hex");
-
     if (expectedSig !== data.razorpay_signature) {
       throw new Error("Invalid payment signature — possible fraud attempt");
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Get the pending order
+    // Get the pending order — with FULL plan + tenant info
     const { data: order, error: orderErr } = await supabaseAdmin
       .from("payment_orders" as any)
-      .select("*, plans(*)")
+      .select("*, plans(*), tenants(*)")
       .eq("razorpay_order_id", data.razorpay_order_id)
       .single();
 
     if (orderErr || !order) throw new Error("Order not found");
-    if ((order as any).status === "completed") return { ok: true, already_completed: true };
+    const ord = order as any;
 
-    const plan = (order as any).plans;
+    // AUTHZ: the user who paid must be an admin of the tenant that placed the
+    // order. Stops a stranger from re-using somebody else's order_id even if
+    // the HMAC happens to be valid (very narrow attack, but worth blocking).
+    const { data: isAdmin } = await supabaseAdmin.rpc("is_tenant_admin", {
+      _user_id: userId,
+      _tenant_id: ord.tenant_id,
+    });
+    if (!isAdmin) throw new Error("Forbidden: not an admin of this tenant");
+
+    // IDEMPOTENCY: if already completed, just return success — the user may
+    // have refreshed mid-flow or Razorpay called the handler twice.
+    if (ord.status === "completed") {
+      return {
+        ok: true,
+        already_completed: true,
+        plan_name: ord.plans?.name ?? "",
+        expires_at: null,
+      };
+    }
+
+    const plan = ord.plans;
     if (!plan) throw new Error("Plan not found on order");
 
-    // Calculate expiry
+    // Calculate expiry from BILLING TYPE on the plan — the source of truth
     const expiresAt =
       plan.billing === "lifetime"
         ? null
@@ -118,11 +139,11 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
         ? new Date(Date.now() + 30 * 86400000).toISOString()
         : new Date(Date.now() + 365 * 86400000).toISOString();
 
-    // Upsert subscription
+    // Upsert subscription (one per tenant — we update if it exists)
     const { data: existingSub } = await supabaseAdmin
       .from("subscriptions" as any)
       .select("id")
-      .eq("tenant_id", (order as any).tenant_id)
+      .eq("tenant_id", ord.tenant_id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -130,11 +151,16 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     if (existingSub) {
       await supabaseAdmin
         .from("subscriptions" as any)
-        .update({ plan_id: plan.id, status: "active", expires_at: expiresAt, razorpay_payment_id: data.razorpay_payment_id })
+        .update({
+          plan_id: plan.id,
+          status: "active",
+          expires_at: expiresAt,
+          razorpay_payment_id: data.razorpay_payment_id,
+        })
         .eq("id", (existingSub as any).id);
     } else {
       await supabaseAdmin.from("subscriptions" as any).insert({
-        tenant_id: (order as any).tenant_id,
+        tenant_id: ord.tenant_id,
         plan_id: plan.id,
         status: "active",
         expires_at: expiresAt,
@@ -142,7 +168,29 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       });
     }
 
-    // Mark order complete
+    // CRITICAL: update tenants.employee_limit so the new plan's cap takes
+    // effect. Without this, paying for a bigger plan does nothing.
+    await supabaseAdmin
+      .from("tenants")
+      .update({ employee_limit: plan.employee_limit })
+      .eq("id", ord.tenant_id);
+
+    // RECORD THE PAYMENT in payments table — this is what /billing's history
+    // shows and what super-admin revenue dashboard sums.
+    await supabaseAdmin.from("payments" as any).insert({
+      tenant_id: ord.tenant_id,
+      plan_id: plan.id,
+      amount_inr: Number(plan.price_inr),
+      currency: "INR",
+      status: "success",
+      method: "razorpay",
+      razorpay_order_id: data.razorpay_order_id,
+      razorpay_payment_id: data.razorpay_payment_id,
+      payer_name: ord.tenants?.name ?? null,
+      payer_email: ord.tenants?.contact_email ?? null,
+    });
+
+    // Mark order complete (last, so a re-entry doesn't double-insert)
     await supabaseAdmin
       .from("payment_orders" as any)
       .update({ status: "completed", razorpay_payment_id: data.razorpay_payment_id })

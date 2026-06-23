@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireActiveSubscription } from "@/lib/subscription-gate";
 
 export const STAFF_EMAIL_DOMAIN = "punchly.app";
 
@@ -30,6 +31,9 @@ export const createStaff = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized to add staff for this company");
+
+    // Block writes when the tenant's subscription is expired (super_admin bypasses).
+    if (!isSuper) await requireActiveSubscription(supabase, data.tenant_id);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -295,6 +299,7 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+    if (!isSuper) await requireActiveSubscription(supabase, data.tenant_id);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
