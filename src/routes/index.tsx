@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { BRAND } from "@/lib/brand";
+import { PromotionBanner, PromotionPlanBadge } from "@/lib/promotion";
 import { LogoScene3D } from "@/components/LogoScene3D";
 import { RazorpayCheckoutModal } from "@/components/RazorpayCheckoutModal";
 import { toast } from "sonner";
@@ -266,6 +267,11 @@ function Landing() {
         </div>
 
         <motion.div style={{ y: heroY, opacity: heroOpacity }} className="relative z-10 mx-auto max-w-6xl px-4 py-20 md:py-28">
+          {/* Live lifetime offer banner. Hidden once 50 sign-ups reached. */}
+          <div className="mb-10 md:mb-12">
+            <PromotionBanner />
+          </div>
+
           <div className="grid items-center gap-12 md:grid-cols-2">
             <motion.div variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeUp}>
@@ -713,6 +719,7 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
             return (
               <motion.div key={p.id} variants={fadeUp} whileHover={{ y: -8 }} transition={{ type: "spring", stiffness: 300 }}>
                 <Card className={`relative p-6 h-full transition-all ${popular ? "border-primary/70 shadow-xl md:scale-[1.04] bg-gradient-to-b from-primary/5 to-transparent" : "border-border/60 hover:border-primary/40 hover:shadow-lg"}`}>
+                  <PromotionPlanBadge planId={p.id} />
                   {popular && (
                     <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 shadow">Most popular</Badge>
                   )}

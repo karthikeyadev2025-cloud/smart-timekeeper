@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +26,7 @@ import {
   type CityOverride,
 } from "@/lib/site-content";
 import { CITIES } from "@/lib/cities";
-import { ShieldAlert, Save, KeyRound, Globe, Building2, Paintbrush, FileText, Lock, ExternalLink, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ShieldAlert, Save, KeyRound, Globe, Building2, Paintbrush, FileText, Lock, ExternalLink, AlertTriangle, CheckCircle2, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
@@ -76,6 +78,7 @@ function AdminPage() {
             <TabsTrigger value="branding"><Paintbrush className="mr-1 h-4 w-4" />Branding</TabsTrigger>
             <TabsTrigger value="seo"><FileText className="mr-1 h-4 w-4" />SEO</TabsTrigger>
             <TabsTrigger value="integrations"><KeyRound className="mr-1 h-4 w-4" />Integrations</TabsTrigger>
+            <TabsTrigger value="promotions"><Sparkles className="mr-1 h-4 w-4" />Promotions</TabsTrigger>
           </TabsList>
 
           <TabsContent value="home"><HomeEditor /></TabsContent>
@@ -83,6 +86,7 @@ function AdminPage() {
           <TabsContent value="branding"><BrandingEditor /></TabsContent>
           <TabsContent value="seo"><SeoEditor /></TabsContent>
           <TabsContent value="integrations"><IntegrationsEditor /></TabsContent>
+          <TabsContent value="promotions"><PromotionsEditor /></TabsContent>
         </Tabs>
       </div>
     </AppShell>
@@ -360,6 +364,161 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1.5">
       <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
       {children}
+    </div>
+  );
+}
+
+/* ─────────────── PROMOTIONS EDITOR (super-admin only) ─────────────── */
+function PromotionsEditor() {
+  const { data: promo, refetch } = useQuery({
+    queryKey: ["admin-active-promotion"],
+    queryFn: async () => {
+      // Fetch the full promotion row (admin sees more than the public view).
+      const [{ data: row }, { data: counters }] = await Promise.all([
+        supabase.from("promotions").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.rpc("get_active_promotion"),
+      ]);
+      return {
+        row: row as any,
+        counters: counters && counters.length > 0 ? counters[0] : null,
+      };
+    },
+  });
+
+  const { data: plans } = useQuery({
+    queryKey: ["plans-for-promo"],
+    queryFn: async () => {
+      const { data } = await supabase.from("plans").select("id, name, price_inr, billing").eq("is_active", true).order("display_order");
+      return data ?? [];
+    },
+  });
+
+  const [form, setForm] = useState<any | null>(null);
+  // Hydrate the form from the loaded row exactly once so super-admin edits aren't clobbered.
+  if (form === null && promo?.row) setForm({ ...promo.row });
+
+  const save = async () => {
+    if (!form?.id) return;
+    const { error } = await supabase.from("promotions").update({
+      title: form.title,
+      banner_text: form.banner_text,
+      cta_text: form.cta_text,
+      max_claims: Number(form.max_claims) || 0,
+      ends_at: form.ends_at || null,
+      is_active: !!form.is_active,
+      highlight_plan_id: form.highlight_plan_id || null,
+    }).eq("id", form.id);
+    if (error) toast.error(error.message);
+    else { toast.success("Promotion updated"); refetch(); }
+  };
+
+  if (!promo?.row || !form) {
+    return <Card className="p-6"><p className="text-sm text-muted-foreground">Loading promotion...</p></Card>;
+  }
+
+  const counters = promo.counters;
+
+  return (
+    <div className="space-y-4">
+      {/* Live counter card */}
+      {counters && (
+        <Card className="overflow-hidden border-amber-400/30 p-0">
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-5 text-white">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] opacity-90">Live counter</p>
+                <p className="mt-1 text-2xl font-bold sm:text-3xl">
+                  {counters.claimed_count} / {counters.max_claims} claimed
+                </p>
+                <p className="text-sm opacity-90 mt-0.5">
+                  {counters.remaining} slots remaining
+                  {counters.is_exhausted && ' — banner is hidden (offer exhausted)'}
+                  {counters.is_expired && ' — banner is hidden (offer expired)'}
+                </p>
+              </div>
+              <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center">
+                <Sparkles className="h-7 w-7" />
+              </div>
+            </div>
+            <div className="mt-4 h-2 rounded-full bg-white/20 overflow-hidden">
+              <div className="h-full bg-white transition-all" style={{ width: `${Math.min(100, (counters.claimed_count / counters.max_claims) * 100)}%` }} />
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <Card className="p-6 space-y-4">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" /> Edit promotion
+        </h3>
+
+        <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={!!form.is_active}
+              onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+              className="h-4 w-4 cursor-pointer accent-primary"
+            />
+            <span className="text-sm font-medium">Active</span>
+          </label>
+          <p className="text-xs text-muted-foreground">Turn off to hide the banner from the landing page without losing the configuration.</p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Title (small label on banner)</Label>
+            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Lifetime Free - First 50" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>CTA button text</Label>
+            <Input value={form.cta_text} onChange={(e) => setForm({ ...form, cta_text: e.target.value })} placeholder="Claim free lifetime" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Banner text (the main message)</Label>
+          <Textarea value={form.banner_text} onChange={(e) => setForm({ ...form, banner_text: e.target.value })} rows={2} placeholder="🎉 Limited launch offer: First 50 companies get lifetime free access. No card needed." />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Max claims (offer hides after this many sign-ups)</Label>
+            <Input type="number" min="0" value={form.max_claims} onChange={(e) => setForm({ ...form, max_claims: e.target.value })} />
+            <p className="text-xs text-muted-foreground">Count is real signups since {new Date(form.starts_at).toLocaleDateString()}, not a manual counter.</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Ends at (optional)</Label>
+            <Input
+              type="datetime-local"
+              value={form.ends_at ? new Date(form.ends_at).toISOString().slice(0, 16) : ""}
+              onChange={(e) => setForm({ ...form, ends_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
+            />
+            <p className="text-xs text-muted-foreground">Leave blank for no time limit.</p>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Highlight which plan on the pricing page</Label>
+          <select
+            value={form.highlight_plan_id ?? ""}
+            onChange={(e) => setForm({ ...form, highlight_plan_id: e.target.value || null })}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="">— no highlight —</option>
+            {(plans ?? []).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name} (₹{p.price_inr} {p.billing})</option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">The matching plan card on the price sheet gets an "Lifetime free · X of Y left" badge.</p>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Button onClick={save} className="gap-2">
+            <Save className="h-4 w-4" /> Save promotion
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }
