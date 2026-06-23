@@ -32,27 +32,50 @@ function SupportPage() {
         <h1 className="text-4xl font-bold tracking-tight mb-2">Support & Help</h1>
         <p className="text-muted-foreground mb-10">We typically respond within 24 hours on business days (Mon–Sat).</p>
 
-        <div className="grid gap-4 sm:grid-cols-2 mb-12">
-          <Card className="p-5">
-            <Mail className="h-6 w-6 text-primary mb-3" />
-            <h2 className="font-semibold mb-1">Email support</h2>
-            <p className="text-sm text-muted-foreground mb-3">For any question, bug report, or feedback.</p>
-            <a href="mailto:support@punchly.online" className="font-medium text-primary hover:underline">support@punchly.online</a>
-          </Card>
+        <Card className="overflow-hidden border-primary/20 p-0 mb-10">
+          <div className="bg-gradient-to-br from-primary to-primary/80 p-6 text-primary-foreground sm:p-8">
+            <div className="flex items-start gap-4">
+              <div className="rounded-xl bg-white/15 p-3 backdrop-blur-sm">
+                <Mail className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs uppercase tracking-[0.2em] opacity-80">Get in touch</p>
+                <h2 className="mt-1 text-2xl font-bold sm:text-3xl">support@punchly.online</h2>
+                <p className="mt-1 text-sm opacity-90">For everything — questions, bugs, billing, privacy, account deletion. One inbox. We reply within 24 hours on business days.</p>
+                <a
+                  href="mailto:support@punchly.online"
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-primary transition-transform hover:scale-[1.02]"
+                >
+                  <Mail className="h-4 w-4" /> Email us
+                </a>
+              </div>
+            </div>
+          </div>
+        </Card>
 
-          <Card className="p-5">
-            <ShieldQuestion className="h-6 w-6 text-amber-600 mb-3" />
-            <h2 className="font-semibold mb-1">Privacy & data</h2>
-            <p className="text-sm text-muted-foreground mb-3">Data export, DPDP / GDPR requests.</p>
-            <a href="mailto:privacy@punchly.online" className="font-medium text-amber-600 hover:underline">privacy@punchly.online</a>
-          </Card>
-
-          <Card className="p-5">
-            <Trash2 className="h-6 w-6 text-destructive mb-3" />
-            <h2 className="font-semibold mb-1">Account deletion</h2>
-            <p className="text-sm text-muted-foreground mb-3">Delete your account & personal data.</p>
-            <a href="mailto:support@punchly.online?subject=Delete%20my%20account" className="font-medium text-destructive hover:underline">Request deletion →</a>
-          </Card>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Quick subjects</h2>
+        <div className="grid gap-3 sm:grid-cols-3 mb-12">
+          <a href="mailto:support@punchly.online?subject=Privacy%20%26%20data%20request" className="group">
+            <Card className="h-full p-4 transition-all hover:border-amber-500/40 hover:shadow-md">
+              <ShieldQuestion className="h-5 w-5 text-amber-600 mb-2" />
+              <p className="font-semibold text-sm">Privacy & data</p>
+              <p className="text-xs text-muted-foreground mt-1">Data export, DPDP / GDPR requests.</p>
+            </Card>
+          </a>
+          <a href="mailto:support@punchly.online?subject=Delete%20my%20account" className="group">
+            <Card className="h-full p-4 transition-all hover:border-destructive/40 hover:shadow-md">
+              <Trash2 className="h-5 w-5 text-destructive mb-2" />
+              <p className="font-semibold text-sm">Account deletion</p>
+              <p className="text-xs text-muted-foreground mt-1">Delete your account & personal data.</p>
+            </Card>
+          </a>
+          <a href="mailto:support@punchly.online?subject=Bug%20report" className="group">
+            <Card className="h-full p-4 transition-all hover:border-primary/40 hover:shadow-md">
+              <BookOpen className="h-5 w-5 text-primary mb-2" />
+              <p className="font-semibold text-sm">Report a bug</p>
+              <p className="text-xs text-muted-foreground mt-1">Steps, screenshots, anything weird.</p>
+            </Card>
+          </a>
         </div>
 
         <section className="mb-12">

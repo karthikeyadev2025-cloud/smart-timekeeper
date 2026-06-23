@@ -201,7 +201,7 @@ function TermsPage() {
               These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in Hyderabad, Telangana.
             </p>
             <p className="mt-3">
-              Before initiating legal proceedings, you agree to attempt to resolve disputes informally by contacting us at legal@punchly.online.
+              Before initiating legal proceedings, you agree to attempt to resolve disputes informally by contacting us at support@punchly.online.
               We will attempt to resolve disputes within 30 days.
             </p>
           </section>
@@ -221,7 +221,7 @@ function TermsPage() {
               <p>Hyderabad, Telangana — 500001, India</p>
               <p>General: support@punchly.online</p>
               <p>Billing: billing@punchly.online</p>
-              <p>Legal: legal@punchly.online</p>
+              <p>Legal: support@punchly.online</p>
             </div>
           </section>
 

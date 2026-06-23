@@ -146,7 +146,7 @@ function PrivacyPage() {
               <li><strong>Right to withdraw consent:</strong> Withdraw consent for biometric data collection at any time</li>
               <li><strong>Right to nominate:</strong> Nominate another person to exercise your rights in case of incapacity</li>
             </ul>
-            <p className="mt-3">To exercise any of these rights, email us at: <strong>privacy@punchly.online</strong> with subject "Data Rights Request".</p>
+            <p className="mt-3">To exercise any of these rights, email us at: <strong>support@punchly.online</strong> with subject "Data Rights Request".</p>
             <p className="mt-2">We will respond within 72 hours and fulfil the request within 30 days.</p>
           </section>
 
@@ -224,7 +224,7 @@ function PrivacyPage() {
               <p><strong>Punchly Privacy Team</strong></p>
               <p>K² Adexos Global Technologies</p>
               <p>Hyderabad, Telangana — 500001</p>
-              <p>Email: privacy@punchly.online</p>
+              <p>Email: support@punchly.online</p>
               <p>Website: https://punchly.online</p>
             </div>
           </section>
