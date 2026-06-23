@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Phone, Shield, MessageCircle, Pencil, Trash2, UserRound, UserCheck, MapPinned, Wallet, Sparkles } from "lucide-react";
+import { UserPlus, Phone, Shield, MessageCircle, Pencil, Trash2, UserRound, UserCheck, MapPinned, Wallet, Sparkles, Search, Users } from "lucide-react";
 import { openWhatsapp } from "@/lib/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -37,6 +37,8 @@ function TeamPage() {
   const [open, setOpen] = useState(false);
   const [inviteMode, setInviteMode] = useState<"staff" | "branch_manager">("staff");
   const [editStaff, setEditStaff] = useState<any | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "disabled" | "field">("all");
   const deleteStaffFn = useServerFn(deleteStaff);
 
   const handleDelete = async (s: any) => {
@@ -89,71 +91,124 @@ function TeamPage() {
 
   if (!tenantId) return <AppShell><Card className="p-6">You need a company to manage staff.</Card></AppShell>;
 
+  // Apply search + status filters client-side (cheap, the list is small)
+  const allStaff = staff ?? [];
+  const q = search.trim().toLowerCase();
+  const filteredStaff = allStaff.filter((s: any) => {
+    if (statusFilter === "active" && !s.is_active) return false;
+    if (statusFilter === "disabled" && s.is_active) return false;
+    if (statusFilter === "field" && !s.is_field_staff) return false;
+    if (q) {
+      const hay = `${s.full_name ?? ""} ${s.phone ?? ""} ${s.designation ?? ""} ${s.staff_id ?? ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Aggregate stats (computed once)
+  const stats = {
+    total: allStaff.length,
+    active: allStaff.filter((s: any) => s.is_active).length,
+    field: allStaff.filter((s: any) => s.is_field_staff).length,
+    monthlyPayroll: allStaff.reduce((a: number, s: any) => a + Number(s.monthly_salary ?? 0), 0),
+    avgCompletion: allStaff.length
+      ? Math.round(allStaff.reduce((a: number, s: any) => a + ((s.profile_completion ?? 0) / 10) * 100, 0) / allStaff.length)
+      : 0,
+  };
+
   return (
     <AppShell>
       <div className="space-y-6">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Staff</h1>
-            <p className="text-muted-foreground">{staff?.length ?? 0} members{branchId !== "all" ? ` in selected ${branchLabel.toLowerCase()}` : ""}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <StaffImportExportDialog
-              tenantId={tenantId!}
-              staff={staff ?? []}
-              onDone={() => { qc.invalidateQueries({ queryKey: ["staff"] }); }}
-            />
-            <Button variant="outline" className="gap-2" onClick={() => { setInviteMode("branch_manager"); setOpen(true); }}>
-              <Shield className="h-4 w-4" /> Invite {branchLabel.toLowerCase()} manager
-            </Button>
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2" onClick={() => setInviteMode("staff")}><UserPlus className="h-4 w-4" /> Add staff</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <AddStaffForm
-                  tenantId={tenantId}
-                  shifts={shifts ?? []}
-                  branches={branches ?? []}
-                  branchLabel={branchLabel}
-                  mode={inviteMode}
-                  defaultBranchId={branchId !== "all" ? branchId : null}
-                  onDone={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["staff"] }); qc.invalidateQueries({ queryKey: ["branches"] }); }}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
-        </header>
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-primary/10 p-2"><UserRound className="h-4 w-4 text-primary" /></div>
-              <div><p className="text-2xl font-bold leading-none">{staff?.length ?? 0}</p><p className="text-xs text-muted-foreground">Total staff</p></div>
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-success/10 p-2"><UserCheck className="h-4 w-4 text-success" /></div>
-              <div><p className="text-2xl font-bold leading-none">{(staff ?? []).filter((s: any) => s.is_active).length}</p><p className="text-xs text-muted-foreground">Active</p></div>
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-blue-500/10 p-2"><MapPinned className="h-4 w-4 text-blue-600 dark:text-blue-400" /></div>
-              <div><p className="text-2xl font-bold leading-none">{(staff ?? []).filter((s: any) => s.is_field_staff).length}</p><p className="text-xs text-muted-foreground">Field staff</p></div>
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-amber-500/10 p-2"><Wallet className="h-4 w-4 text-amber-600 dark:text-amber-400" /></div>
+        {/* HERO HEADER */}
+        <Card className="overflow-hidden border-primary/20 p-0">
+          <div className="bg-gradient-to-br from-primary via-primary to-primary/80 p-5 text-primary-foreground sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-2xl font-bold leading-none">₹{(staff ?? []).reduce((a: number, s: any) => a + Number(s.monthly_salary ?? 0), 0).toLocaleString("en-IN")}</p>
-                <p className="text-xs text-muted-foreground">Monthly payroll</p>
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  <p className="text-xs uppercase tracking-[0.2em] opacity-80">Team</p>
+                </div>
+                <h1 className="mt-1 text-3xl font-bold tracking-tight">Staff</h1>
+                <p className="text-sm opacity-90 mt-0.5">
+                  {stats.total} {stats.total === 1 ? "member" : "members"}
+                  {branchId !== "all" ? ` in selected ${branchLabel.toLowerCase()}` : " across all branches"}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <StaffImportExportDialog
+                  tenantId={tenantId!}
+                  staff={staff ?? []}
+                  onDone={() => { qc.invalidateQueries({ queryKey: ["staff"] }); }}
+                />
+                <Button variant="outline" className="gap-2 border-white/30 bg-white/10 text-white hover:bg-white/20" onClick={() => { setInviteMode("branch_manager"); setOpen(true); }}>
+                  <Shield className="h-4 w-4" /> Invite {branchLabel.toLowerCase()} manager
+                </Button>
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="secondary" className="gap-2 bg-white text-primary hover:bg-white/90" onClick={() => setInviteMode("staff")}>
+                      <UserPlus className="h-4 w-4" /> Add staff
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <AddStaffForm
+                      tenantId={tenantId}
+                      shifts={shifts ?? []}
+                      branches={branches ?? []}
+                      branchLabel={branchLabel}
+                      mode={inviteMode}
+                      defaultBranchId={branchId !== "all" ? branchId : null}
+                      onDone={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["staff"] }); qc.invalidateQueries({ queryKey: ["branches"] }); }}
+                    />
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
-          </Card>
+          </div>
+        </Card>
+
+        {/* STAT CARDS */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile icon={UserRound} value={stats.total} label="Total staff" tint="primary" />
+          <StatTile icon={UserCheck} value={stats.active} label="Active" tint="success" sub={stats.total > 0 ? `${Math.round((stats.active / stats.total) * 100)}%` : undefined} />
+          <StatTile icon={MapPinned} value={stats.field} label="Field staff" tint="blue" />
+          <StatTile icon={Wallet} value={`₹${stats.monthlyPayroll.toLocaleString("en-IN")}`} label="Monthly payroll" tint="amber" sub={stats.avgCompletion > 0 ? `${stats.avgCompletion}% profile avg` : undefined} />
         </div>
+
+        {/* SEARCH + FILTER CHIPS */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[220px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, phone, ID, designation…"
+              className="pl-9"
+            />
+          </div>
+          <div className="flex items-center gap-1 rounded-full border bg-background p-1 text-xs">
+            {([
+              { key: "all", label: "All", count: stats.total },
+              { key: "active", label: "Active", count: stats.active },
+              { key: "disabled", label: "Disabled", count: stats.total - stats.active },
+              { key: "field", label: "Field", count: stats.field },
+            ] as const).map((chip) => (
+              <button
+                key={chip.key}
+                onClick={() => setStatusFilter(chip.key)}
+                className={`rounded-full px-3 py-1 transition-all ${statusFilter === chip.key ? "bg-primary text-primary-foreground font-medium shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {chip.label} <span className="opacity-60">·</span> {chip.count}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {filteredStaff.length === 0 && allStaff.length > 0 && (
+          <Card className="p-8 text-center">
+            <p className="text-sm text-muted-foreground">No staff match your search or filter.</p>
+            <Button variant="link" size="sm" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</Button>
+          </Card>
+        )}
 
         <Card className="overflow-x-auto">
           <Table>
@@ -172,19 +227,24 @@ function TeamPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(staff ?? []).map((s) => (
+              {filteredStaff.map((s) => (
                 <TableRow key={s.id}>
                   <TableCell className="font-mono text-xs text-muted-foreground">{(s as any).staff_id ?? "—"}</TableCell>
                   <TableCell className="font-medium">
                     <button
                       type="button"
                       onClick={() => navigate({ to: "/staff/$staffId", params: { staffId: s.id } })}
-                      className="flex items-center gap-2 hover:underline text-left"
+                      className="flex items-center gap-2.5 text-left transition-colors hover:text-primary"
                     >
-                      <Avatar className="h-7 w-7">
-                        <AvatarFallback className="text-xs">{(s.full_name ?? "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}</AvatarFallback>
+                      <Avatar className="h-9 w-9 ring-2 ring-background ring-offset-2 ring-offset-card">
+                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-xs font-semibold text-primary-foreground">
+                          {(s.full_name ?? "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
+                        </AvatarFallback>
                       </Avatar>
-                      {s.full_name ?? "—"}
+                      <div>
+                        <p className="font-medium leading-tight">{s.full_name ?? "—"}</p>
+                        {s.designation && <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{s.designation}</p>}
+                      </div>
                     </button>
                   </TableCell>
                   <TableCell className="font-mono">{s.phone ?? "—"}</TableCell>
@@ -224,16 +284,19 @@ function TeamPage() {
                     })()}
                   </TableCell>
                   <TableCell>
-                    <input
-                      type="checkbox"
-                      checked={!!(s as any).is_field_staff}
-                      onChange={async (e) => {
-                        const { error } = await supabase.from("profiles").update({ is_field_staff: e.target.checked }).eq("id", s.id);
-                        if (error) toast.error(error.message);
-                        else { toast.success("Updated"); qc.invalidateQueries({ queryKey: ["staff"] }); }
-                      }}
-                      className="h-4 w-4 cursor-pointer"
-                    />
+                    <label className="inline-flex cursor-pointer items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={!!(s as any).is_field_staff}
+                        onChange={async (e) => {
+                          const { error } = await supabase.from("profiles").update({ is_field_staff: e.target.checked }).eq("id", s.id);
+                          if (error) toast.error(error.message);
+                          else { toast.success("Updated"); qc.invalidateQueries({ queryKey: ["staff"] }); }
+                        }}
+                        className="h-4 w-4 cursor-pointer accent-blue-600"
+                      />
+                      {(s as any).is_field_staff && <MapPinned className="h-3 w-3 text-blue-600" />}
+                    </label>
                   </TableCell>
                   <TableCell>
                     <button
@@ -245,8 +308,14 @@ function TeamPage() {
                         if (error) toast.error(error.message);
                         else { toast.success(next ? "Staff re-enabled" : "Staff disabled"); qc.invalidateQueries({ queryKey: ["staff"] }); }
                       }}
+                      className="group"
+                      title={s.is_active ? "Click to disable" : "Click to re-enable"}
                     >
-                      <Badge variant={s.is_active ? "default" : "secondary"} className="cursor-pointer">
+                      <Badge
+                        variant={s.is_active ? "default" : "secondary"}
+                        className={`cursor-pointer gap-1 transition-all group-hover:scale-105 ${s.is_active ? "bg-success/15 text-success hover:bg-success/25 border-success/20" : ""}`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${s.is_active ? "bg-success animate-pulse" : "bg-muted-foreground/50"}`} />
                         {s.is_active ? "Active" : "Disabled"}
                       </Badge>
                     </button>
@@ -280,8 +349,16 @@ function TeamPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {staff?.length === 0 && (
-                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No staff yet. Click "Add staff" to begin.</TableCell></TableRow>
+              {allStaff.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={10} className="py-16 text-center">
+                    <div className="mx-auto mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                      <Users className="h-7 w-7 text-primary" />
+                    </div>
+                    <p className="font-semibold">No staff yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">Click "Add staff" to begin building your team.</p>
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
@@ -606,5 +683,31 @@ function StaffRemarksPanel({ tenantId, userId }: { tenantId: string; userId: str
         </div>
       )}
     </div>
+  );
+}
+
+function StatTile({
+  icon: Icon, value, label, sub, tint = "primary",
+}: {
+  icon: any; value: string | number; label: string; sub?: string;
+  tint?: "primary" | "success" | "blue" | "amber";
+}) {
+  const tintMap = {
+    primary: "bg-primary/10 text-primary",
+    success: "bg-success/10 text-success",
+    blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  };
+  return (
+    <Card className="p-4 transition-transform hover:scale-[1.01]">
+      <div className="flex items-start justify-between gap-2">
+        <div className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ${tintMap[tint]}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+        {sub && <span className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">{sub}</span>}
+      </div>
+      <p className="mt-3 text-2xl font-bold leading-none tabular-nums">{value}</p>
+      <p className="text-xs text-muted-foreground mt-1">{label}</p>
+    </Card>
   );
 }
