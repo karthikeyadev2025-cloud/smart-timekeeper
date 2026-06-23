@@ -388,7 +388,7 @@ In Play Console left sidebar → **Grow → Store presence → Main store listin
 | Tags | (copy from md file) |
 | Contact email | support@punchly.online |
 | Contact website | https://punchly.online |
-| Contact phone | (optional) +91 85000 16059 |
+| Contact phone | (optional — leave blank unless you want users to call you) |
 | Privacy Policy | https://punchly.online/privacy |
 
 ## Step 7.4: Take phone screenshots

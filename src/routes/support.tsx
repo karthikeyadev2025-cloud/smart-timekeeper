@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Logo } from "@/components/Logo";
 import { Card } from "@/components/ui/card";
-import { Mail, MessageCircle, ShieldQuestion, Trash2, RefreshCw, BookOpen } from "lucide-react";
+import { Mail, ShieldQuestion, Trash2, RefreshCw, BookOpen } from "lucide-react";
 
 export const Route = createFileRoute("/support")({
   head: () => ({
@@ -41,16 +41,9 @@ function SupportPage() {
           </Card>
 
           <Card className="p-5">
-            <MessageCircle className="h-6 w-6 text-success mb-3" />
-            <h2 className="font-semibold mb-1">WhatsApp</h2>
-            <p className="text-sm text-muted-foreground mb-3">Quick questions, demos and onboarding help.</p>
-            <a href="https://wa.me/918500016059" target="_blank" rel="noopener" className="font-medium text-success hover:underline">+91 85000 16059</a>
-          </Card>
-
-          <Card className="p-5">
             <ShieldQuestion className="h-6 w-6 text-amber-600 mb-3" />
             <h2 className="font-semibold mb-1">Privacy & data</h2>
-            <p className="text-sm text-muted-foreground mb-3">Data export, GDPR/DPDP requests.</p>
+            <p className="text-sm text-muted-foreground mb-3">Data export, DPDP / GDPR requests.</p>
             <a href="mailto:privacy@punchly.online" className="font-medium text-amber-600 hover:underline">privacy@punchly.online</a>
           </Card>
 
