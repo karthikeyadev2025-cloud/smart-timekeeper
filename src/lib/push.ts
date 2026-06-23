@@ -49,15 +49,19 @@ async function registerNativePush(userId: string) {
     await PushNotifications.register();
 
     PushNotifications.addListener("registration", async (token) => {
-      await supabase.from("push_subscriptions").upsert(
-        {
-          user_id: userId,
-          endpoint: token.value,
-          platform: nativePlatform(),
-          last_seen_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,endpoint" },
-      );
+      try {
+        await (supabase as any).from("push_subscriptions").upsert(
+          {
+            user_id: userId,
+            endpoint: token.value,
+            platform: nativePlatform(),
+            last_seen_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,endpoint" },
+        );
+      } catch (e) {
+        console.warn("[push] could not save token (table missing?):", e);
+      }
     });
 
     PushNotifications.addListener("registrationError", (e) => {

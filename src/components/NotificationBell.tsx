@@ -30,13 +30,25 @@ export function NotificationBell() {
     queryKey: ["notifications", user?.userId],
     enabled: !!user?.userId,
     refetchInterval: 60_000, // poll every minute
+    retry: false,            // if the table doesn't exist yet (SQL not run), don't hammer it
     queryFn: async () => {
-      const { data } = await supabase
-        .from("notifications")
-        .select("id, kind, title, body, action_url, read_at, created_at")
-        .order("created_at", { ascending: false })
-        .limit(20);
-      return data ?? [];
+      try {
+        const { data, error } = await (supabase as any)
+          .from("notifications")
+          .select("id, kind, title, body, action_url, read_at, created_at")
+          .order("created_at", { ascending: false })
+          .limit(20);
+        if (error) {
+          // Common case: SQL migration not run yet → silently hide the bell
+          // rather than breaking the page. Once migration runs the bell starts working.
+          console.warn("[notifications] table not ready:", error.message);
+          return [];
+        }
+        return data ?? [];
+      } catch (e) {
+        console.warn("[notifications] query failed:", e);
+        return [];
+      }
     },
   });
 
@@ -45,29 +57,40 @@ export function NotificationBell() {
   // Realtime subscription — instant updates when a new notification is inserted
   useEffect(() => {
     if (!user?.userId) return;
-    const channel = supabase
-      .channel(`notif:${user.userId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.userId}` },
-        () => qc.invalidateQueries({ queryKey: ["notifications", user.userId] }),
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    let channel: any = null;
+    try {
+      channel = supabase
+        .channel(`notif:${user.userId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.userId}` },
+          () => qc.invalidateQueries({ queryKey: ["notifications", user.userId] }),
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn("[notifications] realtime subscribe failed:", e);
+    }
+    return () => { if (channel) try { supabase.removeChannel(channel); } catch {} };
   }, [user?.userId, qc]);
 
   const markAllRead = async () => {
-    await supabase.rpc("mark_notifications_read");
-    qc.invalidateQueries({ queryKey: ["notifications", user?.userId] });
+    try {
+      await (supabase as any).rpc("mark_notifications_read");
+      qc.invalidateQueries({ queryKey: ["notifications", user?.userId] });
+    } catch (e) { console.warn("[notifications] mark all read failed:", e); }
   };
 
   const onItemClick = async (n: any) => {
     if (!n.read_at) {
-      await supabase.rpc("mark_notifications_read", { _ids: [n.id] });
-      qc.invalidateQueries({ queryKey: ["notifications", user?.userId] });
+      try {
+        await (supabase as any).rpc("mark_notifications_read", { _ids: [n.id] });
+        qc.invalidateQueries({ queryKey: ["notifications", user?.userId] });
+      } catch {}
     }
     setOpen(false);
-    if (n.action_url) navigate({ to: n.action_url as any });
+    if (n.action_url) {
+      try { navigate({ to: n.action_url as any }); } catch {}
+    }
   };
 
   return (
