@@ -1010,40 +1010,55 @@ function IrregularStaffWidget({
   const [windowDays, setWindowDays] = useState<7 | 14 | 30>(7);
   const branchFilter = branchManagerMode && userBranchId ? userBranchId : null;
 
-  const { data: summary, isLoading } = useQuery({
+  const { data: summary, isLoading, error, refetch } = useQuery({
     queryKey: ["attendance-summary", tenantId, branchFilter, windowDays],
     enabled: !!tenantId,
+    retry: 1,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("staff_attendance_summary", {
         _tenant_id: tenantId!,
         _branch_id: branchFilter,
         _days: windowDays,
       });
-      if (error) throw error;
-      return data as any[];
+      if (error) throw new Error(error.message || "RPC failed");
+      return (data ?? []) as any[];
     },
   });
 
   const { data: trend } = useQuery({
     queryKey: ["attendance-trend", tenantId, branchFilter],
     enabled: !!tenantId,
+    retry: 1,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("daily_attendance_trend", {
         _tenant_id: tenantId!,
         _branch_id: branchFilter,
         _days: 14,
       });
-      if (error) throw error;
-      return (data as any[]).map((d) => ({
+      if (error) throw new Error(error.message || "RPC failed");
+      return ((data ?? []) as any[]).map((d) => ({
         ...d,
         label: new Date(d.attendance_date).toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }),
       }));
     },
   });
 
-  if (isLoading || !summary) {
+  if (isLoading) {
     return <Card className="p-4 sm:p-6"><p className="text-sm text-muted-foreground">Loading attendance insights…</p></Card>;
   }
+  if (error) {
+    return (
+      <Card className="p-4 sm:p-6 space-y-2">
+        <p className="text-sm font-medium text-destructive">Couldn't load attendance insights</p>
+        <p className="text-xs text-muted-foreground font-mono">{(error as Error).message}</p>
+        <p className="text-xs text-muted-foreground">
+          Most likely the database function isn't installed yet. Run <code className="font-mono">sql_attendance_insights.sql</code> in Supabase SQL Editor, then click Retry.
+        </p>
+        <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+      </Card>
+    );
+  }
+  if (!summary) return null;
 
   // Bucket the staff so admins can see urgent → low concern at a glance
   const critical = summary.filter((s) => s.days_absent >= Math.ceil(windowDays * 0.5)); // missed half or more
