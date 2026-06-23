@@ -212,27 +212,66 @@ function PlanForm({ initial, onDone }: { initial: Plan | null; onDone: () => voi
           <Input type="number" min="0" value={price} onChange={e => setPrice(e.target.value)} placeholder="999" required />
         </div>
         <div className="space-y-1">
-          <Label>Billing</Label>
-          <Select value={billing} onValueChange={setBilling}>
+          <Label>Duration</Label>
+          <Select
+            value={(() => {
+              // Derive the dropdown selection from billing + months.
+              // Anything that doesn't match a preset becomes "custom".
+              const m = billingMonths === "" ? null : Number(billingMonths);
+              if (m === 1 || (m == null && billing === "monthly")) return "monthly";
+              if (m === 12 || (m == null && billing === "yearly")) return "yearly";
+              if (m === 24) return "2y";
+              if (m === 36) return "3y";
+              if (m === 60) return "5y";
+              if (m === 6) return "6m";
+              if (m == null && billing === "lifetime") return "lifetime";
+              return "custom";
+            })()}
+            onValueChange={(v) => {
+              if (v === "monthly")  { setBilling("monthly");  setBillingMonths(""); }
+              else if (v === "yearly")   { setBilling("yearly");   setBillingMonths(""); }
+              else if (v === "2y")       { setBilling("yearly");   setBillingMonths("24"); }
+              else if (v === "3y")       { setBilling("yearly");   setBillingMonths("36"); }
+              else if (v === "5y")       { setBilling("yearly");   setBillingMonths("60"); }
+              else if (v === "6m")       { setBilling("monthly");  setBillingMonths("6"); }
+              else if (v === "lifetime") { setBilling("lifetime"); setBillingMonths(""); }
+              else if (v === "custom")   { /* user will type months below */ }
+            }}
+          >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="monthly">Monthly</SelectItem>
-              <SelectItem value="yearly">Yearly</SelectItem>
-              <SelectItem value="lifetime">Lifetime</SelectItem>
+              <SelectItem value="monthly">Monthly (1 month)</SelectItem>
+              <SelectItem value="6m">6 months</SelectItem>
+              <SelectItem value="yearly">Yearly (12 months)</SelectItem>
+              <SelectItem value="2y">2 years</SelectItem>
+              <SelectItem value="3y">3 years</SelectItem>
+              <SelectItem value="5y">5 years</SelectItem>
+              <SelectItem value="lifetime">Lifetime (no expiry)</SelectItem>
+              <SelectItem value="custom">Custom (specify months)</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <Label>Custom duration (months)</Label>
-          <Input
-            type="number"
-            min="1"
-            value={billingMonths}
-            onChange={e => setBillingMonths(e.target.value)}
-            placeholder="e.g. 36 for 3-year, 6 for 6-month"
-          />
-          <p className="text-[10px] text-muted-foreground">Leave blank to use the billing type's default (1 / 12 / lifetime).</p>
-        </div>
+        {/* Only show the months input when user explicitly picks Custom */}
+        {(() => {
+          const m = billingMonths === "" ? null : Number(billingMonths);
+          const isPreset =
+            m === 1 || m === 6 || m === 12 || m === 24 || m === 36 || m === 60 ||
+            (m == null && (billing === "monthly" || billing === "yearly" || billing === "lifetime"));
+          if (isPreset) return null;
+          return (
+            <div className="space-y-1">
+              <Label>Custom duration (months)</Label>
+              <Input
+                type="number"
+                min="1"
+                value={billingMonths}
+                onChange={e => setBillingMonths(e.target.value)}
+                placeholder="e.g. 18 for 18-month plan"
+                required
+              />
+            </div>
+          );
+        })()}
         <div className="space-y-1">
           <Label>Employee limit</Label>
           <Input type="number" min="1" value={limit} onChange={e => setLimit(e.target.value)} placeholder="Leave blank for unlimited" />
