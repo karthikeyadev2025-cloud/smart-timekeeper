@@ -276,7 +276,7 @@ function Landing() {
             <motion.div variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeUp}>
                 <Badge variant="secondary" className="mb-4 gap-1">
-                  <Sparkles className="h-3 w-3" /> New · Lifetime plans available
+                  <Sparkles className="h-3 w-3" /> Flexible plans — monthly to multi-year
                 </Badge>
               </motion.div>
               <motion.h1 variants={fadeUp} className="text-4xl font-bold leading-[1.05] tracking-tight text-foreground md:text-6xl">
@@ -663,48 +663,87 @@ type Plan = {
 };
 
 
-function billingLabel(b?: string): string {
-  switch ((b ?? "").toLowerCase()) {
-    case "lifetime": return "one-time";
-    case "monthly":  return "/month";
-    case "yearly":   return "/year";
-    case "weekly":   return "/week";
-    default:         return b || "";
+function billingLabel(p: Plan): string {
+  // Prefer billing_period_months if set (the new explicit duration field).
+  // Falls back to the legacy enum so old plans still render sensibly.
+  const m = (p as any).billing_period_months as number | null | undefined;
+  if (m == null) {
+    switch ((p.billing ?? "").toLowerCase()) {
+      case "lifetime": return "one-time";
+      case "monthly":  return "/month";
+      case "yearly":   return "/year";
+      case "weekly":   return "/week";
+      default:         return p.billing || "";
+    }
   }
+  if (m === 1) return "/month";
+  if (m === 12) return "/year";
+  if (m % 12 === 0) return `/${m / 12} years`;
+  return `/${m} months`;
 }
 
 function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Plan[]; tenantId: string; isLoggedIn: boolean; onCheckout: (p: { id: string; name: string; price: number; billing: string }) => void }) {
-  const [billing, setBilling] = useState<"lifetime" | "monthly">("lifetime");
+  // Tab semantics: "monthly" = pay-monthly, "longterm" = anything longer.
+  // We split by billing_period_months (1 = monthly, anything else = longterm).
+  const [billing, setBilling] = useState<"monthly" | "longterm">("longterm");
+
+  const isMonthlyPlan = (p: Plan) => {
+    const m = (p as any).billing_period_months as number | null | undefined;
+    if (m != null) return m === 1;
+    return p.billing === "monthly";
+  };
+
   const core = plans
-    .filter((p) => p.billing === billing && p.employee_limit <= 50)
+    .filter((p) => (billing === "monthly" ? isMonthlyPlan(p) : !isMonthlyPlan(p)))
+    .filter((p) => p.employee_limit <= 50)
+    .filter((p) => !/school|enterprise/i.test(p.name))
     .sort((a, b) => Number(a.price_inr) - Number(b.price_inr));
   const school = plans.find((p) => /school/i.test(p.name));
   const enterprise = plans.find((p) => /enterprise/i.test(p.name));
+
+  // Compute savings hint dynamically — average longterm price / months vs avg monthly price.
+  const avgMonthly = (() => {
+    const ms = plans.filter(isMonthlyPlan);
+    if (ms.length === 0) return null;
+    return ms.reduce((a, p) => a + Number(p.price_inr), 0) / ms.length;
+  })();
+  const avgLongPerMonth = (() => {
+    const lts = plans.filter((p) => !isMonthlyPlan(p) && !/school|enterprise/i.test(p.name));
+    if (lts.length === 0 || !avgMonthly) return null;
+    const perMonth = lts.map((p) => {
+      const m = (p as any).billing_period_months ?? (p.billing === "yearly" ? 12 : 36);
+      return Number(p.price_inr) / m;
+    });
+    return perMonth.reduce((a, n) => a + n, 0) / perMonth.length;
+  })();
+  const savePct = avgMonthly && avgLongPerMonth
+    ? Math.max(0, Math.round((1 - avgLongPerMonth / avgMonthly) * 100))
+    : null;
 
   return (
     <section id="pricing" className="border-t border-border/60 bg-card/40 py-20">
       <div className="mx-auto max-w-6xl px-4">
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.6 }} className="text-center">
           <Badge variant="secondary" className="mb-3">Pricing</Badge>
-          <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Pay once. Use forever.</h2>
-          <p className="mt-2 text-muted-foreground">Or pick a low monthly plan. Switch anytime.</p>
+          <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Pay less. Stay longer.</h2>
+          <p className="mt-2 text-muted-foreground">Pick a long-term plan for the best price, or pay monthly. Switch anytime.</p>
         </motion.div>
 
         <div className="mt-8 flex justify-center">
           <div className="inline-flex rounded-full border border-border/60 bg-background p-1 shadow-sm">
-            {(["lifetime", "monthly"] as const).map((k) => (
+            {(["longterm", "monthly"] as const).map((k) => (
               <button
                 key={k}
                 onClick={() => setBilling(k)}
-                className={`relative rounded-full px-5 py-2 text-sm font-medium capitalize transition-colors ${billing === k ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                className={`relative rounded-full px-5 py-2 text-sm font-medium transition-colors ${billing === k ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
               >
                 {billing === k && (
                   <motion.span layoutId="bill-pill" className="absolute inset-0 rounded-full bg-primary" transition={{ type: "spring", stiffness: 400, damping: 30 }} />
                 )}
                 <span className="relative flex items-center gap-2">
-                  {k === "lifetime" ? "Lifetime" : "Monthly"}
-                  {k === "lifetime" && (
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${billing === k ? "bg-primary-foreground/20" : "bg-success/15 text-success"}`}>Save 80%</span>
+                  {k === "longterm" ? "Long-term" : "Monthly"}
+                  {k === "longterm" && savePct && savePct >= 10 && (
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${billing === k ? "bg-primary-foreground/20" : "bg-success/15 text-success"}`}>Save {savePct}%</span>
                   )}
                 </span>
               </button>
@@ -723,16 +762,16 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
                   {popular && (
                     <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 shadow">Most popular</Badge>
                   )}
-                  <h3 className="text-xl font-semibold">{p.name.replace(/ (Lifetime|Monthly)$/i, "")}</h3>
+                  <h3 className="text-xl font-semibold">{p.name.replace(/\s*(Lifetime|Monthly|Yearly|\d+[- ]?(Year|Month)s?)$/i, "")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">Up to {p.employee_limit} employees</p>
                   <div className="mt-4 flex items-baseline gap-1">
                     <span className="text-4xl font-bold tracking-tight">₹{Number(p.price_inr).toLocaleString("en-IN")}</span>
-                    <span className="text-sm text-muted-foreground">{billingLabel(p.billing)}</span>
+                    <span className="text-sm text-muted-foreground">{billingLabel(p)}</span>
                   </div>
                   <Button
                     className="w-full mt-5"
                     variant={popular ? "default" : "outline"}
-                    onClick={() => onCheckout({ id: p.id, name: p.name.replace(/ (Lifetime|Monthly)$/i, ''), price: Number(p.price_inr), billing: p.billing })}
+                    onClick={() => onCheckout({ id: p.id, name: p.name.replace(/\s*(Lifetime|Monthly|Yearly|\d+[- ]?(Year|Month)s?)$/i, ''), price: Number(p.price_inr), billing: p.billing })}
                   >
                     {isLoggedIn ? "Pay now" : "Sign up & pay"} <ArrowRight className="ml-1 h-4 w-4" />
                   </Button>
@@ -766,7 +805,7 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold">₹{Number(school.price_inr).toLocaleString("en-IN")}</div>
-                    <div className="text-[11px] text-muted-foreground">{billingLabel(school.billing)}</div>
+                    <div className="text-[11px] text-muted-foreground">{billingLabel(school)}</div>
                   </div>
                 </div>
                 <ul className="mt-4 grid gap-1.5 text-sm sm:grid-cols-2">
@@ -795,7 +834,7 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold">₹{Number(enterprise.price_inr).toLocaleString("en-IN")}</div>
-                    <div className="text-[11px] opacity-70">{billingLabel(enterprise.billing)}</div>
+                    <div className="text-[11px] opacity-70">{billingLabel(enterprise)}</div>
                   </div>
                 </div>
                 <ul className="mt-4 grid gap-1.5 text-sm sm:grid-cols-2">
