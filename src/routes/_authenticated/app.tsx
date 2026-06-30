@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, primaryRole } from "@/hooks/useCurrentUser";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles, TrendingUp, AlertTriangle, ShieldAlert, Clock, Camera, MessageCircle, Phone as PhoneIcon, MapPinned } from "lucide-react";
+import { Building2, Users, CheckCircle2, MapPin, Calendar, Wallet, Sparkles, TrendingUp, AlertTriangle, ShieldAlert, Clock, Camera, MessageCircle, Phone as PhoneIcon, MapPinned, Wrench } from "lucide-react";
 import { openWhatsapp } from "@/lib/whatsapp";
 import { formatTime12h } from "@/components/ui/time-input";
 import { toast } from "sonner";
@@ -284,6 +284,21 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
       : null;
 
   const isSuspended = subState === "suspended";
+
+  // Maintenance fee check — independent of plan expiry. A lifetime plan
+  // with an overdue maintenance fee should also go read-only, even though
+  // subState above would otherwise say "active" (the plan itself never expires).
+  const { data: maintInfo } = useQuery({
+    queryKey: ["maintenance-info", tenantId],
+    enabled: !!tenantId && !branchManagerMode,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("tenant_maintenance_info", { _tenant_id: tenantId });
+      if (error || !data || data.length === 0) return null;
+      return data[0] as { maintenance_due_at: string | null; maintenance_fee_inr: number | null; is_overdue: boolean; days_until_lockout: number | null };
+    },
+  });
+  const maintenanceOverdue = !!maintInfo?.is_overdue;
+  const isReadOnly = isSuspended || maintenanceOverdue;
   // Admin user IDs in this tenant — they aren't real staff, exclude from
   // staff lists, absent rosters, etc. Cached because role assignments rarely change.
   const { data: adminUserIds } = useQuery({
@@ -461,6 +476,41 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
             </p>
           </div>
           <Link to="/billing"><Button size="sm">Renew now</Button></Link>
+        </Card>
+      )}
+
+      {/* Maintenance fee overdue — independent of plan expiry; a lifetime
+          plan can hit this even though subState above says "active". */}
+      {subState !== "suspended" && maintenanceOverdue && (
+        <Card className="flex items-start gap-3 border-destructive/40 bg-destructive/5 p-4">
+          <Wrench className="h-5 w-5 shrink-0 text-destructive mt-0.5" />
+          <div className="flex-1 text-sm space-y-1">
+            <p className="font-semibold text-destructive">
+              Maintenance fee overdue. Your account is now read-only.
+            </p>
+            <p className="text-muted-foreground">
+              Your plan never expires, but its yearly maintenance fee
+              {maintInfo?.maintenance_fee_inr ? ` (₹${Number(maintInfo.maintenance_fee_inr).toLocaleString("en-IN")})` : ""} is unpaid.
+              All your data is safe — pay the fee and full access returns instantly.
+            </p>
+          </div>
+          <Link to="/billing"><Button size="sm" variant="destructive">Pay now</Button></Link>
+        </Card>
+      )}
+
+      {/* Maintenance fee due soon (not yet locked) — gentle heads-up. */}
+      {subState !== "suspended" && !maintenanceOverdue && maintInfo?.maintenance_due_at &&
+        new Date(maintInfo.maintenance_due_at) < new Date() && (
+        <Card className="flex items-start gap-3 border-amber-500/40 bg-amber-500/5 p-4">
+          <Wrench className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+          <div className="flex-1 text-sm space-y-1">
+            <p className="font-semibold text-amber-700 dark:text-amber-400">Maintenance fee due now.</p>
+            <p className="text-muted-foreground">
+              ₹{Number(maintInfo.maintenance_fee_inr ?? 0).toLocaleString("en-IN")} is due.
+              {maintInfo.days_until_lockout != null ? ` Pay within ${maintInfo.days_until_lockout} day${maintInfo.days_until_lockout === 1 ? "" : "s"} to avoid read-only mode.` : ""}
+            </p>
+          </div>
+          <Link to="/billing"><Button size="sm" variant="outline">Pay now</Button></Link>
         </Card>
       )}
 

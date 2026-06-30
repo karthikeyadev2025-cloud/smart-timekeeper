@@ -99,8 +99,20 @@ function PlansPage() {
               </div>
               <p className="mt-3 text-3xl font-bold">
                 ₹{Number(p.price_inr).toLocaleString("en-IN")}
-                <span className="text-sm font-normal text-muted-foreground">/{p.billing}</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {(() => {
+                    const m = (p as any).billing_period_months;
+                    if (m == null) return p.billing === "lifetime" ? " one-time" : `/${p.billing}`;
+                    if (m === 1) return "/month"; if (m === 12) return "/year";
+                    return m % 12 === 0 ? `/${m / 12} yrs` : `/${m} mo`;
+                  })()}
+                </span>
               </p>
+              {!!(p as any).maintenance_fee_inr && (
+                <Badge variant="outline" className="mt-1.5 w-fit gap-1 text-[10px] border-amber-500/40 text-amber-600">
+                  + ₹{Number((p as any).maintenance_fee_inr).toLocaleString("en-IN")}/yr maintenance after {Math.round(((p as any).maintenance_grace_months ?? 24) / 12)}y
+                </Badge>
+              )}
               <p className="mt-1 text-sm text-muted-foreground">{p.employee_limit ?? "Unlimited"} employees</p>
               <ul className="mt-4 space-y-1 text-sm flex-1">
                 {(Array.isArray(p.features) ? (p.features as string[]) : []).map((f: string) => (
@@ -158,10 +170,25 @@ function PlanForm({ initial, onDone }: { initial: Plan | null; onDone: () => voi
   const [active, setActive] = useState(initial?.is_active ?? true);
   const [loading, setLoading] = useState(false);
 
+  // Lifetime + recurring maintenance fee
+  const hasMaintenance = !!(initial as any)?.maintenance_fee_inr;
+  const [maintEnabled, setMaintEnabled] = useState(hasMaintenance);
+  const [maintFee, setMaintFee] = useState(String((initial as any)?.maintenance_fee_inr ?? ""));
+  const [maintGraceYears, setMaintGraceYears] = useState(
+    String(Math.round(((initial as any)?.maintenance_grace_months ?? 24) / 12))
+  );
+  const [maintPeriodMonths, setMaintPeriodMonths] = useState(
+    String((initial as any)?.maintenance_period_months ?? 12)
+  );
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) { toast.error("Name is required"); return; }
     if (!price || isNaN(Number(price))) { toast.error("Enter a valid price"); return; }
+    if (maintEnabled && (!maintFee || isNaN(Number(maintFee)) || Number(maintFee) <= 0)) {
+      toast.error("Enter a valid maintenance fee, or turn off the maintenance toggle");
+      return;
+    }
 
     const payload = {
       name: name.trim(),
@@ -175,6 +202,11 @@ function PlanForm({ initial, onDone }: { initial: Plan | null; onDone: () => voi
       features: featuresText.split("\n").map(s => s.trim()).filter(Boolean),
       display_order: Number(displayOrder) || 0,
       is_active: active,
+      // Maintenance fields — null out everything when toggled off so an
+      // old plan doesn't keep a stale fee active.
+      maintenance_fee_inr: maintEnabled ? Number(maintFee) : null,
+      maintenance_grace_months: maintEnabled ? Number(maintGraceYears) * 12 : null,
+      maintenance_period_months: maintEnabled ? Number(maintPeriodMonths) : 12,
     };
 
     setLoading(true);
@@ -288,6 +320,36 @@ function PlanForm({ initial, onDone }: { initial: Plan | null; onDone: () => voi
           <Label>Features (one per line)</Label>
           <Textarea rows={5} value={featuresText} onChange={e => setFeaturesText(e.target.value)} placeholder={"GPS attendance\nSelfie capture\nPayroll"} />
         </div>
+
+        {/* Recurring maintenance fee — for lifetime/long-term plans that
+            charge a smaller upkeep fee after an initial free period. */}
+        <div className="col-span-2 rounded-lg border p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <Switch checked={maintEnabled} onCheckedChange={setMaintEnabled} />
+            <Label>Charge a recurring maintenance fee</Label>
+          </div>
+          {maintEnabled && (
+            <div className="grid grid-cols-3 gap-3 pl-1">
+              <div className="space-y-1">
+                <Label className="text-xs">Fee (₹)</Label>
+                <Input type="number" min="1" value={maintFee} onChange={e => setMaintFee(e.target.value)} placeholder="2000" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Free for (years)</Label>
+                <Input type="number" min="0" value={maintGraceYears} onChange={e => setMaintGraceYears(e.target.value)} placeholder="2" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Then every (months)</Label>
+                <Input type="number" min="1" value={maintPeriodMonths} onChange={e => setMaintPeriodMonths(e.target.value)} placeholder="12" />
+              </div>
+              <p className="col-span-3 text-[10px] text-muted-foreground">
+                e.g. ₹2000, free for 2 years, then every 12 months → customer pays ₹2000/year starting year 3.
+                Unpaid maintenance puts the account read-only 14 days after it's due.
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="col-span-2 flex items-center gap-2">
           <Switch checked={active} onCheckedChange={setActive} />
           <Label>{active ? "Active — visible on pricing page" : "Inactive — hidden from public"}</Label>

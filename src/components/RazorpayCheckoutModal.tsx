@@ -29,7 +29,7 @@ declare global {
   }
 }
 
-async function loadRazorpayScript(): Promise<void> {
+export async function loadRazorpayScript(): Promise<void> {
   if (window.Razorpay) return;
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");

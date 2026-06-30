@@ -19,11 +19,22 @@ export async function requireActiveSubscription(supabase: SupabaseClient, tenant
     console.warn("[requireActiveSubscription] RPC failed, allowing:", error);
     return;
   }
-  if (state === "trial" || state === "active") return;
+  if (state !== "trial" && state !== "active") {
+    const reason = state === "expired" ? "Subscription expired"
+      : state === "trial_ended" ? "Trial period ended"
+      : state === "none" ? "No subscription found"
+      : `Subscription is ${state}`;
+    throw new Error(`${reason}. Renew your plan to make changes.`);
+  }
 
-  const reason = state === "expired" ? "Subscription expired"
-    : state === "trial_ended" ? "Trial period ended"
-    : state === "none" ? "No subscription found"
-    : `Subscription is ${state}`;
-  throw new Error(`${reason}. Renew your plan to make changes.`);
+  // Separately, check for overdue maintenance fee (applies even to plans
+  // with no expiry — e.g. lifetime plans with a yearly maintenance charge).
+  const { data: overdue, error: mErr } = await supabase.rpc("tenant_maintenance_overdue", { _tenant_id: tenantId });
+  if (mErr) {
+    console.warn("[requireActiveSubscription] maintenance check failed, allowing:", mErr);
+    return;
+  }
+  if (overdue) {
+    throw new Error("Maintenance fee overdue. Pay the maintenance fee in Billing to continue making changes.");
+  }
 }

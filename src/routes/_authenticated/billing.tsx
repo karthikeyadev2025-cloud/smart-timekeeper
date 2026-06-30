@@ -1,17 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser, primaryRole } from "@/hooks/useCurrentUser";
-import { RazorpayCheckoutModal } from "@/components/RazorpayCheckoutModal";
+import { RazorpayCheckoutModal, loadRazorpayScript } from "@/components/RazorpayCheckoutModal";
+import { createMaintenanceOrder, verifyRazorpayPayment } from "@/lib/payment.functions";
 import { useActivePromotion } from "@/lib/promotion";
 import {
   Wallet, CheckCircle2, Clock, Calendar, Sparkles, ShieldAlert, Receipt,
-  AlertTriangle, ArrowRight, Download,
+  AlertTriangle, ArrowRight, Download, Wrench, Loader2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/billing")({
@@ -46,6 +48,7 @@ function BillingPage() {
         </header>
 
         {tenantId && <CurrentPlanCard tenantId={tenantId} />}
+        {tenantId && <MaintenanceFeeCard tenantId={tenantId} />}
 
         <PromoBanner />
 
@@ -371,6 +374,111 @@ function PaymentHistoryCard({ tenantId }: { tenantId: string }) {
             </p>
           </div>
         ))}
+      </div>
+    </Card>
+  );
+}
+
+/* ─────────────── MAINTENANCE FEE CARD ───────────────
+ * Only renders when the tenant's plan has a maintenance fee configured
+ * (maintenance_due_at is non-null on their subscription). Shows the next
+ * due date, an overdue warning if applicable, and a Pay button that opens
+ * a lightweight Razorpay checkout for just the maintenance amount. */
+function MaintenanceFeeCard({ tenantId }: { tenantId: string }) {
+  const qc = useQueryClient();
+  const [paying, setPaying] = useState(false);
+
+  const { data: info } = useQuery({
+    queryKey: ["maintenance-info", tenantId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("tenant_maintenance_info", { _tenant_id: tenantId });
+      if (error || !data || data.length === 0) return null;
+      return data[0] as {
+        maintenance_due_at: string | null;
+        maintenance_fee_inr: number | null;
+        is_overdue: boolean;
+        days_until_lockout: number | null;
+      };
+    },
+  });
+
+  // No maintenance fee on this plan at all — render nothing.
+  if (!info || info.maintenance_due_at == null) return null;
+
+  const dueDate = new Date(info.maintenance_due_at);
+  const isPastDue = dueDate.getTime() < Date.now();
+  const fee = Number(info.maintenance_fee_inr ?? 0);
+
+  const handlePay = async () => {
+    setPaying(true);
+    try {
+      await loadRazorpayScript();
+      const order = await createMaintenanceOrder({ data: { tenant_id: tenantId } });
+
+      await new Promise<void>((resolve, reject) => {
+        const rzp = new (window as any).Razorpay({
+          key: order.key_id,
+          order_id: order.order_id,
+          amount: order.amount_paise,
+          currency: "INR",
+          name: "Punchly",
+          description: `${order.plan_name} — maintenance fee`,
+          theme: { color: "#4F46E5" },
+          modal: { ondismiss() { reject(new Error("dismissed")); } },
+          handler: async (response: any) => {
+            try {
+              await verifyRazorpayPayment({
+                data: {
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                },
+              });
+              toast.success("🎉 Maintenance fee paid — account fully active.");
+              qc.invalidateQueries({ queryKey: ["maintenance-info", tenantId] });
+              resolve();
+            } catch (err: any) {
+              reject(err);
+            }
+          },
+        });
+        rzp.open();
+      });
+    } catch (err: any) {
+      if (err.message !== "dismissed") toast.error(`Payment failed: ${err.message}`);
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  return (
+    <Card className={`overflow-hidden p-0 ${info.is_overdue ? "border-destructive/40" : isPastDue ? "border-amber-500/40" : "border-border/60"}`}>
+      <div className={`flex flex-wrap items-center justify-between gap-3 p-5 ${info.is_overdue ? "bg-destructive/10" : isPastDue ? "bg-amber-500/10" : "bg-muted/30"}`}>
+        <div className="flex items-start gap-3">
+          <div className={`rounded-lg p-2 ${info.is_overdue ? "bg-destructive/15 text-destructive" : "bg-primary/10 text-primary"}`}>
+            <Wrench className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-semibold">
+              {info.is_overdue ? "Maintenance fee overdue — account is read-only" : isPastDue ? "Maintenance fee due now" : "Maintenance fee"}
+            </p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {info.is_overdue
+                ? `Pay ₹${fee.toLocaleString("en-IN")} to restore full access immediately.`
+                : isPastDue
+                ? `₹${fee.toLocaleString("en-IN")} due now. ${info.days_until_lockout != null ? `Account becomes read-only in ${info.days_until_lockout} day${info.days_until_lockout === 1 ? "" : "s"} if unpaid.` : ""}`
+                : `Next payment of ₹${fee.toLocaleString("en-IN")} due on ${dueDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}.`}
+            </p>
+          </div>
+        </div>
+        <Button
+          onClick={handlePay}
+          disabled={paying || (!isPastDue && !info.is_overdue)}
+          variant={info.is_overdue ? "destructive" : "default"}
+        >
+          {paying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {paying ? "Processing…" : `Pay ₹${fee.toLocaleString("en-IN")}`}
+        </Button>
       </div>
     </Card>
   );

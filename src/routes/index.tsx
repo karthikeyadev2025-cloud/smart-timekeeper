@@ -768,6 +768,11 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
                     <span className="text-4xl font-bold tracking-tight">₹{Number(p.price_inr).toLocaleString("en-IN")}</span>
                     <span className="text-sm text-muted-foreground">{billingLabel(p)}</span>
                   </div>
+                  {!!(p as any).maintenance_fee_inr && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      + ₹{Number((p as any).maintenance_fee_inr).toLocaleString("en-IN")}/yr maintenance from year {Math.round(((p as any).maintenance_grace_months ?? 24) / 12) + 1}
+                    </p>
+                  )}
                   <Button
                     className="w-full mt-5"
                     variant={popular ? "default" : "outline"}
