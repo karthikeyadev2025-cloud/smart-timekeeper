@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
+import { StaffPhotoUpload } from "@/components/StaffPhotoUpload";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,6 +110,15 @@ function MyProfile() {
           </div>
         </Card>
 
+        {/* ID card photo — used on the /my-id-card page. Both staff and admin
+            can upload (RLS gates writes to own-photo OR tenant-admin-of-owner). */}
+        {user?.userId && (
+          <StaffPhotoUpload
+            userId={user.userId}
+            currentName={user?.profile?.full_name}
+          />
+        )}
+
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="p-5 space-y-4">
             <h3 className="flex items-center gap-2 font-semibold"><CalendarHeart className="h-4 w-4" /> Personal details</h3>
@@ -123,6 +133,18 @@ function MyProfile() {
                     <SelectItem value="male">Male</SelectItem>
                     <SelectItem value="female">Female</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Blood group</Label>
+                <Select value={get("blood_group") || "unset"} onValueChange={(v) => set("blood_group")(v === "unset" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unset">—</SelectItem>
+                    {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map((bg) => (
+                      <SelectItem key={bg} value={bg}>{bg}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

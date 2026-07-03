@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Share2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { IdCardFront, IdCardBack, type StaffForCard, type TenantForCard } from "@/components/IdCard";
+import { useStaffPhotoUrl } from "@/components/StaffPhotoUpload";
 import { cardToDataUrl, downloadDataUrl, shareCard } from "@/lib/id-card-export";
 
 export function IdCardPreviewModal({
@@ -25,6 +26,9 @@ export function IdCardPreviewModal({
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<"idle" | "download" | "share">("idle");
+  // Fresh signed URL for the photo — avatar_url on the row may be stale
+  const { data: photoUrl } = useStaffPhotoUrl(staff.id);
+  const staffWithFreshPhoto = { ...staff, avatar_url: photoUrl ?? staff.avatar_url };
 
   // Verify URL — a public route that shows a minimal "This is a valid Punchly
   // ID for {name} at {tenant}" page. Even before we build that route, scanning
@@ -70,10 +74,10 @@ export function IdCardPreviewModal({
 
         <div className="flex flex-col items-center gap-4 py-2">
           <div ref={frontRef}>
-            <IdCardFront staff={staff} tenant={tenant} verifyUrl={verifyUrl} />
+            <IdCardFront staff={staffWithFreshPhoto} tenant={tenant} verifyUrl={verifyUrl} />
           </div>
           <div ref={backRef}>
-            <IdCardBack staff={staff} tenant={tenant} />
+            <IdCardBack staff={staffWithFreshPhoto} tenant={tenant} />
           </div>
         </div>
 

@@ -98,6 +98,7 @@ const updateInput = z.object({
   // Personal details
   date_of_birth: z.string().trim().max(10).nullable().optional(),
   gender: z.enum(["male", "female", "other"]).nullable().optional(),
+  blood_group: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).nullable().optional(),
   date_of_joining: z.string().trim().max(10).nullable().optional(),
   address: z.string().trim().max(500).nullable().optional(),
   emergency_contact_name: z.string().trim().max(100).nullable().optional(),
@@ -134,6 +135,7 @@ export const updateStaff = createServerFn({ method: "POST" })
     if (data.is_field_staff !== undefined) profileUpdate.is_field_staff = data.is_field_staff;
     if (data.date_of_birth !== undefined) profileUpdate.date_of_birth = data.date_of_birth || null;
     if (data.gender !== undefined) profileUpdate.gender = data.gender;
+    if (data.blood_group !== undefined) profileUpdate.blood_group = data.blood_group || null;
     if (data.date_of_joining !== undefined) profileUpdate.date_of_joining = data.date_of_joining || null;
     if (data.address !== undefined) profileUpdate.address = data.address || null;
     if (data.emergency_contact_name !== undefined) profileUpdate.emergency_contact_name = data.emergency_contact_name || null;
@@ -241,6 +243,7 @@ export const deleteStaff = createServerFn({ method: "POST" })
 const selfUpdateInput = z.object({
   date_of_birth: z.string().trim().max(10).nullable().optional(),
   gender: z.enum(["male", "female", "other"]).nullable().optional(),
+  blood_group: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).nullable().optional(),
   address: z.string().trim().max(500).nullable().optional(),
   emergency_contact_name: z.string().trim().max(100).nullable().optional(),
   emergency_contact_phone: z.string().trim().max(20).nullable().optional(),
@@ -258,6 +261,7 @@ export const updateMyProfile = createServerFn({ method: "POST" })
     const update: Record<string, unknown> = {};
     if (data.date_of_birth !== undefined) update.date_of_birth = data.date_of_birth || null;
     if (data.gender !== undefined) update.gender = data.gender;
+    if (data.blood_group !== undefined) update.blood_group = data.blood_group || null;
     if (data.address !== undefined) update.address = data.address || null;
     if (data.emergency_contact_name !== undefined) update.emergency_contact_name = data.emergency_contact_name || null;
     if (data.emergency_contact_phone !== undefined) update.emergency_contact_phone = data.emergency_contact_phone || null;

@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IdCardPreviewModal } from "@/components/IdCardPreviewModal";
+import { StaffPhotoUpload } from "@/components/StaffPhotoUpload";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -162,6 +163,7 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
     monthly_salary: staff.monthly_salary?.toString() ?? "",
     date_of_birth: staff.date_of_birth ?? "",
     gender: staff.gender ?? "",
+    blood_group: staff.blood_group ?? "",
     date_of_joining: staff.date_of_joining ?? "",
     address: staff.address ?? "",
     emergency_contact_name: staff.emergency_contact_name ?? "",
@@ -184,6 +186,7 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
           monthly_salary: Number(form.monthly_salary) || 0,
           date_of_birth: form.date_of_birth || null,
           gender: (form.gender || null) as any,
+          blood_group: (form.blood_group || null) as any,
           date_of_joining: form.date_of_joining || null,
           address: form.address || null,
           emergency_contact_name: form.emergency_contact_name || null,
@@ -205,6 +208,7 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
     <div className="grid gap-4 lg:grid-cols-2">
       <Card className="p-5 space-y-4">
         <h3 className="flex items-center gap-2 font-semibold"><Pencil className="h-4 w-4" /> Basic details</h3>
+        <StaffPhotoUpload userId={staff.id} currentName={form.full_name} variant="inline" />
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1 col-span-2"><Label>Full name</Label><Input value={form.full_name} onChange={(e) => set("full_name")(e.target.value)} /></div>
           <div className="space-y-1"><Label>Designation</Label><Input value={form.designation} onChange={(e) => set("designation")(e.target.value)} /></div>
@@ -229,7 +233,19 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1 col-span-2"><Label>Date of joining</Label><Input type="date" value={form.date_of_joining} onChange={(e) => set("date_of_joining")(e.target.value)} /></div>
+          <div className="space-y-1">
+            <Label>Blood group</Label>
+            <Select value={form.blood_group || "unset"} onValueChange={(v) => set("blood_group")(v === "unset" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unset">—</SelectItem>
+                {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map((bg) => (
+                  <SelectItem key={bg} value={bg}>{bg}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1"><Label>Date of joining</Label><Input type="date" value={form.date_of_joining} onChange={(e) => set("date_of_joining")(e.target.value)} /></div>
           <div className="space-y-1 col-span-2"><Label>Address</Label><Textarea value={form.address} onChange={(e) => set("address")(e.target.value)} rows={2} /></div>
           <div className="space-y-1"><Label>Emergency contact name</Label><Input value={form.emergency_contact_name} onChange={(e) => set("emergency_contact_name")(e.target.value)} /></div>
           <div className="space-y-1"><Label>Emergency contact phone</Label><Input value={form.emergency_contact_phone} onChange={(e) => set("emergency_contact_phone")(e.target.value.replace(/[^0-9]/g, ""))} className="font-mono" /></div>
