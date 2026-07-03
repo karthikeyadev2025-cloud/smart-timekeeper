@@ -59,11 +59,32 @@ async function inlineImagesInNode(node: HTMLElement): Promise<() => void> {
  * Convert one or two elements (front, optional back) to a single PNG data URL.
  * When both are provided they're stacked vertically with a small gap.
  * Scale of 4 gives us a crisp export (~1370px wide for a card).
+ *
+ * Before capture:
+ *   - Preload all <img> as data URLs (prevents CORS canvas taint)
+ *   - Strip border-radius + box-shadow from the card outer so the exported
+ *     PNG has clean straight edges (needed for print / ID-card printers)
+ *     and no shadow bleeding into the transparent area around the card
+ * After capture: restore both.
  */
 export async function cardToDataUrl(front: HTMLElement, back?: HTMLElement | null): Promise<string> {
-  // Inline external images to data URLs first — sidesteps CORS taint
+  // 1) Inline external images to data URLs (sidesteps CORS taint)
   const restoreFront = await inlineImagesInNode(front);
   const restoreBack = back ? await inlineImagesInNode(back) : null;
+
+  // 2) Strip radius/shadow for the capture — restored in the finally block.
+  // Print use case needs clean edges; on-screen the styling stays via CSS.
+  const stripStyles = (el: HTMLElement) => {
+    const prev = { borderRadius: el.style.borderRadius, boxShadow: el.style.boxShadow };
+    el.style.borderRadius = "0";
+    el.style.boxShadow = "none";
+    return () => {
+      el.style.borderRadius = prev.borderRadius;
+      el.style.boxShadow = prev.boxShadow;
+    };
+  };
+  const restoreFrontStyle = stripStyles(front);
+  const restoreBackStyle = back ? stripStyles(back) : null;
 
   try {
     const scale = 4;
@@ -71,14 +92,14 @@ export async function cardToDataUrl(front: HTMLElement, back?: HTMLElement | nul
       scale,
       useCORS: true,          // no-op now (all images are data URLs), belt+braces
       allowTaint: false,
-      backgroundColor: null,
+      backgroundColor: "#ffffff",
       logging: false,
     });
 
     if (!back) return canvasFront.toDataURL("image/png");
 
     const canvasBack = await html2canvas(back, {
-      scale, useCORS: true, allowTaint: false, backgroundColor: null, logging: false,
+      scale, useCORS: true, allowTaint: false, backgroundColor: "#ffffff", logging: false,
     });
 
     // Stack them vertically. Width = max, height = sum + small gap.
@@ -91,7 +112,8 @@ export async function cardToDataUrl(front: HTMLElement, back?: HTMLElement | nul
     combined.height = height;
     const ctx = combined.getContext("2d");
     if (!ctx) return canvasFront.toDataURL("image/png");
-    // Fill with white so the PNG doesn't have a black background
+    // Fill with white so the PNG doesn't have a transparent background
+    // (which would render as black when pasted into some apps)
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
     ctx.drawImage(canvasFront, 0, 0);
@@ -100,6 +122,8 @@ export async function cardToDataUrl(front: HTMLElement, back?: HTMLElement | nul
   } finally {
     restoreFront();
     if (restoreBack) restoreBack();
+    restoreFrontStyle();
+    if (restoreBackStyle) restoreBackStyle();
   }
 }
 
