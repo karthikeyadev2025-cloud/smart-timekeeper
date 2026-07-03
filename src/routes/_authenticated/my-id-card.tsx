@@ -37,7 +37,7 @@ function MyIdCardPage() {
 
       const { data: tenant } = await (supabase as any)
         .from("tenants")
-        .select("id, name, logo_url, id_card_accent")
+        .select("id, name, logo_url, id_card_accent, id_card_template")
         .eq("id", (profile as any).tenant_id ?? user?.tenant?.id)
         .maybeSingle();
 

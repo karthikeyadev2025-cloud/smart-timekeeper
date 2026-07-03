@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { updateOwnCompanyProfile } from "@/lib/admin.functions";
+import { IdCardTemplateChooser } from "@/components/IdCardTemplateChooser";
 import { Building2, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,7 +31,7 @@ function CompanyProfilePage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("tenants")
-        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type")
+        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent")
         .eq("id", tenantId!)
         .maybeSingle();
       return data;
@@ -44,6 +45,8 @@ function CompanyProfilePage() {
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [logoUploading, setLogoUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [cardTemplate, setCardTemplate] = useState<"corporate" | "modern" | "compact">("corporate");
+  const [cardAccent, setCardAccent] = useState<string>("#4F46E5");
 
   // Sync state when tenant loads
   useEffect(() => {
@@ -53,6 +56,8 @@ function CompanyProfilePage() {
     setContactPhone(tenant.contact_phone ?? "");
     setPrimaryColor(tenant.primary_color ?? "#4F46E5");
     setLogoUrl(tenant.logo_url ?? "");
+    setCardTemplate(((tenant as any).id_card_template ?? "corporate") as any);
+    setCardAccent((tenant as any).id_card_accent ?? "#4F46E5");
   }, [tenant]);
 
   if (!tenantId) {
@@ -94,6 +99,8 @@ function CompanyProfilePage() {
           primary_color: primaryColor || null,
           contact_email: contactEmail || null,
           contact_phone: contactPhone || null,
+          id_card_template: cardTemplate,
+          id_card_accent: cardAccent || null,
         },
       });
       toast.success("Company profile updated");
@@ -191,6 +198,48 @@ function CompanyProfilePage() {
           <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
             <p><span className="font-medium text-foreground">Slug:</span> <span className="font-mono">{tenant?.slug ?? "—"}</span></p>
             <p><span className="font-medium text-foreground">Type:</span> {tenant?.tenant_type === "school" ? "School / college / coaching" : "Business"}</p>
+          </div>
+
+          {/* ─── ID card template picker ─── */}
+          <div className="space-y-3 border-t pt-5">
+            <div>
+              <Label className="text-base">Staff ID card design</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Pick a template. Every staff member's ID card will use it.
+              </p>
+            </div>
+
+            <IdCardTemplateChooser
+              value={cardTemplate}
+              onChange={setCardTemplate}
+              accent={cardAccent}
+              tenantName={name || "Your Company"}
+              logoUrl={logoUrl}
+            />
+
+            <div className="flex items-center gap-3 pt-2">
+              <Label htmlFor="cp-accent" className="text-sm">Card accent color</Label>
+              <input
+                id="cp-accent"
+                type="color"
+                value={cardAccent}
+                onChange={(e) => setCardAccent(e.target.value)}
+                className="h-9 w-16 cursor-pointer rounded border"
+              />
+              <Input
+                value={cardAccent}
+                onChange={(e) => setCardAccent(e.target.value)}
+                className="w-32 font-mono text-xs"
+                maxLength={7}
+              />
+              <button
+                type="button"
+                onClick={() => setCardAccent("#4F46E5")}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Reset
+              </button>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t">

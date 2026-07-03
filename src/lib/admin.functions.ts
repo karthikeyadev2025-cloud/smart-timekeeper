@@ -313,6 +313,8 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     primary_color?: string | null;
     contact_email?: string | null;
     contact_phone?: string | null;
+    id_card_template?: "corporate" | "modern" | "compact" | null;
+    id_card_accent?: string | null;
   }) => data)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -335,6 +337,21 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     if (data.primary_color !== undefined) update.primary_color = data.primary_color || null;
     if (data.contact_email !== undefined) update.contact_email = data.contact_email || null;
     if (data.contact_phone !== undefined) update.contact_phone = data.contact_phone || null;
+    if (data.id_card_template !== undefined) {
+      // Validate against allowed values (the DB has a CHECK constraint too,
+      // but a clear error here beats a raw pg exception).
+      if (data.id_card_template && !["corporate", "modern", "compact"].includes(data.id_card_template)) {
+        throw new Error("Invalid ID card template");
+      }
+      update.id_card_template = data.id_card_template || "corporate";
+    }
+    if (data.id_card_accent !== undefined) {
+      // Basic hex validation. NULL clears it (falls back to the app's indigo).
+      if (data.id_card_accent && !/^#[0-9a-fA-F]{6}$/.test(data.id_card_accent)) {
+        throw new Error("Accent color must be a 6-digit hex (e.g. #4F46E5)");
+      }
+      update.id_card_accent = data.id_card_accent || null;
+    }
 
     if (Object.keys(update).length === 0) return { ok: true };
 

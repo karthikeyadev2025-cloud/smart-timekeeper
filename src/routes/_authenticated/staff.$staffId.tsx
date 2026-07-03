@@ -126,7 +126,7 @@ function StaffDetailsPage() {
           open={showIdCard}
           onOpenChange={setShowIdCard}
           staff={{ ...s, branch_name: (s as any).branches?.name ?? null }}
-          tenant={{ id: user?.tenant?.id ?? "", name: user?.tenant?.name ?? "", logo_url: (user?.tenant as any)?.logo_url, id_card_accent: (user?.tenant as any)?.id_card_accent }}
+          tenant={{ id: user?.tenant?.id ?? "", name: user?.tenant?.name ?? "", logo_url: (user?.tenant as any)?.logo_url, id_card_accent: (user?.tenant as any)?.id_card_accent, id_card_template: (user?.tenant as any)?.id_card_template }}
         />
 
         <Tabs defaultValue="profile">

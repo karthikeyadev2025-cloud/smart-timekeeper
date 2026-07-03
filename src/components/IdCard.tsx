@@ -43,6 +43,7 @@ export type TenantForCard = {
   name: string;
   logo_url?: string | null;
   id_card_accent?: string | null;
+  id_card_template?: "corporate" | "modern" | "compact" | null;
 };
 
 function initials(name?: string | null): string {
@@ -64,8 +65,36 @@ function maskId(v?: string | null): string {
   return "•••• " + s.slice(-4);
 }
 
-/* ─────────────── FRONT ─────────────── */
-export function IdCardFront({ staff, tenant, verifyUrl, className }: {
+export type IdCardTemplate = "corporate" | "modern" | "compact";
+
+/* ─────────────── DISPATCHERS ───────────────
+ * These are what consumers use. They pick the right front/back rendering
+ * based on tenant.id_card_template (falls back to 'corporate' if unset). */
+export function IdCardFront(props: {
+  staff: StaffForCard;
+  tenant: TenantForCard;
+  verifyUrl: string;
+  className?: string;
+}) {
+  const t = (props.tenant.id_card_template as IdCardTemplate) || "corporate";
+  if (t === "modern") return <ModernFront {...props} />;
+  if (t === "compact") return <CompactFront {...props} />;
+  return <CorporateFront {...props} />;
+}
+
+export function IdCardBack(props: {
+  staff: StaffForCard;
+  tenant: TenantForCard;
+  className?: string;
+}) {
+  const t = (props.tenant.id_card_template as IdCardTemplate) || "corporate";
+  if (t === "modern") return <ModernBack {...props} />;
+  if (t === "compact") return <CompactBack {...props} />;
+  return <CorporateBack {...props} />;
+}
+
+/* ─────────────── CORPORATE (default, was the original design) ─────────────── */
+function CorporateFront({ staff, tenant, verifyUrl, className }: {
   staff: StaffForCard;
   tenant: TenantForCard;
   verifyUrl: string;
@@ -196,8 +225,8 @@ export function IdCardFront({ staff, tenant, verifyUrl, className }: {
   );
 }
 
-/* ─────────────── BACK ─────────────── */
-export function IdCardBack({ staff, tenant, className }: {
+/* ─────────────── CORPORATE BACK ─────────────── */
+function CorporateBack({ staff, tenant, className }: {
   staff: StaffForCard;
   tenant: TenantForCard;
   className?: string;
@@ -289,6 +318,375 @@ function BackRow({ label, value, span, accent, bold }: {
         marginTop: 1,
       }}>
         {value}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── MODERN ───────────────
+ * A dark hero band takes the top third with the tenant name and a large
+ * headline treatment. The photo is a big circle overlapping the band. Below
+ * is a single-column, generous-whitespace layout. Feels newer and more
+ * design-forward than the classic corporate look.
+ */
+function ModernFront({ staff, tenant, verifyUrl, className }: {
+  staff: StaffForCard;
+  tenant: TenantForCard;
+  verifyUrl: string;
+  className?: string;
+}) {
+  const accent = tenant.id_card_accent || "#4F46E5";
+
+  return (
+    <div
+      className={className}
+      style={{
+        width: CARD_W, height: CARD_H,
+        background: "#ffffff",
+        borderRadius: 12,
+        boxShadow: "0 8px 24px -12px rgba(15, 23, 42, 0.35)",
+        overflow: "hidden",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        color: "#0F172A",
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Hero band with big tenant name */}
+      <div style={{
+        background: `linear-gradient(135deg, #0F172A 0%, ${accent} 130%)`,
+        color: "#ffffff",
+        padding: "14px 16px 34px",
+        position: "relative",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {tenant.logo_url ? (
+            <img src={tenant.logo_url} alt="" crossOrigin="anonymous"
+              style={{ height: 20, width: 20, borderRadius: 4, background: "#ffffff", padding: 2, objectFit: "contain" }} />
+          ) : null}
+          <span style={{ fontSize: 8, opacity: 0.7, letterSpacing: 2, textTransform: "uppercase", fontWeight: 600 }}>
+            {tenant.name}
+          </span>
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1, marginTop: 6 }}>
+          EMPLOYEE
+        </div>
+      </div>
+
+      {/* Photo overlapping the band */}
+      <div style={{ position: "absolute", top: 62, left: 16 }}>
+        <div style={{
+          width: 78, height: 78,
+          borderRadius: "50%",
+          background: "#F1F5F9",
+          border: `3px solid #ffffff`,
+          boxShadow: "0 2px 8px rgba(15,23,42,0.2)",
+          overflow: "hidden",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {staff.avatar_url ? (
+            <img src={staff.avatar_url} alt="" crossOrigin="anonymous"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <div style={{ fontSize: 28, fontWeight: 700, color: accent }}>
+              {initials(staff.full_name)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Body — offset to make room for the overlapping photo */}
+      <div style={{ padding: "24px 16px 8px 104px", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>
+          {staff.full_name || "—"}
+        </div>
+        {staff.designation && (
+          <div style={{ fontSize: 9, color: "#64748B", marginTop: 2 }}>
+            {staff.designation}
+          </div>
+        )}
+        <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 5 }}>
+          <div style={{ height: 2, width: 14, background: accent, borderRadius: 1 }} />
+          <span style={{ fontSize: 10, fontWeight: 700, color: accent, letterSpacing: 0.5 }}>
+            {staff.staff_id || "EMP —"}
+          </span>
+        </div>
+        {staff.branch_name && (
+          <div style={{ fontSize: 8, color: "#94A3B8", marginTop: 3, letterSpacing: 0.5, textTransform: "uppercase" }}>
+            {staff.branch_name}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom row: QR + phone */}
+      <div style={{
+        padding: "6px 16px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "#F8FAFC", borderTop: "1px solid #E2E8F0",
+      }}>
+        {staff.phone && (
+          <div style={{ fontSize: 8, color: "#64748B" }}>
+            <span style={{ letterSpacing: 1, textTransform: "uppercase", fontWeight: 600 }}>Contact</span>
+            <div style={{ color: "#0F172A", fontWeight: 600, marginTop: 1 }}>{staff.phone}</div>
+          </div>
+        )}
+        <div style={{ background: "#ffffff", padding: 3, borderRadius: 4, border: "1px solid #E2E8F0" }}>
+          <QRCodeSVG value={verifyUrl} size={38} level="M" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModernBack({ staff, tenant, className }: {
+  staff: StaffForCard;
+  tenant: TenantForCard;
+  className?: string;
+}) {
+  const accent = tenant.id_card_accent || "#4F46E5";
+  return (
+    <div
+      className={className}
+      style={{
+        width: CARD_W, height: CARD_H,
+        background: "#ffffff",
+        borderRadius: 12,
+        boxShadow: "0 8px 24px -12px rgba(15, 23, 42, 0.35)",
+        overflow: "hidden",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        color: "#0F172A",
+        display: "flex", flexDirection: "column",
+      }}
+    >
+      <div style={{ background: "#0F172A", color: "#ffffff", padding: "8px 16px" }}>
+        <div style={{ fontSize: 8, letterSpacing: 2, textTransform: "uppercase", opacity: 0.7, fontWeight: 600 }}>
+          Employee Details
+        </div>
+      </div>
+
+      <div style={{ padding: "10px 16px", flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", fontSize: 9 }}>
+          <BackRow label="Date of birth" value={fmtDate(staff.date_of_birth)} />
+          <BackRow label="Blood group" value={staff.blood_group || "—"} accent={accent} bold={!!staff.blood_group} />
+          <BackRow label="Emergency contact" value={staff.emergency_contact_name || "—"} />
+          <BackRow label="Emergency phone" value={staff.emergency_contact_phone || "—"} />
+          {staff.id_proof_type && (
+            <BackRow label={staff.id_proof_type.toUpperCase()} value={maskId(staff.id_proof_number)} span={2} />
+          )}
+          {staff.address && (
+            <BackRow label="Address" value={staff.address} span={2} />
+          )}
+        </div>
+
+        <div style={{ marginTop: "auto", display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ borderBottom: `2px solid ${accent}`, height: 20 }} />
+            <div style={{ fontSize: 7, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
+              Signature
+            </div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ borderBottom: `2px solid ${accent}`, height: 20 }} />
+            <div style={{ fontSize: 7, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
+              Authority
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        background: "#0F172A", color: "#ffffff",
+        padding: "5px 16px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        fontSize: 7, opacity: 0.85,
+      }}>
+        <span>Property of {tenant.name}</span>
+        <span style={{ fontWeight: 600 }}>{staff.staff_id || ""}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── COMPACT ───────────────
+ * Dense landscape layout with a thin colored bar on the left. Everything
+ * fits in a smaller visual footprint. Best when the card is worn on a
+ * lanyard where users look at it at a glance.
+ */
+function CompactFront({ staff, tenant, verifyUrl, className }: {
+  staff: StaffForCard;
+  tenant: TenantForCard;
+  verifyUrl: string;
+  className?: string;
+}) {
+  const accent = tenant.id_card_accent || "#4F46E5";
+
+  return (
+    <div
+      className={className}
+      style={{
+        width: CARD_W, height: CARD_H,
+        background: "#ffffff",
+        borderRadius: 12,
+        boxShadow: "0 8px 24px -12px rgba(15, 23, 42, 0.35)",
+        overflow: "hidden",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        color: "#0F172A",
+        display: "flex",
+        position: "relative",
+      }}
+    >
+      {/* Left accent bar with tenant */}
+      <div style={{
+        width: 40,
+        background: accent,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between",
+        padding: "12px 0",
+        color: "#ffffff",
+      }}>
+        {tenant.logo_url ? (
+          <img src={tenant.logo_url} alt="" crossOrigin="anonymous"
+            style={{ height: 26, width: 26, borderRadius: 4, background: "#ffffff", padding: 2, objectFit: "contain" }} />
+        ) : (
+          <div style={{
+            height: 26, width: 26, borderRadius: 4, background: "rgba(255,255,255,0.2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 11, fontWeight: 700
+          }}>
+            {initials(tenant.name)}
+          </div>
+        )}
+        {/* Vertical text */}
+        <div style={{
+          fontSize: 7, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase",
+          writingMode: "vertical-rl", transform: "rotate(180deg)",
+        }}>
+          Employee ID
+        </div>
+        <div style={{ background: "#ffffff", padding: 2, borderRadius: 3 }}>
+          <QRCodeSVG value={verifyUrl} size={34} level="M" />
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div style={{ flex: 1, padding: "10px 12px", display: "flex", gap: 10 }}>
+        {/* Photo */}
+        <div style={{
+          width: 70, height: 90,
+          borderRadius: 4,
+          background: "#F1F5F9",
+          border: `1.5px solid #E2E8F0`,
+          overflow: "hidden",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0,
+        }}>
+          {staff.avatar_url ? (
+            <img src={staff.avatar_url} alt="" crossOrigin="anonymous"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <div style={{ fontSize: 26, fontWeight: 700, color: accent }}>
+              {initials(staff.full_name)}
+            </div>
+          )}
+        </div>
+
+        {/* Details */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ fontSize: 7, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700, color: accent }}>
+            {tenant.name}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.05, marginTop: 2 }}>
+            {staff.full_name || "—"}
+          </div>
+          {staff.designation && (
+            <div style={{ fontSize: 9, color: "#475569", lineHeight: 1.2 }}>
+              {staff.designation}
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3, marginTop: 4, fontSize: 7 }}>
+            <div>
+              <div style={{ color: "#94A3B8", letterSpacing: 1, textTransform: "uppercase", fontWeight: 600 }}>ID</div>
+              <div style={{ fontWeight: 700, fontSize: 9, marginTop: 1 }}>{staff.staff_id || "—"}</div>
+            </div>
+            {staff.blood_group && (
+              <div>
+                <div style={{ color: "#94A3B8", letterSpacing: 1, textTransform: "uppercase", fontWeight: 600 }}>Blood</div>
+                <div style={{ fontWeight: 700, fontSize: 9, marginTop: 1, color: accent }}>{staff.blood_group}</div>
+              </div>
+            )}
+            {staff.date_of_joining && (
+              <div>
+                <div style={{ color: "#94A3B8", letterSpacing: 1, textTransform: "uppercase", fontWeight: 600 }}>Joined</div>
+                <div style={{ fontWeight: 600, fontSize: 8, marginTop: 1 }}>{fmtDate(staff.date_of_joining)}</div>
+              </div>
+            )}
+            {staff.branch_name && (
+              <div>
+                <div style={{ color: "#94A3B8", letterSpacing: 1, textTransform: "uppercase", fontWeight: 600 }}>Branch</div>
+                <div style={{ fontWeight: 600, fontSize: 8, marginTop: 1 }}>{staff.branch_name}</div>
+              </div>
+            )}
+          </div>
+
+          {staff.phone && (
+            <div style={{ fontSize: 8, color: "#64748B", marginTop: "auto", fontWeight: 500 }}>
+              📞 {staff.phone}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CompactBack({ staff, tenant, className }: {
+  staff: StaffForCard;
+  tenant: TenantForCard;
+  className?: string;
+}) {
+  const accent = tenant.id_card_accent || "#4F46E5";
+  return (
+    <div
+      className={className}
+      style={{
+        width: CARD_W, height: CARD_H,
+        background: "#ffffff",
+        borderRadius: 12,
+        boxShadow: "0 8px 24px -12px rgba(15, 23, 42, 0.35)",
+        overflow: "hidden",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        color: "#0F172A",
+        display: "flex",
+      }}
+    >
+      <div style={{ width: 6, background: accent }} />
+
+      <div style={{ flex: 1, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontSize: 8, letterSpacing: 1.5, textTransform: "uppercase", color: "#64748B", fontWeight: 700 }}>
+          If found, return to
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 700 }}>{tenant.name}</div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 10px", fontSize: 9, marginTop: 4 }}>
+          <BackRow label="DOB" value={fmtDate(staff.date_of_birth)} />
+          <BackRow label="Blood" value={staff.blood_group || "—"} accent={accent} bold={!!staff.blood_group} />
+          <BackRow label="Emergency" value={staff.emergency_contact_phone || "—"} span={2} />
+          {staff.id_proof_type && (
+            <BackRow label={staff.id_proof_type.toUpperCase()} value={maskId(staff.id_proof_number)} span={2} />
+          )}
+        </div>
+
+        <div style={{
+          marginTop: "auto",
+          borderTop: "1px dashed #CBD5E1",
+          paddingTop: 4,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          fontSize: 7, color: "#94A3B8",
+        }}>
+          <span>Not transferable · Punchly</span>
+          <span style={{ fontWeight: 600 }}>{staff.staff_id || ""}</span>
+        </div>
       </div>
     </div>
   );
