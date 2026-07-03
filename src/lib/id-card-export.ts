@@ -1,17 +1,21 @@
 /**
- * Capture a rendered ID card DOM node and turn it into PNG / PDF / a share
- * intent. All the DOM heavy lifting is done by html2canvas + jspdf which are
- * already project dependencies (used elsewhere for payslips).
+ * Capture a rendered ID card DOM node and turn it into PNG / a share intent.
+ *
+ * WHY html-to-image (not html2canvas): the app's stylesheet uses oklch()
+ * color functions (Tailwind v4 palette). html2canvas re-implements CSS
+ * parsing and CRASHES on oklch — the exact cause of "download does
+ * nothing". html-to-image renders via SVG <foreignObject>, i.e. the
+ * browser's own engine paints the pixels, so every modern CSS feature
+ * works exactly as on screen.
  */
 
-import html2canvas from "html2canvas";
+import { toPng } from "html-to-image";
 
 /**
- * Preload every <img> inside a node so that html2canvas sees fully-loaded
- * pixels regardless of CORS state. We fetch each image, convert the bytes
- * to a data URL, and replace the src in-place before capture. This
- * completely sidesteps the "canvas tainted by cross-origin data"
- * SecurityError that otherwise makes toDataURL() throw at the last step.
+ * Preload every <img> inside a node as a data URL. foreignObject rendering
+ * requires images to be same-origin or CORS-clean; converting to data URLs
+ * beforehand guarantees the capture never has blank/missing images
+ * (e.g. Supabase Storage signed URLs, tenant logos).
  */
 async function inlineImagesInNode(node: HTMLElement): Promise<() => void> {
   const imgs = Array.from(node.querySelectorAll("img"));
@@ -20,7 +24,6 @@ async function inlineImagesInNode(node: HTMLElement): Promise<() => void> {
   await Promise.all(imgs.map(async (img) => {
     const src = img.getAttribute("src");
     if (!src || src.startsWith("data:")) return;
-
     try {
       const res = await fetch(src, { mode: "cors" });
       if (!res.ok) return;
@@ -33,97 +36,82 @@ async function inlineImagesInNode(node: HTMLElement): Promise<() => void> {
       });
       originals.push({ img, src });
       img.setAttribute("src", dataUrl);
-      // Wait for the browser to actually decode the swapped src
       await new Promise<void>((resolve) => {
         if (img.complete) return resolve();
         img.onload = () => resolve();
         img.onerror = () => resolve();
       });
     } catch (e) {
-      // If a specific image can't be inlined (e.g. expired signed URL),
-      // just leave its src alone — the card will render with a broken
-      // photo but at least the rest of the card exports fine, and the
-      // fallback initials/logo placeholder will show through.
       console.warn("[id-card] could not inline image", src, e);
     }
   }));
 
-  // Return a restore fn so we don't leave data-URL srcs on the live DOM
-  // (which would balloon memory for large cards visible on screen).
   return () => {
     for (const { img, src } of originals) img.setAttribute("src", src);
   };
 }
 
+/** Render one card side to a PNG data URL at 4x resolution. */
+async function captureSide(el: HTMLElement): Promise<string> {
+  return toPng(el, {
+    pixelRatio: 4,
+    backgroundColor: "#ffffff",
+    // Applied to the CLONED node only — live DOM keeps its rounded corners
+    // and shadow; the exported PNG gets clean straight edges for printing.
+    style: {
+      borderRadius: "0",
+      boxShadow: "none",
+      margin: "0",
+    },
+    // Skip font embedding — the card uses system-ui exclusively, and
+    // skipping avoids CORS fetches of any linked webfonts (Google Fonts
+    // would otherwise fail and reject the whole capture).
+    skipFonts: true,
+  });
+}
+
+/** Load a data URL into an HTMLImageElement. */
+function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not decode captured image"));
+    img.src = dataUrl;
+  });
+}
+
 /**
- * Convert one or two elements (front, optional back) to a single PNG data URL.
- * When both are provided they're stacked vertically with a small gap.
- * Scale of 4 gives us a crisp export (~1370px wide for a card).
- *
- * Before capture:
- *   - Preload all <img> as data URLs (prevents CORS canvas taint)
- *   - Strip border-radius + box-shadow from the card outer so the exported
- *     PNG has clean straight edges (needed for print / ID-card printers)
- *     and no shadow bleeding into the transparent area around the card
- * After capture: restore both.
+ * Convert one or two elements (front, optional back) to a single PNG data URL,
+ * stacked vertically with a small white gap.
  */
 export async function cardToDataUrl(front: HTMLElement, back?: HTMLElement | null): Promise<string> {
-  // 1) Inline external images to data URLs (sidesteps CORS taint)
   const restoreFront = await inlineImagesInNode(front);
   const restoreBack = back ? await inlineImagesInNode(back) : null;
 
-  // 2) Strip radius/shadow for the capture — restored in the finally block.
-  // Print use case needs clean edges; on-screen the styling stays via CSS.
-  const stripStyles = (el: HTMLElement) => {
-    const prev = { borderRadius: el.style.borderRadius, boxShadow: el.style.boxShadow };
-    el.style.borderRadius = "0";
-    el.style.boxShadow = "none";
-    return () => {
-      el.style.borderRadius = prev.borderRadius;
-      el.style.boxShadow = prev.boxShadow;
-    };
-  };
-  const restoreFrontStyle = stripStyles(front);
-  const restoreBackStyle = back ? stripStyles(back) : null;
-
   try {
-    const scale = 4;
-    const canvasFront = await html2canvas(front, {
-      scale,
-      useCORS: true,          // no-op now (all images are data URLs), belt+braces
-      allowTaint: false,
-      backgroundColor: "#ffffff",
-      logging: false,
-    });
+    const frontPng = await captureSide(front);
+    if (!back) return frontPng;
 
-    if (!back) return canvasFront.toDataURL("image/png");
+    const backPng = await captureSide(back);
+    const [imgF, imgB] = await Promise.all([loadImage(frontPng), loadImage(backPng)]);
 
-    const canvasBack = await html2canvas(back, {
-      scale, useCORS: true, allowTaint: false, backgroundColor: "#ffffff", logging: false,
-    });
-
-    // Stack them vertically. Width = max, height = sum + small gap.
-    const gap = 20 * scale;
-    const width = Math.max(canvasFront.width, canvasBack.width);
-    const height = canvasFront.height + canvasBack.height + gap;
+    const gap = 80; // px at 4x scale = 20 css px
+    const width = Math.max(imgF.width, imgB.width);
+    const height = imgF.height + imgB.height + gap;
 
     const combined = document.createElement("canvas");
     combined.width = width;
     combined.height = height;
     const ctx = combined.getContext("2d");
-    if (!ctx) return canvasFront.toDataURL("image/png");
-    // Fill with white so the PNG doesn't have a transparent background
-    // (which would render as black when pasted into some apps)
+    if (!ctx) return frontPng;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(canvasFront, 0, 0);
-    ctx.drawImage(canvasBack, 0, canvasFront.height + gap);
+    ctx.drawImage(imgF, 0, 0);
+    ctx.drawImage(imgB, 0, imgF.height + gap);
     return combined.toDataURL("image/png");
   } finally {
     restoreFront();
     if (restoreBack) restoreBack();
-    restoreFrontStyle();
-    if (restoreBackStyle) restoreBackStyle();
   }
 }
 
@@ -139,11 +127,9 @@ export function downloadDataUrl(dataUrl: string, filename: string) {
 
 /**
  * Share via the platform Web Share API if available (mobile), else fall back
- * to WhatsApp share URL, else copy the download to clipboard.
- * Returns whether a share intent was actually opened.
+ * to downloading the file so the user can share manually.
  */
 export async function shareCard(dataUrl: string, filename: string, staffName: string): Promise<boolean> {
-  // Try native share first — best on Android / iOS
   if (navigator.share && navigator.canShare) {
     try {
       const blob = await (await fetch(dataUrl)).blob();
@@ -157,11 +143,12 @@ export async function shareCard(dataUrl: string, filename: string, staffName: st
         return true;
       }
     } catch (err: any) {
-      // User cancel is not an error we should surface — just fall through
-      if (err.name === "AbortError") return false;
+      if (err?.name === "AbortError") return false;       // user closed the sheet
+      // NotAllowedError (Safari user-gesture timeout) and anything else:
+      // fall through to download so the user still gets the file.
+      console.warn("[id-card] native share failed, falling back to download:", err);
     }
   }
-  // Fallback: just download it. The user can then share manually.
   downloadDataUrl(dataUrl, filename);
   return true;
 }
