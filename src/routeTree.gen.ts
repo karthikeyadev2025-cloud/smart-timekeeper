@@ -26,6 +26,7 @@ import { Route as AuthenticatedPayrollRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedMySalaryRouteImport } from './routes/_authenticated/my-salary'
 import { Route as AuthenticatedMyProfileRouteImport } from './routes/_authenticated/my-profile'
 import { Route as AuthenticatedMyLeavesRouteImport } from './routes/_authenticated/my-leaves'
+import { Route as AuthenticatedMyIdCardRouteImport } from './routes/_authenticated/my-id-card'
 import { Route as AuthenticatedMyAttendanceRouteImport } from './routes/_authenticated/my-attendance'
 import { Route as AuthenticatedMarkAttendanceRouteImport } from './routes/_authenticated/mark-attendance'
 import { Route as AuthenticatedLiveMapRouteImport } from './routes/_authenticated/live-map'
@@ -125,6 +126,11 @@ const AuthenticatedMyProfileRoute = AuthenticatedMyProfileRouteImport.update({
 const AuthenticatedMyLeavesRoute = AuthenticatedMyLeavesRouteImport.update({
   id: '/my-leaves',
   path: '/my-leaves',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMyIdCardRoute = AuthenticatedMyIdCardRouteImport.update({
+  id: '/my-id-card',
+  path: '/my-id-card',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedMyAttendanceRoute =
@@ -235,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/live-map': typeof AuthenticatedLiveMapRoute
   '/mark-attendance': typeof AuthenticatedMarkAttendanceRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
+  '/my-id-card': typeof AuthenticatedMyIdCardRoute
   '/my-leaves': typeof AuthenticatedMyLeavesRoute
   '/my-profile': typeof AuthenticatedMyProfileRoute
   '/my-salary': typeof AuthenticatedMySalaryRoute
@@ -269,6 +276,7 @@ export interface FileRoutesByTo {
   '/live-map': typeof AuthenticatedLiveMapRoute
   '/mark-attendance': typeof AuthenticatedMarkAttendanceRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
+  '/my-id-card': typeof AuthenticatedMyIdCardRoute
   '/my-leaves': typeof AuthenticatedMyLeavesRoute
   '/my-profile': typeof AuthenticatedMyProfileRoute
   '/my-salary': typeof AuthenticatedMySalaryRoute
@@ -305,6 +313,7 @@ export interface FileRoutesById {
   '/_authenticated/live-map': typeof AuthenticatedLiveMapRoute
   '/_authenticated/mark-attendance': typeof AuthenticatedMarkAttendanceRoute
   '/_authenticated/my-attendance': typeof AuthenticatedMyAttendanceRoute
+  '/_authenticated/my-id-card': typeof AuthenticatedMyIdCardRoute
   '/_authenticated/my-leaves': typeof AuthenticatedMyLeavesRoute
   '/_authenticated/my-profile': typeof AuthenticatedMyProfileRoute
   '/_authenticated/my-salary': typeof AuthenticatedMySalaryRoute
@@ -341,6 +350,7 @@ export interface FileRouteTypes {
     | '/live-map'
     | '/mark-attendance'
     | '/my-attendance'
+    | '/my-id-card'
     | '/my-leaves'
     | '/my-profile'
     | '/my-salary'
@@ -375,6 +385,7 @@ export interface FileRouteTypes {
     | '/live-map'
     | '/mark-attendance'
     | '/my-attendance'
+    | '/my-id-card'
     | '/my-leaves'
     | '/my-profile'
     | '/my-salary'
@@ -410,6 +421,7 @@ export interface FileRouteTypes {
     | '/_authenticated/live-map'
     | '/_authenticated/mark-attendance'
     | '/_authenticated/my-attendance'
+    | '/_authenticated/my-id-card'
     | '/_authenticated/my-leaves'
     | '/_authenticated/my-profile'
     | '/_authenticated/my-salary'
@@ -555,6 +567,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMyLeavesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/my-id-card': {
+      id: '/_authenticated/my-id-card'
+      path: '/my-id-card'
+      fullPath: '/my-id-card'
+      preLoaderRoute: typeof AuthenticatedMyIdCardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/my-attendance': {
       id: '/_authenticated/my-attendance'
       path: '/my-attendance'
@@ -686,6 +705,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedLiveMapRoute: typeof AuthenticatedLiveMapRoute
   AuthenticatedMarkAttendanceRoute: typeof AuthenticatedMarkAttendanceRoute
   AuthenticatedMyAttendanceRoute: typeof AuthenticatedMyAttendanceRoute
+  AuthenticatedMyIdCardRoute: typeof AuthenticatedMyIdCardRoute
   AuthenticatedMyLeavesRoute: typeof AuthenticatedMyLeavesRoute
   AuthenticatedMyProfileRoute: typeof AuthenticatedMyProfileRoute
   AuthenticatedMySalaryRoute: typeof AuthenticatedMySalaryRoute
@@ -714,6 +734,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLiveMapRoute: AuthenticatedLiveMapRoute,
   AuthenticatedMarkAttendanceRoute: AuthenticatedMarkAttendanceRoute,
   AuthenticatedMyAttendanceRoute: AuthenticatedMyAttendanceRoute,
+  AuthenticatedMyIdCardRoute: AuthenticatedMyIdCardRoute,
   AuthenticatedMyLeavesRoute: AuthenticatedMyLeavesRoute,
   AuthenticatedMyProfileRoute: AuthenticatedMyProfileRoute,
   AuthenticatedMySalaryRoute: AuthenticatedMySalaryRoute,

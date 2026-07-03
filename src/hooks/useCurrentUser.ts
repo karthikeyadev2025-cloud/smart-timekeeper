@@ -24,6 +24,7 @@ export interface CurrentUserData {
     slug: string;
     logo_url: string | null;
     primary_color: string | null;
+    id_card_accent: string | null;
     tenant_type: "business" | "school" | null;
   } | null;
 }
@@ -46,7 +47,7 @@ export function useCurrentUser() {
       if (profile?.tenant_id) {
         const { data: t } = await supabase
           .from("tenants")
-          .select("id,name,slug,logo_url,primary_color,tenant_type")
+          .select("id,name,slug,logo_url,primary_color,id_card_accent,tenant_type")
           .eq("id", profile.tenant_id)
           .maybeSingle();
         tenant = t;

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IdCardPreviewModal } from "@/components/IdCardPreviewModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,12 +37,18 @@ function StaffDetailsPage() {
   const { data: user } = useCurrentUser();
   const qc = useQueryClient();
   const tenantId = user?.tenant?.id;
+  const [showIdCard, setShowIdCard] = useState(false);
 
   const { data: staff, isLoading } = useQuery({
     queryKey: ["staff-detail", staffId],
     enabled: !!staffId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("*").eq("id", staffId).maybeSingle();
+      // Pull branch name alongside profile so the ID card has it too
+      const { data, error } = await (supabase as any)
+        .from("profiles")
+        .select("*, branches(name)")
+        .eq("id", staffId)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -94,15 +101,32 @@ function StaffDetailsPage() {
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            className="gap-2"
-            disabled={!s.phone}
-            onClick={() => openWhatsapp(s.phone, `Hi ${s.full_name ?? "there"}, this is a notification from ${user?.tenant?.name ?? "your team"}.`)}
-          >
-            <MessageCircle className="h-4 w-4 text-success" /> WhatsApp
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setShowIdCard(true)}
+            >
+              <IdCard className="h-4 w-4 text-primary" /> ID Card
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              disabled={!s.phone}
+              onClick={() => openWhatsapp(s.phone, `Hi ${s.full_name ?? "there"}, this is a notification from ${user?.tenant?.name ?? "your team"}.`)}
+            >
+              <MessageCircle className="h-4 w-4 text-success" /> WhatsApp
+            </Button>
+          </div>
         </header>
+
+        {/* ID Card preview & share */}
+        <IdCardPreviewModal
+          open={showIdCard}
+          onOpenChange={setShowIdCard}
+          staff={{ ...s, branch_name: (s as any).branches?.name ?? null }}
+          tenant={{ id: user?.tenant?.id ?? "", name: user?.tenant?.name ?? "", logo_url: (user?.tenant as any)?.logo_url, id_card_accent: (user?.tenant as any)?.id_card_accent }}
+        />
 
         <Tabs defaultValue="profile">
           <TabsList>

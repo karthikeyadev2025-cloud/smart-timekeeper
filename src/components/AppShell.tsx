@@ -21,6 +21,7 @@ import {
   Paintbrush,
   UserRound,
   Receipt,
+  IdCard,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -88,6 +89,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/bank-approvals", label: "Bank approvals", icon: ShieldAlert },
       { to: "/my-attendance", label: "My attendance", icon: Calendar },
       { to: "/my-leaves", label: "My leaves", icon: Calendar },
+      { to: "/my-id-card", label: "My ID card", icon: IdCard },
       { to: "/my-profile", label: "My profile", icon: UserRound },
     ];
   }
@@ -97,6 +99,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/app", label: "Today", icon: LayoutDashboard },
       { to: "/mark-attendance", label: "Mark class", icon: ClipboardCheck },
       { to: "/my-leaves", label: "Leaves", icon: Calendar },
+      { to: "/my-id-card", label: "My ID card", icon: IdCard },
       { to: "/my-profile", label: "My profile", icon: UserRound },
     ];
   }
@@ -106,6 +109,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
     { to: "/my-attendance", label: "My attendance", icon: Calendar },
     { to: "/my-leaves", label: "Leaves", icon: Calendar },
     { to: "/my-salary", label: "Salary", icon: Wallet },
+    { to: "/my-id-card", label: "My ID card", icon: IdCard },
     { to: "/my-profile", label: "My profile", icon: UserRound },
   ];
 }
