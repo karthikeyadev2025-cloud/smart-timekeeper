@@ -84,8 +84,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
       // Primary SEO
       { title: "Punchly — Smart Attendance, Payroll & HR for Indian Businesses" },
-      { name: "description", content: "Punchly is India's all-in-one attendance, payroll, leave and HR app. GPS + selfie check-in, multi-branch, bank-fraud protection, free for small teams. Built for shops, hospitals, schools, clinics, field staff." },
-      { name: "keywords", content: "punchly, attendance app india, payroll software, employee attendance, biometric attendance, gps attendance, selfie attendance, hr software india, leave management, staff attendance, shop attendance, hospital attendance, free attendance app, time tracking app, employee management india, multi branch attendance, indian payroll software, mystoreos, adexos, k2 adexos" },
+      { name: "description", content: "Punchly is India's all-in-one attendance, payroll, leave and HR app. GPS + selfie check-in, auto staff ID cards, multi-branch, bank-fraud protection, free for small teams. Built for shops, hospitals, schools, clinics, field staff." },
+      { name: "keywords", content: "punchly, attendance app india, payroll software, employee attendance, biometric attendance, gps attendance, selfie attendance, hr software india, leave management, staff attendance, shop attendance, hospital attendance, free attendance app, time tracking app, employee management india, multi branch attendance, indian payroll software, employee id card generator, staff id card maker, id card with qr code, mystoreos, adexos, k2 adexos, nikki tech labs" },
       { name: "author", content: "K² Adexos Global Technologies" },
       { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" },
       { name: "googlebot", content: "index, follow" },

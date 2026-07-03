@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useScroll, useTransform, type Variants } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, Camera, CheckCircle2, Clock, Users, Shield, Sparkles, Building2, ArrowRight, Map as MapIcon, GraduationCap, Briefcase, Smartphone, BellRing, Wallet, ShieldCheck, UserCog, ShieldAlert } from "lucide-react";
+import { MapPin, Camera, CheckCircle2, Clock, Users, Shield, Sparkles, Building2, ArrowRight, Map as MapIcon, GraduationCap, Briefcase, Smartphone, BellRing, Wallet, ShieldCheck, UserCog, ShieldAlert, IdCard as IdCardIcon } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -372,6 +372,30 @@ function Landing() {
       </section>
 
       {/* 3 steps */}
+      {/* Animated stats band */}
+      <section className="border-t border-border/60 py-10">
+        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-6 px-4 sm:grid-cols-4">
+          {[
+            { n: 700, suffix: "ms", label: "Check-in speed" },
+            { n: 99, suffix: "%", label: "GPS accuracy" },
+            { n: 3, suffix: " taps", label: "To run payroll" },
+            { n: 100, suffix: "%", label: "Data stays in India" },
+          ].map((s, i) => (
+            <motion.div
+              key={s.label}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              className="text-center"
+            >
+              <CountUp target={s.n} suffix={s.suffix} />
+              <p className="mt-1 text-xs text-muted-foreground uppercase tracking-wider">{s.label}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
       <section id="how" className="border-t border-border/60 bg-card/40 py-20">
         <div className="mx-auto max-w-6xl px-4">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.6 }} className="text-center">
@@ -422,6 +446,8 @@ function Landing() {
               { icon: Smartphone, title: "Installable PWA", desc: "Works on any phone or desktop. Install to home screen, use offline-friendly." },
               { icon: ShieldAlert, title: "Anti-cheat (mock GPS)", desc: "Detects fake-GPS apps using browser heuristics — flagged check-ins are marked for review." },
               { icon: BellRing, title: "Parent / WhatsApp alerts", desc: "One tap to ping all absent students' parents — or message any staff — via WhatsApp." },
+              { icon: IdCardIcon, title: "Staff ID cards", desc: "Auto-generated ID cards with your logo, photo & QR — 3 templates, download or share in one tap." },
+              { icon: BellRing, title: "Smart notifications", desc: "Missed check-ins, leave approvals, payslips, expiring plans — automatic in-app alerts." },
             ].map((f) => (
               <motion.div key={f.title} variants={fadeUp} whileHover={{ y: -4, scale: 1.02 }} transition={{ type: "spring", stiffness: 300 }}>
                 <Card className="relative p-6 h-full border-border/60 hover:border-primary/40 hover:shadow-md transition-all">
@@ -495,24 +521,60 @@ function Landing() {
         </motion.div>
       </section>
 
-      <footer className="border-t border-border/60 py-10">
-        <div className="mx-auto max-w-6xl px-4 space-y-6">
-          <div className="flex flex-col items-center justify-between gap-4 text-sm text-muted-foreground md:flex-row">
-            <Logo size={20} />
-            <div className="flex gap-6">
-              <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
-              <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
-              <Link to="/support" className="hover:text-foreground transition-colors">Support</Link>
+      <footer className="relative overflow-hidden border-t border-border/60">
+        {/* Ambient gradient glow */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-24 mx-auto h-48 w-[600px] rounded-full bg-primary/10 blur-3xl" />
+
+        <div className="relative mx-auto max-w-6xl px-4 py-12 space-y-8">
+          {/* Top row: brand + nav columns */}
+          <div className="grid gap-8 md:grid-cols-4">
+            <div className="space-y-3 md:col-span-2">
+              <Logo size={24} />
+              <p className="max-w-sm text-sm text-muted-foreground">
+                GPS + selfie attendance, automatic payroll, leave management and staff
+                ID cards — built for Indian businesses and schools.
+              </p>
             </div>
-            <p>© {new Date().getFullYear()} {BRAND.name}. All rights reserved.</p>
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Product</p>
+              <div className="flex flex-col gap-2 text-sm">
+                <a href="#features" className="story-link text-muted-foreground hover:text-foreground transition-colors">Features</a>
+                <a href="#pricing" className="story-link text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+                <a href="#how" className="story-link text-muted-foreground hover:text-foreground transition-colors">How it works</a>
+              </div>
+            </div>
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Company</p>
+              <div className="flex flex-col gap-2 text-sm">
+                <Link to="/privacy" className="story-link text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link>
+                <Link to="/terms" className="story-link text-muted-foreground hover:text-foreground transition-colors">Terms of Service</Link>
+                <Link to="/support" className="story-link text-muted-foreground hover:text-foreground transition-colors">Support</Link>
+              </div>
+            </div>
           </div>
-          <div className="border-t border-border/40 pt-6 text-center">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              Powered by{" "}
-              <span className="font-semibold text-foreground">
-                K<sup>2</sup> Adexos Global Technologies
-              </span>
+
+          {/* Credits band */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="rounded-2xl border border-border/60 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 p-5 text-center"
+          >
+            <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+              An innovation by
             </p>
+            <p className="mt-1 text-lg font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Nikki Tech Labs
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Powered by <span className="font-semibold text-foreground">K<sup>2</sup> Adexos Global Technologies</span>
+            </p>
+          </motion.div>
+
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-border/40 pt-6 text-xs text-muted-foreground md:flex-row">
+            <p>© {new Date().getFullYear()} {BRAND.name}. All rights reserved.</p>
+            <p>Made with ❤️ in Hyderabad, India</p>
           </div>
         </div>
       </footer>
@@ -864,3 +926,41 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
 }
 
 
+
+/** Animated number counter — counts from 0 to target when scrolled into view. */
+function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
+  const [value, setValue] = useState(0);
+  const [started, setStarted] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !started) {
+          setStarted(true);
+          const duration = 1200;
+          const start = performance.now();
+          const tick = (now: number) => {
+            const p = Math.min(1, (now - start) / duration);
+            // easeOutCubic
+            const eased = 1 - Math.pow(1 - p, 3);
+            setValue(Math.round(eased * target));
+            if (p < 1) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }
+      },
+      { threshold: 0.4 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [target, started]);
+
+  return (
+    <span ref={ref} className="text-3xl font-bold tabular-nums tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+      {value}{suffix}
+    </span>
+  );
+}

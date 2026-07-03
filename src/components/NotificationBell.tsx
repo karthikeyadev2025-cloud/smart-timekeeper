@@ -60,7 +60,7 @@ export function NotificationBell() {
   // (timestamp-suffixed) and explicitly tear it down on cleanup.
   useEffect(() => {
     if (!user?.userId) return;
-    const topic = `notif:${user.userId}:${Date.now()}`;
+    const topic = `notif:${user.userId}:${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
     const channel = supabase.channel(topic);
     let removed = false;
 

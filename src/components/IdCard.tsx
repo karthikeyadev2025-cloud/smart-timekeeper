@@ -12,7 +12,7 @@
  * both screen viewing and print.
  */
 
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 
 // 85.6 × 53.98 mm at 4 px/mm = 342 × 216 px in the DOM. Renders at 4x scale
 // when downloaded, so exported PNGs come out at ~1370×864 (print-friendly).
@@ -218,7 +218,7 @@ function CorporateFront({ staff, tenant, verifyUrl, className }: {
           <div style={{ color: "#0F172A", fontWeight: 600, marginTop: 1 }}>{fmtDate(staff.date_of_joining)}</div>
         </div>
         <div style={{ background: "#ffffff", padding: 4, borderRadius: 4, border: "1px solid #E2E8F0" }}>
-          <QRCodeSVG value={verifyUrl} size={56} level="H" includeMargin={false} />
+          <QRCodeCanvas value={verifyUrl} size={56} level="H" includeMargin={false} />
         </div>
       </div>
     </div>
@@ -432,7 +432,7 @@ function ModernFront({ staff, tenant, verifyUrl, className }: {
           </div>
         )}
         <div style={{ background: "#ffffff", padding: 4, borderRadius: 4, border: "1px solid #E2E8F0" }}>
-          <QRCodeSVG value={verifyUrl} size={54} level="H" includeMargin={false} />
+          <QRCodeCanvas value={verifyUrl} size={54} level="H" includeMargin={false} />
         </div>
       </div>
     </div>
@@ -564,7 +564,7 @@ function CompactFront({ staff, tenant, verifyUrl, className }: {
           Employee ID
         </div>
         <div style={{ background: "#ffffff", padding: 3, borderRadius: 3 }}>
-          <QRCodeSVG value={verifyUrl} size={44} level="H" includeMargin={false} />
+          <QRCodeCanvas value={verifyUrl} size={44} level="H" includeMargin={false} />
         </div>
       </div>
 
