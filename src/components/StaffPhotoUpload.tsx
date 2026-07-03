@@ -58,9 +58,25 @@ interface Props {
   onChanged?: (newSignedUrl: string | null) => void;
   /** Show as a large panel or a compact inline row. */
   variant?: "panel" | "inline";
+  /**
+   * When true, this staff member's photo can be changed directly without
+   * approval — the "first upload OR admin editing on behalf". When false
+   * (the default for a locked staff self-upload), the widget submits a
+   * pending_photo_change instead of writing over the canonical photo.
+   *
+   * Callers:
+   *  - /my-profile passes false (or omits) unless the profile is unlocked
+   *  - Admin staff-detail passes true (admins bypass approval)
+   */
+  bypassApproval?: boolean;
+  /** Whether the photo is currently locked (staff already uploaded once). */
+  photoLocked?: boolean;
 }
 
-export function StaffPhotoUpload({ userId, currentName, onChanged, variant = "panel" }: Props) {
+export function StaffPhotoUpload({
+  userId, currentName, onChanged, variant = "panel",
+  bypassApproval = false, photoLocked = false,
+}: Props) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +117,29 @@ export function StaffPhotoUpload({ userId, currentName, onChanged, variant = "pa
     setUploading(true);
     try {
       const blob = await compress(file);
+      const needsApproval = photoLocked && !bypassApproval;
+
+      if (needsApproval) {
+        // Locked-photo path: upload to a pending-* filename in the same
+        // per-user folder (RLS allows this — the user owns their folder),
+        // then submit a pending_photo_changes row for admin review. The
+        // canonical profile.jpg is NOT touched until admin approves.
+        const pendingPath = `${userId}/pending-${Date.now()}.jpg`;
+        const { error: upErr } = await supabase.storage
+          .from("staff-photos")
+          .upload(pendingPath, blob, { upsert: false, contentType: "image/jpeg" });
+        if (upErr) throw upErr;
+
+        // Dynamic import to keep server-fn code out of the initial bundle
+        const { requestPhotoChange } = await import("@/lib/photo-change.functions");
+        await requestPhotoChange({ data: { photo_path: pendingPath } });
+
+        toast.success("Photo change submitted — waiting for admin approval");
+        onChanged?.(preview);   // preview unchanged, show current photo
+        return;
+      }
+
+      // Direct write path — first upload or admin bypass
       const path = `${userId}/profile.jpg`;
       const { error } = await supabase.storage
         .from("staff-photos")
@@ -111,9 +150,12 @@ export function StaffPhotoUpload({ userId, currentName, onChanged, variant = "pa
       // widgets (dashboard, admin views) see the new photo immediately.
       const { data: signed } = await supabase.storage.from("staff-photos").createSignedUrl(path, 300);
       const url = signed?.signedUrl ?? null;
-      if (url) {
-        await (supabase as any).from("profiles").update({ avatar_url: url }).eq("id", userId);
-      }
+      const patch: Record<string, any> = { avatar_url: url };
+      // First-upload path: flip the lock so future changes need approval.
+      // Admin bypass path: leave the lock alone (may already be true).
+      if (!bypassApproval && !photoLocked) patch.photo_locked = true;
+      await (supabase as any).from("profiles").update(patch).eq("id", userId);
+
       await refetch();
       onChanged?.(url);
       toast.success("Photo updated");
@@ -209,7 +251,7 @@ export function StaffPhotoUpload({ userId, currentName, onChanged, variant = "pa
           </Button>
         </div>
 
-        {preview && (
+        {preview && !(photoLocked && !bypassApproval) && (
           <Button variant="ghost" size="sm" disabled={uploading} onClick={handleDelete} className="text-destructive hover:text-destructive gap-2">
             <Trash2 className="h-4 w-4" /> Remove photo
           </Button>
@@ -218,6 +260,12 @@ export function StaffPhotoUpload({ userId, currentName, onChanged, variant = "pa
         <p className="text-xs text-muted-foreground text-center">
           Used on your Punchly ID card. Front-facing headshot works best.
         </p>
+        {photoLocked && !bypassApproval && (
+          <div className="w-full rounded-md bg-amber-500/10 border border-amber-500/30 p-2.5 text-xs text-amber-800 dark:text-amber-200">
+            <strong>Change needs approval.</strong> Since you've already set your photo,
+            any new upload will be sent to your admin for review before it appears on your ID card.
+          </div>
+        )}
       </div>
     </Card>
   );

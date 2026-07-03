@@ -208,7 +208,13 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
     <div className="grid gap-4 lg:grid-cols-2">
       <Card className="p-5 space-y-4">
         <h3 className="flex items-center gap-2 font-semibold"><Pencil className="h-4 w-4" /> Basic details</h3>
-        <StaffPhotoUpload userId={staff.id} currentName={form.full_name} variant="inline" />
+        <StaffPhotoUpload
+          userId={staff.id}
+          currentName={form.full_name}
+          variant="inline"
+          bypassApproval
+          photoLocked={!!staff.photo_locked}
+        />
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1 col-span-2"><Label>Full name</Label><Input value={form.full_name} onChange={(e) => set("full_name")(e.target.value)} /></div>
           <div className="space-y-1"><Label>Designation</Label><Input value={form.designation} onChange={(e) => set("designation")(e.target.value)} /></div>

@@ -116,6 +116,7 @@ function MyProfile() {
           <StaffPhotoUpload
             userId={user.userId}
             currentName={user?.profile?.full_name}
+            photoLocked={!!user?.profile?.photo_locked}
           />
         )}
 
