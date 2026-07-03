@@ -37,6 +37,14 @@ export function useStaffPhotoUrl(userId: string | undefined) {
     retry: false,
     queryFn: async (): Promise<string | null> => {
       try {
+        // First check the file exists via list() — returns 200 with an empty
+        // array when there's no photo, instead of the noisy 400 that
+        // createSignedUrl throws for missing objects.
+        const { data: files, error: listErr } = await supabase.storage
+          .from("staff-photos")
+          .list(userId!, { search: "profile.jpg", limit: 1 });
+        if (listErr || !files || files.length === 0) return null;
+
         const path = `${userId}/profile.jpg`;
         const { data, error } = await supabase.storage.from("staff-photos").createSignedUrl(path, 300);
         if (error) return null;
