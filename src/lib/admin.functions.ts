@@ -313,7 +313,7 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     primary_color?: string | null;
     contact_email?: string | null;
     contact_phone?: string | null;
-    id_card_template?: "corporate" | "modern" | "compact" | null;
+    id_card_template?: "corporate" | "modern" | "compact" | "minimal" | "bold" | "formal" | "badge" | null;
     id_card_accent?: string | null;
   }) => data)
   .handler(async ({ data, context }) => {
@@ -340,7 +340,7 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     if (data.id_card_template !== undefined) {
       // Validate against allowed values (the DB has a CHECK constraint too,
       // but a clear error here beats a raw pg exception).
-      if (data.id_card_template && !["corporate", "modern", "compact"].includes(data.id_card_template)) {
+      if (data.id_card_template && !["corporate", "modern", "compact", "minimal", "bold", "formal", "badge"].includes(data.id_card_template)) {
         throw new Error("Invalid ID card template");
       }
       update.id_card_template = data.id_card_template || "corporate";

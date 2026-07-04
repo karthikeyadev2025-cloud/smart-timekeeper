@@ -25,8 +25,12 @@ const MOCK_STAFF = {
 
 const TEMPLATES: { id: IdCardTemplate; label: string; blurb: string }[] = [
   { id: "corporate", label: "Corporate", blurb: "Classic layout. Photo left, details right." },
-  { id: "modern",    label: "Modern",    blurb: "Bold hero band. Photo overlaps. Whitespace-forward." },
+  { id: "modern",    label: "Modern",    blurb: "Gradient hero band, circular photo overlap." },
   { id: "compact",   label: "Compact",   blurb: "Landscape, dense. Great for lanyards." },
+  { id: "minimal",   label: "Minimal",   blurb: "Plain white, thin accent line. Understated." },
+  { id: "bold",      label: "Bold",      blurb: "Full-color background. High visual impact." },
+  { id: "formal",    label: "Formal",    blurb: "Centered, double-border frame. Institutional look." },
+  { id: "badge",     label: "Badge",     blurb: "Symmetric, conference-badge style layout." },
 ];
 
 export function IdCardTemplateChooser({
@@ -39,7 +43,7 @@ export function IdCardTemplateChooser({
   logoUrl: string | null | undefined;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {TEMPLATES.map((t) => {
         const selected = value === t.id;
         // Scale the 342px-wide card down to fit the preview slot.

@@ -46,7 +46,7 @@ function CompanyProfilePage() {
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [logoUploading, setLogoUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [cardTemplate, setCardTemplate] = useState<"corporate" | "modern" | "compact">("corporate");
+  const [cardTemplate, setCardTemplate] = useState<"corporate" | "modern" | "compact" | "minimal" | "bold" | "formal" | "badge">("corporate");
   const [cardAccent, setCardAccent] = useState<string>("#4F46E5");
 
   // Sync state when tenant loads

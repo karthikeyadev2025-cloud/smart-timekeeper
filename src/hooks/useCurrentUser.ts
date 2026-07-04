@@ -27,7 +27,7 @@ export interface CurrentUserData {
     logo_url: string | null;
     primary_color: string | null;
     id_card_accent: string | null;
-    id_card_template: "corporate" | "modern" | "compact" | null;
+    id_card_template: "corporate" | "modern" | "compact" | "minimal" | "bold" | "formal" | "badge" | null;
     tenant_type: "business" | "school" | null;
   } | null;
 }
