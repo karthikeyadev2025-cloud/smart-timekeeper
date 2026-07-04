@@ -20,7 +20,10 @@ import { Route as BiometricAttendanceCityRouteImport } from './routes/biometric-
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
 import { Route as AuthenticatedSignatureApprovalsRouteImport } from './routes/_authenticated/signature-approvals'
 import { Route as AuthenticatedShiftsRouteImport } from './routes/_authenticated/shifts'
+import { Route as AuthenticatedShiftSwapsRouteImport } from './routes/_authenticated/shift-swaps'
+import { Route as AuthenticatedShiftSwapApprovalsRouteImport } from './routes/_authenticated/shift-swap-approvals'
 import { Route as AuthenticatedRevenueRouteImport } from './routes/_authenticated/revenue'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/plans'
 import { Route as AuthenticatedPinResetsRouteImport } from './routes/_authenticated/pin-resets'
 import { Route as AuthenticatedPhotoApprovalsRouteImport } from './routes/_authenticated/photo-approvals'
@@ -43,6 +46,7 @@ import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedBankApprovalsRouteImport } from './routes/_authenticated/bank-approvals'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
+import { Route as AuthenticatedAnnouncementsRouteImport } from './routes/_authenticated/announcements'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedStaffStaffIdRouteImport } from './routes/_authenticated/staff.$staffId'
 
@@ -101,9 +105,25 @@ const AuthenticatedShiftsRoute = AuthenticatedShiftsRouteImport.update({
   path: '/shifts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedShiftSwapsRoute = AuthenticatedShiftSwapsRouteImport.update({
+  id: '/shift-swaps',
+  path: '/shift-swaps',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedShiftSwapApprovalsRoute =
+  AuthenticatedShiftSwapApprovalsRouteImport.update({
+    id: '/shift-swap-approvals',
+    path: '/shift-swap-approvals',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedRevenueRoute = AuthenticatedRevenueRouteImport.update({
   id: '/revenue',
   path: '/revenue',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPlansRoute = AuthenticatedPlansRouteImport.update({
@@ -221,6 +241,12 @@ const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   path: '/app',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAnnouncementsRoute =
+  AuthenticatedAnnouncementsRouteImport.update({
+    id: '/announcements',
+    path: '/announcements',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -241,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/announcements': typeof AuthenticatedAnnouncementsRoute
   '/app': typeof AuthenticatedAppRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/bank-approvals': typeof AuthenticatedBankApprovalsRoute
@@ -263,7 +290,10 @@ export interface FileRoutesByFullPath {
   '/photo-approvals': typeof AuthenticatedPhotoApprovalsRoute
   '/pin-resets': typeof AuthenticatedPinResetsRoute
   '/plans': typeof AuthenticatedPlansRoute
+  '/reports': typeof AuthenticatedReportsRoute
   '/revenue': typeof AuthenticatedRevenueRoute
+  '/shift-swap-approvals': typeof AuthenticatedShiftSwapApprovalsRoute
+  '/shift-swaps': typeof AuthenticatedShiftSwapsRoute
   '/shifts': typeof AuthenticatedShiftsRoute
   '/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/team': typeof AuthenticatedTeamRoute
@@ -278,6 +308,7 @@ export interface FileRoutesByTo {
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/announcements': typeof AuthenticatedAnnouncementsRoute
   '/app': typeof AuthenticatedAppRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/bank-approvals': typeof AuthenticatedBankApprovalsRoute
@@ -300,7 +331,10 @@ export interface FileRoutesByTo {
   '/photo-approvals': typeof AuthenticatedPhotoApprovalsRoute
   '/pin-resets': typeof AuthenticatedPinResetsRoute
   '/plans': typeof AuthenticatedPlansRoute
+  '/reports': typeof AuthenticatedReportsRoute
   '/revenue': typeof AuthenticatedRevenueRoute
+  '/shift-swap-approvals': typeof AuthenticatedShiftSwapApprovalsRoute
+  '/shift-swaps': typeof AuthenticatedShiftSwapsRoute
   '/shifts': typeof AuthenticatedShiftsRoute
   '/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/team': typeof AuthenticatedTeamRoute
@@ -317,6 +351,7 @@ export interface FileRoutesById {
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/announcements': typeof AuthenticatedAnnouncementsRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/bank-approvals': typeof AuthenticatedBankApprovalsRoute
@@ -339,7 +374,10 @@ export interface FileRoutesById {
   '/_authenticated/photo-approvals': typeof AuthenticatedPhotoApprovalsRoute
   '/_authenticated/pin-resets': typeof AuthenticatedPinResetsRoute
   '/_authenticated/plans': typeof AuthenticatedPlansRoute
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/revenue': typeof AuthenticatedRevenueRoute
+  '/_authenticated/shift-swap-approvals': typeof AuthenticatedShiftSwapApprovalsRoute
+  '/_authenticated/shift-swaps': typeof AuthenticatedShiftSwapsRoute
   '/_authenticated/shifts': typeof AuthenticatedShiftsRoute
   '/_authenticated/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
@@ -356,6 +394,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/terms'
     | '/admin'
+    | '/announcements'
     | '/app'
     | '/audit'
     | '/bank-approvals'
@@ -378,7 +417,10 @@ export interface FileRouteTypes {
     | '/photo-approvals'
     | '/pin-resets'
     | '/plans'
+    | '/reports'
     | '/revenue'
+    | '/shift-swap-approvals'
+    | '/shift-swaps'
     | '/shifts'
     | '/signature-approvals'
     | '/team'
@@ -393,6 +435,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/terms'
     | '/admin'
+    | '/announcements'
     | '/app'
     | '/audit'
     | '/bank-approvals'
@@ -415,7 +458,10 @@ export interface FileRouteTypes {
     | '/photo-approvals'
     | '/pin-resets'
     | '/plans'
+    | '/reports'
     | '/revenue'
+    | '/shift-swap-approvals'
+    | '/shift-swaps'
     | '/shifts'
     | '/signature-approvals'
     | '/team'
@@ -431,6 +477,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/terms'
     | '/_authenticated/admin'
+    | '/_authenticated/announcements'
     | '/_authenticated/app'
     | '/_authenticated/audit'
     | '/_authenticated/bank-approvals'
@@ -453,7 +500,10 @@ export interface FileRouteTypes {
     | '/_authenticated/photo-approvals'
     | '/_authenticated/pin-resets'
     | '/_authenticated/plans'
+    | '/_authenticated/reports'
     | '/_authenticated/revenue'
+    | '/_authenticated/shift-swap-approvals'
+    | '/_authenticated/shift-swaps'
     | '/_authenticated/shifts'
     | '/_authenticated/signature-approvals'
     | '/_authenticated/team'
@@ -551,11 +601,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedShiftsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/shift-swaps': {
+      id: '/_authenticated/shift-swaps'
+      path: '/shift-swaps'
+      fullPath: '/shift-swaps'
+      preLoaderRoute: typeof AuthenticatedShiftSwapsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/shift-swap-approvals': {
+      id: '/_authenticated/shift-swap-approvals'
+      path: '/shift-swap-approvals'
+      fullPath: '/shift-swap-approvals'
+      preLoaderRoute: typeof AuthenticatedShiftSwapApprovalsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/revenue': {
       id: '/_authenticated/revenue'
       path: '/revenue'
       fullPath: '/revenue'
       preLoaderRoute: typeof AuthenticatedRevenueRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/plans': {
@@ -712,6 +783,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/announcements': {
+      id: '/_authenticated/announcements'
+      path: '/announcements'
+      fullPath: '/announcements'
+      preLoaderRoute: typeof AuthenticatedAnnouncementsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -731,6 +809,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAnnouncementsRoute: typeof AuthenticatedAnnouncementsRoute
   AuthenticatedAppRoute: typeof AuthenticatedAppRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedBankApprovalsRoute: typeof AuthenticatedBankApprovalsRoute
@@ -753,7 +832,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPhotoApprovalsRoute: typeof AuthenticatedPhotoApprovalsRoute
   AuthenticatedPinResetsRoute: typeof AuthenticatedPinResetsRoute
   AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedRevenueRoute: typeof AuthenticatedRevenueRoute
+  AuthenticatedShiftSwapApprovalsRoute: typeof AuthenticatedShiftSwapApprovalsRoute
+  AuthenticatedShiftSwapsRoute: typeof AuthenticatedShiftSwapsRoute
   AuthenticatedShiftsRoute: typeof AuthenticatedShiftsRoute
   AuthenticatedSignatureApprovalsRoute: typeof AuthenticatedSignatureApprovalsRoute
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
@@ -762,6 +844,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAnnouncementsRoute: AuthenticatedAnnouncementsRoute,
   AuthenticatedAppRoute: AuthenticatedAppRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedBankApprovalsRoute: AuthenticatedBankApprovalsRoute,
@@ -784,7 +867,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPhotoApprovalsRoute: AuthenticatedPhotoApprovalsRoute,
   AuthenticatedPinResetsRoute: AuthenticatedPinResetsRoute,
   AuthenticatedPlansRoute: AuthenticatedPlansRoute,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedRevenueRoute: AuthenticatedRevenueRoute,
+  AuthenticatedShiftSwapApprovalsRoute: AuthenticatedShiftSwapApprovalsRoute,
+  AuthenticatedShiftSwapsRoute: AuthenticatedShiftSwapsRoute,
   AuthenticatedShiftsRoute: AuthenticatedShiftsRoute,
   AuthenticatedSignatureApprovalsRoute: AuthenticatedSignatureApprovalsRoute,
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,

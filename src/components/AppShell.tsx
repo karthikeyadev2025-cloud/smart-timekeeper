@@ -24,6 +24,9 @@ import {
   IdCard,
   Camera,
   PenLine,
+  Repeat,
+  Megaphone,
+  FileBarChart,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -62,6 +65,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
         { to: "/classes", label: "Classes & students", icon: GraduationCap },
         { to: "/mark-attendance", label: "Mark attendance", icon: ClipboardCheck },
         { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
+        { to: "/announcements", label: "Announcements", icon: Megaphone },
         { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
         { to: "/billing", label: "Billing", icon: Receipt },
       ];
@@ -75,10 +79,13 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/live-map", label: "Live map", icon: Map },
       { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
       { to: "/leave-types", label: "Leave types", icon: Calendar },
+      { to: "/shift-swap-approvals", label: "Shift swaps", icon: Repeat },
       { to: "/payroll", label: "Payroll", icon: Wallet },
+      { to: "/reports", label: "Reports", icon: FileBarChart },
       { to: "/bank-approvals", label: "Bank approvals", icon: ShieldAlert },
       { to: "/photo-approvals", label: "Photo approvals", icon: Camera },
       { to: "/signature-approvals", label: "Signature approvals", icon: PenLine },
+      { to: "/announcements", label: "Announcements", icon: Megaphone },
       { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
       { to: "/billing", label: "Billing", icon: Receipt },
     ];
@@ -89,8 +96,10 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/team", label: "My branch staff", icon: Users },
       { to: "/live-map", label: "Live map", icon: Map },
       { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
+      { to: "/shift-swap-approvals", label: "Shift swaps", icon: Repeat },
       { to: "/payroll", label: "Payroll", icon: Wallet },
       { to: "/bank-approvals", label: "Bank approvals", icon: ShieldAlert },
+      { to: "/announcements", label: "Announcements", icon: Megaphone },
       { to: "/my-attendance", label: "My attendance", icon: Calendar },
       { to: "/my-leaves", label: "My leaves", icon: Calendar },
       { to: "/my-id-card", label: "My ID card", icon: IdCard },
@@ -103,6 +112,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/app", label: "Today", icon: LayoutDashboard },
       { to: "/mark-attendance", label: "Mark class", icon: ClipboardCheck },
       { to: "/my-leaves", label: "Leaves", icon: Calendar },
+      { to: "/announcements", label: "Announcements", icon: Megaphone },
       { to: "/my-id-card", label: "My ID card", icon: IdCard },
       { to: "/my-profile", label: "My profile", icon: UserRound },
     ];
@@ -112,7 +122,9 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
     { to: "/check-in", label: "Check in / out", icon: MapPin },
     { to: "/my-attendance", label: "My attendance", icon: Calendar },
     { to: "/my-leaves", label: "Leaves", icon: Calendar },
+    { to: "/shift-swaps", label: "Shift swaps", icon: Repeat },
     { to: "/my-salary", label: "Salary", icon: Wallet },
+    { to: "/announcements", label: "Announcements", icon: Megaphone },
     { to: "/my-id-card", label: "My ID card", icon: IdCard },
     { to: "/my-profile", label: "My profile", icon: UserRound },
   ];

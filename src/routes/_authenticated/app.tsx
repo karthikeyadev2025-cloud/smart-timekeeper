@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
+import { PinnedAnnouncementBanner } from "@/components/PinnedAnnouncementBanner";
+import { PunctualityLeaderboard } from "@/components/PunctualityLeaderboard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -463,6 +465,8 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
         </Card>
       )}
 
+      <PinnedAnnouncementBanner tenantId={tenantId} />
+
       {subState === "suspended" && (
         <Card className="flex items-start gap-3 border-destructive/40 bg-destructive/5 p-4">
           <ShieldAlert className="h-5 w-5 shrink-0 text-destructive mt-0.5" />
@@ -732,6 +736,8 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
           {/* Irregularity + trend section */}
           <IrregularStaffWidget tenantId={tenantId} branchManagerMode={branchManagerMode} userBranchId={user?.profile?.branch_id} tenantName={user?.tenant?.name} />
 
+          <PunctualityLeaderboard tenantId={tenantId} />
+
           {/* Quick links */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <QuickLink to="/team" icon={Users} label="Staff" color="primary" />
@@ -874,6 +880,23 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
     },
   });
 
+  // Streak / punctuality / hours — powered by the my_attendance_stats RPC
+  const { data: myStats } = useQuery({
+    queryKey: ["my-attendance-stats", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("my_attendance_stats", { _user_id: userId });
+      if (error || !data || data.length === 0) return null;
+      return data[0] as {
+        current_streak: number;
+        punctuality_pct: number | null;
+        hours_this_month: number;
+        present_days_this_month: number;
+        total_working_days_this_month: number;
+      };
+    },
+  });
+
   if (!tenantId) return <NoRoleHome />;
 
   const firstName = (me?.profile?.full_name ?? "").split(" ")[0] || "there";
@@ -942,6 +965,33 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
       <header>
         <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
       </header>
+
+      <PinnedAnnouncementBanner tenantId={tenantId} />
+
+      {myStats && (myStats.current_streak > 0 || myStats.punctuality_pct != null || myStats.hours_this_month > 0) && (
+        <Card className="p-4">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-3">Your stats</p>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div>
+              <div className="flex items-center justify-center gap-1">
+                <span className="text-2xl font-bold tabular-nums">{myStats.current_streak}</span>
+                {myStats.current_streak >= 3 && <span className="text-base">🔥</span>}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wide">Day streak</p>
+            </div>
+            <div>
+              <span className="text-2xl font-bold tabular-nums">
+                {myStats.punctuality_pct != null ? `${myStats.punctuality_pct}%` : "—"}
+              </span>
+              <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wide">On-time</p>
+            </div>
+            <div>
+              <span className="text-2xl font-bold tabular-nums">{myStats.hours_this_month}h</span>
+              <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wide">This month</p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {myShift && (
         <Card className="flex items-center gap-3 p-4 border-primary/30 bg-primary/5">
