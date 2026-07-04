@@ -18,6 +18,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BiometricAttendanceCityRouteImport } from './routes/biometric-attendance.$city'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
+import { Route as AuthenticatedSignatureApprovalsRouteImport } from './routes/_authenticated/signature-approvals'
 import { Route as AuthenticatedShiftsRouteImport } from './routes/_authenticated/shifts'
 import { Route as AuthenticatedRevenueRouteImport } from './routes/_authenticated/revenue'
 import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/plans'
@@ -89,6 +90,12 @@ const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
   path: '/team',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSignatureApprovalsRoute =
+  AuthenticatedSignatureApprovalsRouteImport.update({
+    id: '/signature-approvals',
+    path: '/signature-approvals',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedShiftsRoute = AuthenticatedShiftsRouteImport.update({
   id: '/shifts',
   path: '/shifts',
@@ -258,6 +265,7 @@ export interface FileRoutesByFullPath {
   '/plans': typeof AuthenticatedPlansRoute
   '/revenue': typeof AuthenticatedRevenueRoute
   '/shifts': typeof AuthenticatedShiftsRoute
+  '/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/team': typeof AuthenticatedTeamRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
   '/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
@@ -294,6 +302,7 @@ export interface FileRoutesByTo {
   '/plans': typeof AuthenticatedPlansRoute
   '/revenue': typeof AuthenticatedRevenueRoute
   '/shifts': typeof AuthenticatedShiftsRoute
+  '/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/team': typeof AuthenticatedTeamRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
   '/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
@@ -332,6 +341,7 @@ export interface FileRoutesById {
   '/_authenticated/plans': typeof AuthenticatedPlansRoute
   '/_authenticated/revenue': typeof AuthenticatedRevenueRoute
   '/_authenticated/shifts': typeof AuthenticatedShiftsRoute
+  '/_authenticated/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
   '/_authenticated/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
@@ -370,6 +380,7 @@ export interface FileRouteTypes {
     | '/plans'
     | '/revenue'
     | '/shifts'
+    | '/signature-approvals'
     | '/team'
     | '/biometric-attendance/$city'
     | '/staff/$staffId'
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/plans'
     | '/revenue'
     | '/shifts'
+    | '/signature-approvals'
     | '/team'
     | '/biometric-attendance/$city'
     | '/staff/$staffId'
@@ -443,6 +455,7 @@ export interface FileRouteTypes {
     | '/_authenticated/plans'
     | '/_authenticated/revenue'
     | '/_authenticated/shifts'
+    | '/_authenticated/signature-approvals'
     | '/_authenticated/team'
     | '/biometric-attendance/$city'
     | '/_authenticated/staff/$staffId'
@@ -522,6 +535,13 @@ declare module '@tanstack/react-router' {
       path: '/team'
       fullPath: '/team'
       preLoaderRoute: typeof AuthenticatedTeamRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/signature-approvals': {
+      id: '/_authenticated/signature-approvals'
+      path: '/signature-approvals'
+      fullPath: '/signature-approvals'
+      preLoaderRoute: typeof AuthenticatedSignatureApprovalsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/shifts': {
@@ -735,6 +755,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
   AuthenticatedRevenueRoute: typeof AuthenticatedRevenueRoute
   AuthenticatedShiftsRoute: typeof AuthenticatedShiftsRoute
+  AuthenticatedSignatureApprovalsRoute: typeof AuthenticatedSignatureApprovalsRoute
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
   AuthenticatedStaffStaffIdRoute: typeof AuthenticatedStaffStaffIdRoute
 }
@@ -765,6 +786,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPlansRoute: AuthenticatedPlansRoute,
   AuthenticatedRevenueRoute: AuthenticatedRevenueRoute,
   AuthenticatedShiftsRoute: AuthenticatedShiftsRoute,
+  AuthenticatedSignatureApprovalsRoute: AuthenticatedSignatureApprovalsRoute,
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,
   AuthenticatedStaffStaffIdRoute: AuthenticatedStaffStaffIdRoute,
 }

@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { IdCardFront, IdCardBack } from "@/components/IdCard";
 import { useStaffPhotoUrl } from "@/components/StaffPhotoUpload";
+import { useSignatureUrl } from "@/components/SignaturePad";
 import { cardToDataUrl, downloadDataUrl, shareCard } from "@/lib/id-card-export";
 
 export const Route = createFileRoute("/_authenticated/my-id-card")({
@@ -53,7 +54,10 @@ function MyIdCardPage() {
   // Fresh signed URL for the photo (avatar_url on the row may be a stale
   // signed URL if the photo was uploaded a while ago).
   const { data: photoUrl } = useStaffPhotoUrl(user?.userId);
-  const staffForCard = staff ? { ...staff, avatar_url: photoUrl ?? staff.avatar_url } : null;
+  const { data: mySignatureUrl } = useSignatureUrl(user?.userId ? `${user.userId}/signature.png` : undefined);
+  const { data: authoritySignatureUrl } = useSignatureUrl(tenant?.id ? `tenant/${tenant.id}/signature.png` : undefined);
+  const staffForCard = staff ? { ...staff, avatar_url: photoUrl ?? staff.avatar_url, signature_url: mySignatureUrl ?? null } : null;
+  const tenantForCard = tenant ? { ...tenant, authority_signature_url: authoritySignatureUrl ?? null } : null;
   const verifyUrl = `${typeof window !== "undefined" ? window.location.origin : "https://punchly.online"}/verify/${staff?.id ?? ""}`;
   const filename = `${staff?.staff_id || "EMP"}_${(staff?.full_name || "id").replace(/\s+/g, "_")}_id.png`;
 
@@ -126,10 +130,10 @@ function MyIdCardPage() {
 
         <div className="flex flex-col items-center gap-4">
           <div ref={frontRef}>
-            <IdCardFront staff={staffForCard!} tenant={tenant} verifyUrl={verifyUrl} />
+            <IdCardFront staff={staffForCard!} tenant={tenantForCard!} verifyUrl={verifyUrl} />
           </div>
           <div ref={backRef}>
-            <IdCardBack staff={staffForCard!} tenant={tenant} />
+            <IdCardBack staff={staffForCard!} tenant={tenantForCard!} />
           </div>
         </div>
 

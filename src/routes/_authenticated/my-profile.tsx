@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
 import { StaffPhotoUpload } from "@/components/StaffPhotoUpload";
+import { SignaturePad } from "@/components/SignaturePad";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,6 +118,14 @@ function MyProfile() {
             userId={user.userId}
             currentName={user?.profile?.full_name}
             photoLocked={!!user?.profile?.photo_locked}
+          />
+        )}
+
+        {user?.userId && (
+          <SignaturePad
+            kind="employee"
+            ownerId={user.userId}
+            signatureLocked={!!(user?.profile as any)?.signature_locked}
           />
         )}
 

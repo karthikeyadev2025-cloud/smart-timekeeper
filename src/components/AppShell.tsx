@@ -23,6 +23,7 @@ import {
   Receipt,
   IdCard,
   Camera,
+  PenLine,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -77,6 +78,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/payroll", label: "Payroll", icon: Wallet },
       { to: "/bank-approvals", label: "Bank approvals", icon: ShieldAlert },
       { to: "/photo-approvals", label: "Photo approvals", icon: Camera },
+      { to: "/signature-approvals", label: "Signature approvals", icon: PenLine },
       { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
       { to: "/billing", label: "Billing", icon: Receipt },
     ];

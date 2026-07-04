@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IdCardPreviewModal } from "@/components/IdCardPreviewModal";
 import { StaffPhotoUpload } from "@/components/StaffPhotoUpload";
+import { SignaturePad } from "@/components/SignaturePad";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -215,6 +216,7 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
           bypassApproval
           photoLocked={!!staff.photo_locked}
         />
+        <SignaturePad kind="employee" ownerId={staff.id} bypassApproval />
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1 col-span-2"><Label>Full name</Label><Input value={form.full_name} onChange={(e) => set("full_name")(e.target.value)} /></div>
           <div className="space-y-1"><Label>Designation</Label><Input value={form.designation} onChange={(e) => set("designation")(e.target.value)} /></div>

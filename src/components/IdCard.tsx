@@ -36,6 +36,7 @@ export type StaffForCard = {
   id_proof_number?: string | null;
   address?: string | null;
   branch_name?: string | null;
+  signature_url?: string | null;
 };
 
 export type TenantForCard = {
@@ -44,6 +45,7 @@ export type TenantForCard = {
   logo_url?: string | null;
   id_card_accent?: string | null;
   id_card_template?: "corporate" | "modern" | "compact" | null;
+  authority_signature_url?: string | null;
 };
 
 function initials(name?: string | null): string {
@@ -272,13 +274,21 @@ function CorporateBack({ staff, tenant, className }: {
         {/* Signature area */}
         <div style={{ marginTop: "auto", display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
           <div style={{ flex: 1 }}>
-            <div style={{ borderBottom: "1px solid #94A3B8", height: 24 }} />
+            <div style={{ height: 24, display: "flex", alignItems: "flex-end", justifyContent: "center", borderBottom: "1px solid #94A3B8" }}>
+              {staff.signature_url && (
+                <img src={staff.signature_url} alt="" crossOrigin="anonymous" style={{ maxHeight: 22, maxWidth: "90%", objectFit: "contain" }} />
+              )}
+            </div>
             <div style={{ fontSize: 7, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
               Employee signature
             </div>
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ borderBottom: "1px solid #94A3B8", height: 24 }} />
+            <div style={{ height: 24, display: "flex", alignItems: "flex-end", justifyContent: "center", borderBottom: "1px solid #94A3B8" }}>
+              {tenant.authority_signature_url && (
+                <img src={tenant.authority_signature_url} alt="" crossOrigin="anonymous" style={{ maxHeight: 22, maxWidth: "90%", objectFit: "contain" }} />
+              )}
+            </div>
             <div style={{ fontSize: 7, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
               Issuing authority
             </div>
@@ -481,13 +491,21 @@ function ModernBack({ staff, tenant, className }: {
 
         <div style={{ marginTop: "auto", display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
           <div style={{ flex: 1 }}>
-            <div style={{ borderBottom: `2px solid ${accent}`, height: 20 }} />
+            <div style={{ height: 20, display: "flex", alignItems: "flex-end", justifyContent: "center", borderBottom: `2px solid ${accent}` }}>
+              {staff.signature_url && (
+                <img src={staff.signature_url} alt="" crossOrigin="anonymous" style={{ maxHeight: 18, maxWidth: "90%", objectFit: "contain" }} />
+              )}
+            </div>
             <div style={{ fontSize: 7, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
               Signature
             </div>
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ borderBottom: `2px solid ${accent}`, height: 20 }} />
+            <div style={{ height: 20, display: "flex", alignItems: "flex-end", justifyContent: "center", borderBottom: `2px solid ${accent}` }}>
+              {tenant.authority_signature_url && (
+                <img src={tenant.authority_signature_url} alt="" crossOrigin="anonymous" style={{ maxHeight: 18, maxWidth: "90%", objectFit: "contain" }} />
+              )}
+            </div>
             <div style={{ fontSize: 7, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
               Authority
             </div>

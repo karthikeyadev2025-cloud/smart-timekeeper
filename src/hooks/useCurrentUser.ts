@@ -17,6 +17,7 @@ export interface CurrentUserData {
     is_active: boolean;
     staff_id: string | null;
     photo_locked: boolean | null;
+    signature_locked: boolean | null;
   } | null;
   roles: AppRole[];
   tenant: {

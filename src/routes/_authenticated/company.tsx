@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { updateOwnCompanyProfile } from "@/lib/admin.functions";
 import { IdCardTemplateChooser } from "@/components/IdCardTemplateChooser";
+import { SignaturePad } from "@/components/SignaturePad";
 import { Building2, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -240,6 +241,15 @@ function CompanyProfilePage() {
                 Reset
               </button>
             </div>
+
+            {tenantId && (
+              <div className="pt-2">
+                <SignaturePad kind="tenant" ownerId={tenantId} />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Appears as "Issuing authority" on every staff member's ID card. You can change this anytime — no approval needed.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t">

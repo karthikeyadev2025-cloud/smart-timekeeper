@@ -13,6 +13,7 @@ import { Download, Share2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { IdCardFront, IdCardBack, type StaffForCard, type TenantForCard } from "@/components/IdCard";
 import { useStaffPhotoUrl } from "@/components/StaffPhotoUpload";
+import { useSignatureUrl } from "@/components/SignaturePad";
 import { cardToDataUrl, downloadDataUrl, shareCard } from "@/lib/id-card-export";
 
 export function IdCardPreviewModal({
@@ -28,7 +29,10 @@ export function IdCardPreviewModal({
   const [busy, setBusy] = useState<"idle" | "download" | "share">("idle");
   // Fresh signed URL for the photo — avatar_url on the row may be stale
   const { data: photoUrl } = useStaffPhotoUrl(staff.id);
-  const staffWithFreshPhoto = { ...staff, avatar_url: photoUrl ?? staff.avatar_url };
+  const { data: sigUrl } = useSignatureUrl(`${staff.id}/signature.png`);
+  const { data: authoritySigUrl } = useSignatureUrl(tenant.id ? `tenant/${tenant.id}/signature.png` : undefined);
+  const staffWithFreshPhoto = { ...staff, avatar_url: photoUrl ?? staff.avatar_url, signature_url: sigUrl ?? null };
+  const tenantWithSignature = { ...tenant, authority_signature_url: authoritySigUrl ?? null };
 
   // Verify URL — a public route that shows a minimal "This is a valid Punchly
   // ID for {name} at {tenant}" page. Even before we build that route, scanning
@@ -74,10 +78,10 @@ export function IdCardPreviewModal({
 
         <div className="flex flex-col items-center gap-4 py-2">
           <div ref={frontRef}>
-            <IdCardFront staff={staffWithFreshPhoto} tenant={tenant} verifyUrl={verifyUrl} />
+            <IdCardFront staff={staffWithFreshPhoto} tenant={tenantWithSignature} verifyUrl={verifyUrl} />
           </div>
           <div ref={backRef}>
-            <IdCardBack staff={staffWithFreshPhoto} tenant={tenant} />
+            <IdCardBack staff={staffWithFreshPhoto} tenant={tenantWithSignature} />
           </div>
         </div>
 
