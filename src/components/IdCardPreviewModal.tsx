@@ -6,7 +6,7 @@
  * Renders the card, offers a Download PNG and a Share button.
  */
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Download, Share2, Loader2 } from "lucide-react";
@@ -42,31 +42,50 @@ export function IdCardPreviewModal({
 
   const filename = `${(staff.staff_id || "EMP")}_${(staff.full_name || "id").replace(/\s+/g, "_")}_id.png`;
 
-  const handleDownload = async () => {
+  // Pre-generate the PNG as soon as the modal opens (and the card refs +
+  // photo/signature URLs are ready) — NOT when Download/Share is tapped.
+  // navigator.share() only works within a short window of the actual
+  // click; doing 1-3s of image-fetch + render work first silently breaks
+  // it on strict browsers (Safari/iOS especially), making Share look
+  // like it just downloads instead.
+  const [preparedUrl, setPreparedUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) { setPreparedUrl(null); return; }
+    if (!frontRef.current || !backRef.current) return;
+    let cancelled = false;
+    cardToDataUrl(frontRef.current, backRef.current)
+      .then((url) => { if (!cancelled) setPreparedUrl(url); })
+      .catch((e) => console.warn("[id-card] pre-generation failed:", e));
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, staffWithFreshPhoto.avatar_url, staffWithFreshPhoto.signature_url, tenantWithSignature.authority_signature_url, tenantWithSignature.id_card_template]);
+
+  const handleDownload = () => {
+    if (preparedUrl) {
+      downloadDataUrl(preparedUrl, filename);
+      toast.success("ID card downloaded");
+      return;
+    }
+    // Fallback: pre-generation hasn't finished yet (just opened the modal)
     if (!frontRef.current || !backRef.current) return;
     setBusy("download");
-    try {
-      const dataUrl = await cardToDataUrl(frontRef.current, backRef.current);
-      downloadDataUrl(dataUrl, filename);
-      toast.success("ID card downloaded");
-    } catch (e: any) {
-      toast.error(`Download failed: ${e?.message ?? e}`);
-    } finally {
-      setBusy("idle");
-    }
+    cardToDataUrl(frontRef.current, backRef.current)
+      .then((url) => { setPreparedUrl(url); downloadDataUrl(url, filename); toast.success("ID card downloaded"); })
+      .catch((e: any) => toast.error(`Download failed: ${e?.message ?? e}`))
+      .finally(() => setBusy("idle"));
   };
 
-  const handleShare = async () => {
+  const handleShare = () => {
+    if (preparedUrl) {
+      shareCard(preparedUrl, filename, staff.full_name || "staff");
+      return;
+    }
     if (!frontRef.current || !backRef.current) return;
     setBusy("share");
-    try {
-      const dataUrl = await cardToDataUrl(frontRef.current, backRef.current);
-      await shareCard(dataUrl, filename, staff.full_name || "staff");
-    } catch (e: any) {
-      toast.error(`Share failed: ${e?.message ?? e}`);
-    } finally {
-      setBusy("idle");
-    }
+    cardToDataUrl(frontRef.current, backRef.current)
+      .then((url) => { setPreparedUrl(url); shareCard(url, filename, staff.full_name || "staff"); })
+      .catch((e: any) => toast.error(`Share failed: ${e?.message ?? e}`))
+      .finally(() => setBusy("idle"));
   };
 
   return (

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
@@ -23,6 +23,15 @@ function MyIdCardPage() {
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<"idle" | "download" | "share">("idle");
+  // Pre-generated PNG — built as soon as the card is rendered, NOT when
+  // the user taps a button. navigator.share() only works within a short
+  // window of the actual click; generating on-click adds 1-3+ seconds of
+  // image-fetching/rendering delay that silently breaks Share on strict
+  // browsers (notably Safari/iOS), making it look like Share just
+  // downloads instead. Pre-generating means the click handler only has
+  // to do near-instant work.
+  const [preparedUrl, setPreparedUrl] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
 
   // Staff-owned profile + tenant + branch — one round trip
   const { data, isLoading: loadingProfile } = useQuery({
@@ -61,21 +70,44 @@ function MyIdCardPage() {
   const verifyUrl = `${typeof window !== "undefined" ? window.location.origin : "https://punchly.online"}/verify/${staff?.id ?? ""}`;
   const filename = `${staff?.staff_id || "EMP"}_${(staff?.full_name || "id").replace(/\s+/g, "_")}_id.png`;
 
-  const doExport = async (action: "download" | "share") => {
-    if (!frontRef.current || !backRef.current) return;
-    setBusy(action);
-    try {
-      const dataUrl = await cardToDataUrl(frontRef.current, backRef.current);
-      if (action === "download") {
-        downloadDataUrl(dataUrl, filename);
-        toast.success("Downloaded");
-      } else {
-        await shareCard(dataUrl, filename, staff?.full_name || "staff");
-      }
-    } catch (e: any) {
-      toast.error(`${action === "download" ? "Download" : "Share"} failed: ${e?.message ?? e}`);
-    } finally {
-      setBusy("idle");
+  // Pre-generate whenever the rendered card actually changes (photo, both
+  // signatures, or the tenant's template/accent) — not on every render.
+  useEffect(() => {
+    if (!frontRef.current || !backRef.current || !staffForCard || !tenantForCard) return;
+    let cancelled = false;
+    setPreparing(true);
+    cardToDataUrl(frontRef.current, backRef.current)
+      .then((url) => { if (!cancelled) setPreparedUrl(url); })
+      .catch((e) => console.warn("[id-card] pre-generation failed:", e))
+      .finally(() => { if (!cancelled) setPreparing(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staffForCard?.avatar_url, staffForCard?.signature_url, tenantForCard?.authority_signature_url, tenantForCard?.id_card_template, tenantForCard?.id_card_accent]);
+
+  const doExport = (action: "download" | "share") => {
+    // If pre-generation hasn't finished yet (rare — only right after the
+    // page first loads), regenerate on the spot as a fallback. This path
+    // may still hit the Safari timing issue, but it's a fast, uncommon
+    // edge case rather than the everyday behavior.
+    if (!preparedUrl) {
+      if (!frontRef.current || !backRef.current) return;
+      setBusy(action);
+      cardToDataUrl(frontRef.current, backRef.current)
+        .then((url) => {
+          setPreparedUrl(url);
+          if (action === "download") { downloadDataUrl(url, filename); toast.success("Downloaded"); }
+          else shareCard(url, filename, staff?.full_name || "staff");
+        })
+        .catch((e: any) => toast.error(`${action === "download" ? "Download" : "Share"} failed: ${e?.message ?? e}`))
+        .finally(() => setBusy("idle"));
+      return;
+    }
+
+    if (action === "download") {
+      downloadDataUrl(preparedUrl, filename);
+      toast.success("Downloaded");
+    } else {
+      shareCard(preparedUrl, filename, staff?.full_name || "staff");
     }
   };
 

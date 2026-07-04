@@ -126,29 +126,99 @@ export function downloadDataUrl(dataUrl: string, filename: string) {
 }
 
 /**
- * Share via the platform Web Share API if available (mobile), else fall back
- * to downloading the file so the user can share manually.
+ * Share via the best available mechanism, in priority order:
+ *   1. Native Capacitor Share (Android/iOS app) — writes the PNG to the
+ *      device cache, then opens the OS share sheet with the actual file.
+ *      This is necessary because inside a Capacitor WebView, the standard
+ *      Web Share API frequently can't share files (only text/URLs), so it
+ *      silently falls through to a plain download — which is exactly the
+ *      "Share button just downloads" bug this fixes.
+ *   2. Web Share API with files (real mobile browsers, not in-app WebView)
+ *   3. Plain download (desktop, or anything else unsupported)
  */
 export async function shareCard(dataUrl: string, filename: string, staffName: string): Promise<boolean> {
+  const { isNative } = await import("@/lib/native");
+
+  if (isNative()) {
+    try {
+      const { Filesystem, Directory } = await import("@capacitor/filesystem");
+      const { Share } = await import("@capacitor/share");
+
+      // Strip the data: prefix — Filesystem.writeFile wants raw base64.
+      const base64 = dataUrl.split(",")[1] ?? dataUrl;
+
+      const written = await Filesystem.writeFile({
+        path: filename,
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      await Share.share({
+        title: `${staffName} — ID Card`,
+        text: `Employee ID card for ${staffName}`,
+        url: written.uri,
+        dialogTitle: "Share ID card",
+      });
+      return true;
+    } catch (err: any) {
+      // User closing the native share sheet throws too — don't fall back
+      // to a download in that case, just treat it as a normal cancel.
+      if (err?.message?.toLowerCase?.().includes("cancel")) return false;
+      console.warn("[id-card] native share failed, falling back:", err);
+      // fall through to Web Share / download below
+    }
+  }
+
+  // Web Share API path (mobile browser, not inside the Capacitor app).
+  // CRITICAL: navigator.share() only works within a short window of the
+  // user's actual click ("user activation"). By this point we've already
+  // spent time in the Capacitor check above, so every remaining step here
+  // must avoid adding awaits before the share() call itself:
+  //   - dataUrlToBlobSync does NOT fetch (no microtask delay from network)
+  //   - navigator.share() itself is NOT awaited — fire-and-forget with
+  //     .catch() so the synchronous call happens immediately
+  // The caller (cardToDataUrl) should also be invoked well BEFORE the
+  // click — see the components using this: they pre-generate the image
+  // when the card is first shown, not when Share is tapped.
   if (navigator.share && navigator.canShare) {
     try {
-      const blob = await (await fetch(dataUrl)).blob();
+      const blob = dataUrlToBlobSync(dataUrl);
       const file = new File([blob], filename, { type: "image/png" });
       if (navigator.canShare({ files: [file] })) {
-        await navigator.share({
+        navigator.share({
           title: `${staffName} — ID Card`,
           text: `Employee ID card for ${staffName}`,
           files: [file],
+        }).catch((err: any) => {
+          if (err?.name !== "AbortError") {
+            console.warn("[id-card] web share rejected, falling back to download:", err);
+            downloadDataUrl(dataUrl, filename);
+          }
         });
         return true;
       }
-    } catch (err: any) {
-      if (err?.name === "AbortError") return false;       // user closed the sheet
-      // NotAllowedError (Safari user-gesture timeout) and anything else:
-      // fall through to download so the user still gets the file.
-      console.warn("[id-card] native share failed, falling back to download:", err);
+    } catch (err) {
+      console.warn("[id-card] web share setup failed, falling back to download:", err);
     }
   }
+
   downloadDataUrl(dataUrl, filename);
   return true;
+}
+
+/**
+ * Convert a data URL to a Blob SYNCHRONOUSLY (no fetch, no await).
+ * Using fetch() to do this — `await (await fetch(dataUrl)).blob()` — adds
+ * a promise resolution before navigator.share() is called, which is
+ * often just enough delay for strict browsers (notably Safari/iOS) to
+ * decide the "user activation" window has closed and silently reject
+ * the share, falling back to a plain download every single time.
+ */
+function dataUrlToBlobSync(dataUrl: string): Blob {
+  const [header, base64] = dataUrl.split(",");
+  const mime = /data:(.*);base64/.exec(header)?.[1] ?? "image/png";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
 }
