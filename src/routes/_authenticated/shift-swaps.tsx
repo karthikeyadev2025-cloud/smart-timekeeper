@@ -36,7 +36,7 @@ function ShiftSwapsPage() {
         .order("created_at", { ascending: false });
       if (!swaps || swaps.length === 0) return [];
 
-      const ids = Array.from(new Set(swaps.flatMap((s: any) => [s.requester_id, s.target_id])));
+      const ids = Array.from(new Set(swaps.flatMap((s: any) => [s.requester_id, s.target_id]))) as string[];
       const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", ids);
       const byId = new Map((profiles ?? []).map((p: any) => [p.id, p]));
 

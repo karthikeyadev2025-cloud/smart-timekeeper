@@ -15,6 +15,7 @@ async function initSentry() {
   const dsn = import.meta.env?.VITE_SENTRY_DSN as string | undefined;
   if (!dsn) return;
   try {
+    // @ts-ignore — optional dependency, dynamically imported only when VITE_SENTRY_DSN is set
     const Sentry = await import("@sentry/react");
     Sentry.init({
       dsn,
@@ -42,8 +43,9 @@ export async function reportError(
   const dsn = import.meta.env?.VITE_SENTRY_DSN as string | undefined;
   if (!dsn) return;
   try {
+    // @ts-ignore — optional dependency, dynamically imported only when VITE_SENTRY_DSN is set
     const Sentry = await import("@sentry/react");
-    Sentry.withScope((scope) => {
+    Sentry.withScope((scope: any) => {
       Object.entries(context).forEach(([k, v]) => scope.setExtra(k, v));
       Sentry.captureException(error);
     });
