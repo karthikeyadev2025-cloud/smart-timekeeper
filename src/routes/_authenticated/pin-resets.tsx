@@ -48,6 +48,11 @@ function PinResetsPage() {
     mutationFn: async () =>
       resolve({ data: { request_id: active!.id, new_pin: newPin } }),
     onSuccess: (res) => {
+      // Blur the PIN input BEFORE unmounting the dialog — Radix marks the
+      // closing dialog aria-hidden, and a still-focused descendant triggers
+      // the "Blocked aria-hidden on an element because its descendant
+      // retained focus" accessibility warning in Chrome.
+      (document.activeElement as HTMLElement | null)?.blur?.();
       setDone({ phone: res.phone, pin: res.new_pin });
       setActive(null);
       setNewPin("");
