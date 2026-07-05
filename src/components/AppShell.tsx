@@ -175,7 +175,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           <HeaderBranchSwitcher />
         </div>
       </div>
-      <nav className="flex flex-1 flex-col gap-1">
+      {/* Scrollable middle: the link list grew big enough (admin navs have
+          15+ entries now) to overflow small screens. min-h-0 lets this flex
+          child actually shrink, and overflow-y-auto scrolls JUST the links —
+          the logo header above and the Sign out footer below stay pinned
+          and always reachable. */}
+      <nav className="flex flex-1 min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain pr-1">
         {items.map((it) => {
           const active = location.pathname === it.to;
           return (
@@ -222,7 +227,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-64 shrink-0 border-r border-border bg-sidebar md:block">
+      <aside className="hidden w-64 shrink-0 border-r border-border bg-sidebar md:block sticky top-0 h-screen">
         <SidebarContent />
       </aside>
 
@@ -239,7 +244,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-0">
+              <SheetContent side="left" className="w-72 p-0 h-full">
                 <SidebarContent />
               </SheetContent>
             </Sheet>
