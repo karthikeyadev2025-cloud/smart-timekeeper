@@ -27,6 +27,7 @@ import {
   Repeat,
   Megaphone,
   FileBarChart,
+  MonitorSmartphone,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -77,6 +78,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/team", label: "Staff", icon: Users },
       { to: "/shifts", label: "Shifts & locations", icon: Clock },
       { to: "/live-map", label: "Live map", icon: Map },
+      { to: "/kiosk", label: "Kiosk mode", icon: MonitorSmartphone },
       { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
       { to: "/leave-types", label: "Leave types", icon: Calendar },
       { to: "/shift-swap-approvals", label: "Shift swaps", icon: Repeat },
@@ -95,6 +97,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/app", label: "Dashboard", icon: LayoutDashboard },
       { to: "/team", label: "My branch staff", icon: Users },
       { to: "/live-map", label: "Live map", icon: Map },
+      { to: "/kiosk", label: "Kiosk mode", icon: MonitorSmartphone },
       { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
       { to: "/shift-swap-approvals", label: "Shift swaps", icon: Repeat },
       { to: "/payroll", label: "Payroll", icon: Wallet },
