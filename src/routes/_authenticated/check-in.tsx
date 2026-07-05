@@ -14,6 +14,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
 import { detectMockLocation, type AntiCheatResult } from "@/lib/anti-cheat";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
+import { localDateStr } from "@/lib/local-date";
 
 export const Route = createFileRoute("/_authenticated/check-in")({
   component: CheckInFlow,
@@ -73,7 +74,9 @@ function CheckInFlow() {
   const { data: user } = useCurrentUser();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const today = new Date().toISOString().slice(0, 10);
+  // Local (IST) date — NOT toISOString().slice(0,10), which returns the UTC
+  // date and mislabels every punch before 5:30 AM local as the previous day.
+  const today = localDateStr();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [coords, setCoords] = useState<GeolocationCoordinates | null>(null);
@@ -165,11 +168,41 @@ function CheckInFlow() {
   });
 
   const lastKind = todayRecords?.[todayRecords.length - 1]?.kind;
-  const nextKind: "check_in" | "check_out" | "break_out" | "break_in" =
-    lastKind === "check_in" ? "break_out" :
-    lastKind === "break_out" ? "break_in" :
-    lastKind === "break_in" ? "check_out" :
-    lastKind === "check_out" ? "check_in" : "check_in";
+  // Allowed next actions. The old logic FORCED exactly one break cycle
+  // (check_in → break_out → break_in → check_out): staff who took no break
+  // couldn't check out at all without logging a fake break. Now:
+  //   after check_in  → check out OR take a break
+  //   after break_in  → check out OR take another break (multiple breaks OK)
+  //   after break_out → must return from break first
+  //   after check_out → can check in again (split shifts)
+  const allowedKinds: ("check_in" | "check_out" | "break_out" | "break_in")[] =
+    lastKind === "check_in" ? ["check_out", "break_out"] :
+    lastKind === "break_out" ? ["break_in"] :
+    lastKind === "break_in" ? ["check_out", "break_out"] :
+    ["check_in"]; // no records yet today, or last was check_out
+  const [kindOverride, setKindOverride] = useState<typeof allowedKinds[number] | null>(null);
+  const nextKind = kindOverride && allowedKinds.includes(kindOverride) ? kindOverride : allowedKinds[0];
+
+  // Forgotten check-out from a previous day: the state machine only looks at
+  // TODAY's records, so an unclosed session yesterday silently vanishes
+  // (and its hours get dropped from stats/payroll math). Detect it and tell
+  // the staff member so an admin can correct the record.
+  const { data: lastBeforeToday } = useQuery({
+    queryKey: ["last-before-today", user?.userId, today],
+    enabled: !!user?.userId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("attendance_records")
+        .select("kind, attendance_date")
+        .eq("user_id", user!.userId)
+        .lt("attendance_date", today)
+        .order("occurred_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+  const forgotCheckout = !!lastBeforeToday && lastBeforeToday.kind !== "check_out";
 
   const isFieldStaff = (user?.profile as any)?.is_field_staff === true;
 
@@ -326,6 +359,26 @@ function CheckInFlow() {
     }
 
     try {
+      // Duplicate-punch guard: re-read the latest record from the SERVER
+      // right before inserting. Protects against double-tap races, stale
+      // todayRecords cache after tab switches, and two open tabs — any of
+      // which could otherwise insert two consecutive records of the same
+      // kind and corrupt the day's state machine.
+      const { data: latest } = await supabase
+        .from("attendance_records")
+        .select("kind")
+        .eq("user_id", user.userId)
+        .eq("attendance_date", localDateStr())
+        .order("occurred_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latest && latest.kind === nextKind) {
+        toast.error(`Your ${nextKind.replace("_", " ")} was already recorded — refreshing.`);
+        queryClient.invalidateQueries({ queryKey: ["today-records"] });
+        setSubmitting(false);
+        return;
+      }
+
       const path = `${user.userId}/${Date.now()}.jpg`;
       const { error: upErr } = await supabase.storage.from("attendance-selfies").upload(path, selfieBlob, {
         contentType: "image/jpeg",
@@ -349,7 +402,9 @@ function CheckInFlow() {
         face_verified: faceWasVerified,
         notes: antiCheat?.suspicious ? `anti-cheat: ${antiCheat.reasons.join("; ")}` : null,
         occurred_at: occurredAtLocal,
-        attendance_date: occurredAtLocal.slice(0, 10),
+        // Device-local date, NOT the UTC slice of the ISO timestamp — a
+        // 12:30 AM IST night-shift punch belongs to today, not yesterday.
+        attendance_date: localDateStr(),
       });
       if (insErr) throw insErr;
 
@@ -414,6 +469,33 @@ function CheckInFlow() {
           <h1 className="text-2xl font-bold">{nextKind.replace("_", " ").replace(/^\w/, c => c.toUpperCase())}</h1>
           <p className="text-sm text-muted-foreground">3 simple steps to record your attendance.</p>
         </header>
+
+        {allowedKinds.length > 1 && (
+          <div className="flex gap-2">
+            {allowedKinds.map((k) => (
+              <Button
+                key={k}
+                variant={k === nextKind ? "default" : "outline"}
+                size="sm"
+                className="flex-1"
+                onClick={() => setKindOverride(k)}
+              >
+                {k === "check_out" ? "Check out" : k === "break_out" ? "Take a break" : k.replace("_", " ")}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {forgotCheckout && (
+          <Card className="flex items-start gap-2.5 border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <span>
+              Looks like you didn't check out on{" "}
+              <strong>{new Date(lastBeforeToday!.attendance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</strong>.
+              That day's hours may not count — ask your admin to correct the record.
+            </span>
+          </Card>
+        )}
 
         {!isOnline && (
           <Card className="flex items-center gap-2.5 border-amber-500/40 bg-amber-500/10 p-3 text-sm">

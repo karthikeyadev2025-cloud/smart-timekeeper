@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { listPending, removePending, updatePendingError, type PendingAttendance } from "./offline-queue";
+import { localDateStr } from "./local-date";
 
 let syncing = false;
 
@@ -67,7 +68,10 @@ async function uploadOne(item: PendingAttendance): Promise<void> {
     // offline punches we need the ON-DEVICE timestamp, not whenever the sync
     // happens to run (could be the next day). Override both explicitly.
     occurred_at: item.occurred_at_local,
-    attendance_date: item.occurred_at_local.slice(0, 10),
+    // Convert the punch's actual moment to the device-LOCAL calendar date.
+    // .slice(0,10) on the ISO string gives the UTC date, which mislabels
+    // any punch made before 5:30 AM IST as the previous day.
+    attendance_date: localDateStr(new Date(item.occurred_at_local)),
   });
   if (insErr) throw insErr;
 }
