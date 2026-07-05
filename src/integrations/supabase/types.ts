@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          is_pinned: boolean
+          tenant_id: string
+          title: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          is_pinned?: boolean
+          tenant_id: string
+          title: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          is_pinned?: boolean
+          tenant_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           key: string
@@ -44,6 +85,7 @@ export type Database = {
           created_at: string
           distance_from_office_m: number | null
           enforcement_status: Database["public"]["Enums"]["enforcement_status"]
+          face_verified: boolean
           id: string
           is_mock_location: boolean
           kind: Database["public"]["Enums"]["attendance_kind"]
@@ -65,6 +107,7 @@ export type Database = {
           created_at?: string
           distance_from_office_m?: number | null
           enforcement_status?: Database["public"]["Enums"]["enforcement_status"]
+          face_verified?: boolean
           id?: string
           is_mock_location?: boolean
           kind: Database["public"]["Enums"]["attendance_kind"]
@@ -86,6 +129,7 @@ export type Database = {
           created_at?: string
           distance_from_office_m?: number | null
           enforcement_status?: Database["public"]["Enums"]["enforcement_status"]
+          face_verified?: boolean
           id?: string
           is_mock_location?: boolean
           kind?: Database["public"]["Enums"]["attendance_kind"]
@@ -126,6 +170,20 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_user_id_fkey_profiles"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -360,6 +418,20 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "leave_balances_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_balances_user_id_fkey_profiles"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       leave_requests: {
@@ -436,6 +508,20 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "leave_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_user_id_fkey_profiles"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       leave_types: {
@@ -469,6 +555,63 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          action_url: string | null
+          body: string
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          read_at: string | null
+          ref_id: string | null
+          ref_table: string | null
+          tenant_id: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          action_url?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          read_at?: string | null
+          ref_id?: string | null
+          ref_table?: string | null
+          tenant_id?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          action_url?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["notification_kind"]
+          read_at?: string | null
+          ref_id?: string | null
+          ref_table?: string | null
+          tenant_id?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -520,6 +663,67 @@ export type Database = {
           },
           {
             foreignKeyName: "office_locations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_orders: {
+        Row: {
+          amount_paise: number
+          created_at: string
+          id: string
+          plan_id: string
+          purpose: string
+          razorpay_order_id: string
+          razorpay_payment_id: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_paise: number
+          created_at?: string
+          id?: string
+          plan_id: string
+          purpose?: string
+          razorpay_order_id: string
+          razorpay_payment_id?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_paise?: number
+          created_at?: string
+          id?: string
+          plan_id?: string
+          purpose?: string
+          razorpay_order_id?: string
+          razorpay_payment_id?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_orders_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_orders_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans_with_label"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_orders_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -585,6 +789,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payments_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans_with_label"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payments_subscription_id_fkey"
             columns: ["subscription_id"]
             isOneToOne: false
@@ -603,14 +814,19 @@ export type Database = {
       payslips: {
         Row: {
           absent_days: number
+          amount_paid: number
           base_salary: number
           branch_id: string | null
           deductions: number
           generated_at: string
           id: string
+          last_paid_at: string | null
+          late_days: number
+          late_fine: number
           net_pay: number
           overtime_hours: number
           paid_leave_days: number
+          payment_status: string
           period_month: number
           period_year: number
           present_days: number
@@ -621,14 +837,19 @@ export type Database = {
         }
         Insert: {
           absent_days?: number
+          amount_paid?: number
           base_salary: number
           branch_id?: string | null
           deductions?: number
           generated_at?: string
           id?: string
+          last_paid_at?: string | null
+          late_days?: number
+          late_fine?: number
           net_pay?: number
           overtime_hours?: number
           paid_leave_days?: number
+          payment_status?: string
           period_month: number
           period_year: number
           present_days?: number
@@ -639,14 +860,19 @@ export type Database = {
         }
         Update: {
           absent_days?: number
+          amount_paid?: number
           base_salary?: number
           branch_id?: string | null
           deductions?: number
           generated_at?: string
           id?: string
+          last_paid_at?: string | null
+          late_days?: number
+          late_fine?: number
           net_pay?: number
           overtime_hours?: number
           paid_leave_days?: number
+          payment_status?: string
           period_month?: number
           period_year?: number
           present_days?: number
@@ -665,6 +891,179 @@ export type Database = {
           },
           {
             foreignKeyName: "payslips_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payslips_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payslips_user_id_fkey_profiles"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_bank_changes: {
+        Row: {
+          bank_account_holder: string | null
+          bank_account_number: string | null
+          bank_ifsc: string | null
+          bank_name: string | null
+          created_at: string
+          id: string
+          prev_bank_account_holder: string | null
+          prev_bank_account_number: string | null
+          prev_bank_ifsc: string | null
+          prev_bank_name: string | null
+          prev_upi_id: string | null
+          reject_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          tenant_id: string
+          upi_id: string | null
+          user_id: string
+        }
+        Insert: {
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_ifsc?: string | null
+          bank_name?: string | null
+          created_at?: string
+          id?: string
+          prev_bank_account_holder?: string | null
+          prev_bank_account_number?: string | null
+          prev_bank_ifsc?: string | null
+          prev_bank_name?: string | null
+          prev_upi_id?: string | null
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          tenant_id: string
+          upi_id?: string | null
+          user_id: string
+        }
+        Update: {
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_ifsc?: string | null
+          bank_name?: string | null
+          created_at?: string
+          id?: string
+          prev_bank_account_holder?: string | null
+          prev_bank_account_number?: string | null
+          prev_bank_ifsc?: string | null
+          prev_bank_name?: string | null
+          prev_upi_id?: string | null
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          tenant_id?: string
+          upi_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_bank_changes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_photo_changes: {
+        Row: {
+          created_at: string
+          id: string
+          photo_path: string
+          reject_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          photo_path: string
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          photo_path?: string
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_photo_changes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_signature_changes: {
+        Row: {
+          created_at: string
+          id: string
+          reject_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          signature_path: string
+          status: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signature_path: string
+          status?: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signature_path?: string
+          status?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_signature_changes_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -717,11 +1116,26 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pin_reset_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pin_reset_requests_user_id_fkey_profiles"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       plans: {
         Row: {
           billing: Database["public"]["Enums"]["plan_billing"]
+          billing_period_months: number | null
           created_at: string
           description: string | null
           display_order: number | null
@@ -729,12 +1143,16 @@ export type Database = {
           features: Json | null
           id: string
           is_active: boolean
+          maintenance_fee_inr: number | null
+          maintenance_grace_months: number | null
+          maintenance_period_months: number
           name: string
           price_inr: number
           updated_at: string
         }
         Insert: {
           billing: Database["public"]["Enums"]["plan_billing"]
+          billing_period_months?: number | null
           created_at?: string
           description?: string | null
           display_order?: number | null
@@ -742,12 +1160,16 @@ export type Database = {
           features?: Json | null
           id?: string
           is_active?: boolean
+          maintenance_fee_inr?: number | null
+          maintenance_grace_months?: number | null
+          maintenance_period_months?: number
           name: string
           price_inr: number
           updated_at?: string
         }
         Update: {
           billing?: Database["public"]["Enums"]["plan_billing"]
+          billing_period_months?: number | null
           created_at?: string
           description?: string | null
           display_order?: number | null
@@ -755,6 +1177,9 @@ export type Database = {
           features?: Json | null
           id?: string
           is_active?: boolean
+          maintenance_fee_inr?: number | null
+          maintenance_grace_months?: number | null
+          maintenance_period_months?: number
           name?: string
           price_inr?: number
           updated_at?: string
@@ -763,55 +1188,109 @@ export type Database = {
       }
       profiles: {
         Row: {
+          address: string | null
           avatar_url: string | null
+          bank_account_holder: string | null
+          bank_account_number: string | null
+          bank_ifsc: string | null
+          bank_name: string | null
+          blood_group: string | null
           branch_id: string | null
           created_at: string
+          date_of_birth: string | null
+          date_of_joining: string | null
           designation: string | null
           email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
           full_name: string | null
+          gender: string | null
           home_latitude: number | null
           home_longitude: number | null
           id: string
+          id_proof_number: string | null
+          id_proof_type: string | null
           is_active: boolean
           is_field_staff: boolean
           monthly_salary: number | null
           phone: string | null
+          photo_locked: boolean
+          profile_completion: number | null
+          signature_locked: boolean
+          staff_id: string | null
           tenant_id: string | null
           updated_at: string
+          upi_id: string | null
         }
         Insert: {
+          address?: string | null
           avatar_url?: string | null
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_ifsc?: string | null
+          bank_name?: string | null
+          blood_group?: string | null
           branch_id?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          date_of_joining?: string | null
           designation?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
           full_name?: string | null
+          gender?: string | null
           home_latitude?: number | null
           home_longitude?: number | null
           id: string
+          id_proof_number?: string | null
+          id_proof_type?: string | null
           is_active?: boolean
           is_field_staff?: boolean
           monthly_salary?: number | null
           phone?: string | null
+          photo_locked?: boolean
+          profile_completion?: number | null
+          signature_locked?: boolean
+          staff_id?: string | null
           tenant_id?: string | null
           updated_at?: string
+          upi_id?: string | null
         }
         Update: {
+          address?: string | null
           avatar_url?: string | null
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_ifsc?: string | null
+          bank_name?: string | null
+          blood_group?: string | null
           branch_id?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          date_of_joining?: string | null
           designation?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
           full_name?: string | null
+          gender?: string | null
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
+          id_proof_number?: string | null
+          id_proof_type?: string | null
           is_active?: boolean
           is_field_staff?: boolean
           monthly_salary?: number | null
           phone?: string | null
+          photo_locked?: boolean
+          profile_completion?: number | null
+          signature_locked?: boolean
+          staff_id?: string | null
           tenant_id?: string | null
           updated_at?: string
+          upi_id?: string | null
         }
         Relationships: [
           {
@@ -830,14 +1309,232 @@ export type Database = {
           },
         ]
       }
+      promotions: {
+        Row: {
+          banner_text: string
+          created_at: string
+          cta_text: string
+          ends_at: string | null
+          highlight_plan_id: string | null
+          id: string
+          is_active: boolean
+          max_claims: number
+          slug: string
+          starts_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          banner_text: string
+          created_at?: string
+          cta_text?: string
+          ends_at?: string | null
+          highlight_plan_id?: string | null
+          id?: string
+          is_active?: boolean
+          max_claims: number
+          slug: string
+          starts_at?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          banner_text?: string
+          created_at?: string
+          cta_text?: string
+          ends_at?: string | null
+          highlight_plan_id?: string | null
+          id?: string
+          is_active?: boolean
+          max_claims?: number
+          slug?: string
+          starts_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotions_highlight_plan_id_fkey"
+            columns: ["highlight_plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotions_highlight_plan_id_fkey"
+            columns: ["highlight_plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans_with_label"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string | null
+          created_at: string
+          device_label: string | null
+          endpoint: string
+          id: string
+          last_seen_at: string
+          p256dh: string | null
+          platform: string
+          user_id: string
+        }
+        Insert: {
+          auth?: string | null
+          created_at?: string
+          device_label?: string | null
+          endpoint: string
+          id?: string
+          last_seen_at?: string
+          p256dh?: string | null
+          platform?: string
+          user_id: string
+        }
+        Update: {
+          auth?: string | null
+          created_at?: string
+          device_label?: string | null
+          endpoint?: string
+          id?: string
+          last_seen_at?: string
+          p256dh?: string | null
+          platform?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      salary_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          method: string
+          note: string | null
+          paid_at: string
+          paid_by: string | null
+          payslip_id: string
+          reference: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          method?: string
+          note?: string | null
+          paid_at?: string
+          paid_by?: string | null
+          payslip_id: string
+          reference?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          method?: string
+          note?: string | null
+          paid_at?: string
+          paid_by?: string | null
+          payslip_id?: string
+          reference?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_payments_payslip_id_fkey"
+            columns: ["payslip_id"]
+            isOneToOne: false
+            referencedRelation: "payslips"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_payments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_swap_requests: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string | null
+          reject_reason: string | null
+          requester_date: string
+          requester_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          target_date: string
+          target_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          reject_reason?: string | null
+          requester_date: string
+          requester_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_date: string
+          target_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          reject_reason?: string | null
+          requester_date?: string
+          requester_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_date?: string
+          target_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_swap_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shifts: {
         Row: {
           branch_id: string | null
           break_minutes: number | null
           created_at: string
           end_time: string
+          grace_minutes: number
+          half_day_after_minutes: number
           id: string
           is_active: boolean
+          late_fine_amount: number
+          late_fine_type: string
           location_mode: Database["public"]["Enums"]["location_mode"]
           name: string
           start_time: string
@@ -849,8 +1546,12 @@ export type Database = {
           break_minutes?: number | null
           created_at?: string
           end_time: string
+          grace_minutes?: number
+          half_day_after_minutes?: number
           id?: string
           is_active?: boolean
+          late_fine_amount?: number
+          late_fine_type?: string
           location_mode?: Database["public"]["Enums"]["location_mode"]
           name: string
           start_time: string
@@ -862,8 +1563,12 @@ export type Database = {
           break_minutes?: number | null
           created_at?: string
           end_time?: string
+          grace_minutes?: number
+          half_day_after_minutes?: number
           id?: string
           is_active?: boolean
+          late_fine_amount?: number
+          late_fine_type?: string
           location_mode?: Database["public"]["Enums"]["location_mode"]
           name?: string
           start_time?: string
@@ -913,6 +1618,48 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      staff_remarks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          remark: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          remark: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          remark?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_remarks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_remarks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_shifts: {
         Row: {
@@ -965,6 +1712,20 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_shifts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_shifts_user_id_fkey_profiles"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1096,7 +1857,9 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
+          maintenance_due_at: string | null
           plan_id: string
+          razorpay_payment_id: string | null
           razorpay_subscription_id: string | null
           started_at: string
           status: Database["public"]["Enums"]["subscription_status"]
@@ -1107,7 +1870,9 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          maintenance_due_at?: string | null
           plan_id: string
+          razorpay_payment_id?: string | null
           razorpay_subscription_id?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["subscription_status"]
@@ -1118,7 +1883,9 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          maintenance_due_at?: string | null
           plan_id?: string
+          razorpay_payment_id?: string | null
           razorpay_subscription_id?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["subscription_status"]
@@ -1131,6 +1898,13 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans_with_label"
             referencedColumns: ["id"]
           },
           {
@@ -1149,6 +1923,8 @@ export type Database = {
           created_at: string
           employee_limit: number
           id: string
+          id_card_accent: string | null
+          id_card_template: string
           is_active: boolean
           logo_url: string | null
           name: string
@@ -1163,6 +1939,8 @@ export type Database = {
           created_at?: string
           employee_limit?: number
           id?: string
+          id_card_accent?: string | null
+          id_card_template?: string
           is_active?: boolean
           logo_url?: string | null
           name: string
@@ -1177,6 +1955,8 @@ export type Database = {
           created_at?: string
           employee_limit?: number
           id?: string
+          id_card_accent?: string | null
+          id_card_template?: string
           is_active?: boolean
           logo_url?: string | null
           name?: string
@@ -1220,14 +2000,107 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_user_id_fkey_profiles"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      plans_with_label: {
+        Row: {
+          billing: Database["public"]["Enums"]["plan_billing"] | null
+          billing_label: string | null
+          billing_period_months: number | null
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          employee_limit: number | null
+          features: Json | null
+          id: string | null
+          is_active: boolean | null
+          name: string | null
+          price_inr: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          billing?: Database["public"]["Enums"]["plan_billing"] | null
+          billing_label?: never
+          billing_period_months?: number | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          employee_limit?: number | null
+          features?: Json | null
+          id?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          price_inr?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          billing?: Database["public"]["Enums"]["plan_billing"] | null
+          billing_label?: never
+          billing_period_months?: number | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          employee_limit?: number | null
+          features?: Json | null
+          id?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          price_inr?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      cron_birthday_anniversary_wishes: { Args: never; Returns: number }
+      cron_notify_expiring_subs: { Args: never; Returns: number }
+      cron_notify_irregular_attendance: { Args: never; Returns: number }
+      cron_notify_missed_checkins: { Args: never; Returns: number }
       current_tenant_id: { Args: never; Returns: string }
+      daily_attendance_trend: {
+        Args: { _branch_id?: string; _days?: number; _tenant_id: string }
+        Returns: {
+          absent_count: number
+          attendance_date: string
+          present_count: number
+          total_staff: number
+        }[]
+      }
+      expire_overdue_subscriptions: { Args: never; Returns: number }
+      get_active_promotion: {
+        Args: never
+        Returns: {
+          banner_text: string
+          claimed_count: number
+          cta_text: string
+          ends_at: string
+          highlight_plan_id: string
+          id: string
+          is_exhausted: boolean
+          is_expired: boolean
+          max_claims: number
+          remaining: number
+          slug: string
+          starts_at: string
+          title: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1244,9 +2117,90 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_tenant_active: { Args: { _tenant_id: string }; Returns: boolean }
       is_tenant_admin: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
+      }
+      ist_today: { Args: never; Returns: string }
+      mark_notifications_read: { Args: { _ids?: string[] }; Returns: number }
+      my_attendance_stats: {
+        Args: { _user_id: string }
+        Returns: {
+          current_streak: number
+          hours_this_month: number
+          present_days_this_month: number
+          punctuality_pct: number
+          total_working_days_this_month: number
+        }[]
+      }
+      notify: {
+        Args: {
+          _action_url?: string
+          _body: string
+          _kind: Database["public"]["Enums"]["notification_kind"]
+          _ref_id?: string
+          _ref_table?: string
+          _tenant_id: string
+          _title: string
+          _user_id: string
+        }
+        Returns: string
+      }
+      plan_billing_label: {
+        Args: { _billing: string; _months: number }
+        Returns: string
+      }
+      staff_attendance_summary: {
+        Args: { _branch_id?: string; _days?: number; _tenant_id: string }
+        Returns: {
+          attendance_pct: number
+          branch_id: string
+          branch_name: string
+          days_absent: number
+          days_on_leave: number
+          days_present: number
+          days_window: number
+          designation: string
+          full_name: string
+          is_field_staff: boolean
+          last_checkin_date: string
+          phone: string
+          staff_id: string
+          staff_user_id: string
+        }[]
+      }
+      tenant_can_write: { Args: { _tenant_id: string }; Returns: boolean }
+      tenant_maintenance_info: {
+        Args: { _tenant_id: string }
+        Returns: {
+          days_until_lockout: number
+          is_overdue: boolean
+          maintenance_due_at: string
+          maintenance_fee_inr: number
+        }[]
+      }
+      tenant_maintenance_overdue: {
+        Args: { _tenant_id: string }
+        Returns: boolean
+      }
+      tenant_punctuality_leaderboard: {
+        Args: { _limit?: number; _tenant_id: string }
+        Returns: {
+          avatar_url: string
+          checkin_count: number
+          full_name: string
+          on_time_count: number
+          present_days: number
+          punctuality_pct: number
+          staff_id: string
+          user_id: string
+        }[]
+      }
+      tenant_staff_count: { Args: { _tenant_id: string }; Returns: number }
+      tenant_subscription_state: {
+        Args: { _tenant_id: string }
+        Returns: string
       }
     }
     Enums: {
@@ -1255,6 +2209,23 @@ export type Database = {
       enforcement_status: "inside" | "outside_allowed" | "outside_blocked"
       leave_status: "pending" | "approved" | "rejected" | "cancelled"
       location_mode: "office_only" | "field" | "hybrid"
+      notification_kind:
+        | "check_in_missed"
+        | "leave_approved"
+        | "leave_rejected"
+        | "leave_pending_admin"
+        | "payslip_ready"
+        | "salary_paid"
+        | "bank_change_approved"
+        | "bank_change_rejected"
+        | "subscription_expiring"
+        | "irregular_attendance"
+        | "announcement"
+        | "birthday"
+        | "work_anniversary"
+        | "shift_swap_requested"
+        | "shift_swap_approved"
+        | "shift_swap_rejected"
       payment_status: "pending" | "success" | "failed" | "refunded"
       plan_billing: "monthly" | "yearly" | "lifetime"
       student_attendance_status: "present" | "absent" | "late"
@@ -1397,6 +2368,24 @@ export const Constants = {
       enforcement_status: ["inside", "outside_allowed", "outside_blocked"],
       leave_status: ["pending", "approved", "rejected", "cancelled"],
       location_mode: ["office_only", "field", "hybrid"],
+      notification_kind: [
+        "check_in_missed",
+        "leave_approved",
+        "leave_rejected",
+        "leave_pending_admin",
+        "payslip_ready",
+        "salary_paid",
+        "bank_change_approved",
+        "bank_change_rejected",
+        "subscription_expiring",
+        "irregular_attendance",
+        "announcement",
+        "birthday",
+        "work_anniversary",
+        "shift_swap_requested",
+        "shift_swap_approved",
+        "shift_swap_rejected",
+      ],
       payment_status: ["pending", "success", "failed", "refunded"],
       plan_billing: ["monthly", "yearly", "lifetime"],
       student_attendance_status: ["present", "absent", "late"],
