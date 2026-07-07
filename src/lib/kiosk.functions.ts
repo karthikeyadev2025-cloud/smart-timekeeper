@@ -71,22 +71,30 @@ async function verifyStaffCredentials(hostUserId: string, phone: string, pin: st
   return { staffProfile, tenantId: hostProfile.tenant_id as string };
 }
 
-/** Compute today's (device-local date supplied by client) allowed punch kinds. */
+/** Compute the allowed punch kinds from the most recent record within a
+ * 20-hour window — regardless of calendar date. Night shifts (check in
+ * 8 PM, check out 6 AM) must keep the session OPEN across midnight;
+ * judging only "today's" records made the morning checkout get recorded
+ * as a fresh check-in. Returns the open session's attendance_date so
+ * closing punches land on the same day as their check-in. */
 async function computeAllowedKinds(staffUserId: string, localDate: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const since = new Date(Date.now() - 20 * 3600 * 1000).toISOString();
   const { data: records } = await supabaseAdmin
     .from("attendance_records")
-    .select("kind")
+    .select("kind, attendance_date")
     .eq("user_id", staffUserId)
-    .eq("attendance_date", localDate)
+    .gte("occurred_at", since)
     .order("occurred_at", { ascending: true });
-  const lastKind = records?.[records.length - 1]?.kind as string | undefined;
+  const last = records?.[records.length - 1] as { kind: string; attendance_date: string } | undefined;
+  const lastKind = last?.kind;
+  const sessionDate = last && lastKind !== "check_out" ? last.attendance_date : localDate;
   const allowed: string[] =
     lastKind === "check_in" ? ["check_out", "break_out"] :
     lastKind === "break_out" ? ["break_in"] :
     lastKind === "break_in" ? ["check_out", "break_out"] :
     ["check_in"];
-  return { allowed, lastKind: lastKind ?? null };
+  return { allowed, lastKind: lastKind ?? null, sessionDate };
 }
 
 const verifySchema = z.object({
@@ -136,7 +144,7 @@ export const kioskPunch = createServerFn({ method: "POST" })
 
     // Server-side state machine + dedupe: the requested kind must be allowed
     // RIGHT NOW according to the server's records.
-    const { allowed } = await computeAllowedKinds(staffProfile.id, data.local_date);
+    const { allowed, sessionDate } = await computeAllowedKinds(staffProfile.id, data.local_date);
     if (!allowed.includes(data.kind)) {
       throw new Error(`'${data.kind.replace("_", " ")}' isn't valid right now — the last punch may have just been recorded. Start again.`);
     }
@@ -195,7 +203,7 @@ export const kioskPunch = createServerFn({ method: "POST" })
       face_verified: false,
       notes: `kiosk punch (host: ${context.userId})${data.latitude == null ? " — no GPS on kiosk device" : ""}`,
       occurred_at: data.occurred_at,
-      attendance_date: data.local_date,
+      attendance_date: sessionDate,
     } as any);
     if (insErr) throw new Error(insErr.message);
 

@@ -139,20 +139,6 @@ function CheckInFlow() {
     },
   });
 
-  const { data: todayRecords } = useQuery({
-    queryKey: ["today-records", user?.userId, today],
-    enabled: !!user?.userId,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("attendance_records")
-        .select("*")
-        .eq("user_id", user!.userId)
-        .eq("attendance_date", today)
-        .order("occurred_at");
-      return data ?? [];
-    },
-  });
-
   const { data: myShift } = useQuery({
     queryKey: ["my-shift", user?.userId],
     enabled: !!user?.userId,
@@ -167,42 +153,74 @@ function CheckInFlow() {
     },
   });
 
-  const lastKind = todayRecords?.[todayRecords.length - 1]?.kind;
-  // Allowed next actions. The old logic FORCED exactly one break cycle
-  // (check_in → break_out → break_in → check_out): staff who took no break
-  // couldn't check out at all without logging a fake break. Now:
+  // ── SESSION-AWARE state machine ──────────────────────────────────────
+  // The machine used to look only at TODAY's records. For night shifts
+  // (hospitals!) that was catastrophically wrong: check in 8 PM, come back
+  // to check out at 6 AM — the new calendar day has zero records, so the
+  // only action offered was "Check in" and the CHECKOUT GOT RECORDED AS A
+  // CHECK-IN. Now the machine follows the most recent record within a
+  // 20-hour window, regardless of calendar date: an open session stays
+  // open across midnight, and closing punches inherit the session's
+  // attendance_date so the day's check-in/check-out pair stays together.
+  // (20h cap: a genuinely forgotten checkout from yesterday's day shift is
+  // >20h old by the next morning, so the machine correctly starts fresh.)
+  const { data: recentRecords } = useQuery({
+    queryKey: ["recent-records", user?.userId, today],
+    enabled: !!user?.userId,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const since = new Date(Date.now() - 20 * 3600 * 1000).toISOString();
+      const { data } = await supabase
+        .from("attendance_records")
+        .select("*")
+        .eq("user_id", user!.userId)
+        .gte("occurred_at", since)
+        .order("occurred_at");
+      return data ?? [];
+    },
+  });
+  // Today's list is still shown in the UI timeline below.
+  const todayRecords = (recentRecords ?? []).filter((r: any) => r.attendance_date === today);
+
+  const lastRecent = recentRecords?.[recentRecords.length - 1];
+  const lastKind = lastRecent?.kind;
+  // The open session's date: whatever attendance_date the session's records
+  // carry. A 6 AM checkout closing an 8 PM session gets the 8 PM date.
+  const sessionDate: string =
+    lastRecent && lastKind !== "check_out" ? lastRecent.attendance_date : today;
+
+  // Allowed next actions:
   //   after check_in  → check out OR take a break
   //   after break_in  → check out OR take another break (multiple breaks OK)
   //   after break_out → must return from break first
-  //   after check_out → can check in again (split shifts)
+  //   after check_out (or no open session) → check in
   const allowedKinds: ("check_in" | "check_out" | "break_out" | "break_in")[] =
     lastKind === "check_in" ? ["check_out", "break_out"] :
     lastKind === "break_out" ? ["break_in"] :
     lastKind === "break_in" ? ["check_out", "break_out"] :
-    ["check_in"]; // no records yet today, or last was check_out
+    ["check_in"];
   const [kindOverride, setKindOverride] = useState<typeof allowedKinds[number] | null>(null);
   const nextKind = kindOverride && allowedKinds.includes(kindOverride) ? kindOverride : allowedKinds[0];
 
-  // Forgotten check-out from a previous day: the state machine only looks at
-  // TODAY's records, so an unclosed session yesterday silently vanishes
-  // (and its hours get dropped from stats/payroll math). Detect it and tell
-  // the staff member so an admin can correct the record.
-  const { data: lastBeforeToday } = useQuery({
-    queryKey: ["last-before-today", user?.userId, today],
-    enabled: !!user?.userId,
+  // Forgotten check-out: an unclosed session OLDER than the 20h window
+  // (outside recentRecords). Detect and tell the staff member so an admin
+  // can correct the record — its hours won't count otherwise.
+  const { data: lastBeforeWindow } = useQuery({
+    queryKey: ["last-before-window", user?.userId, today],
+    enabled: !!user?.userId && (recentRecords?.length ?? 0) === 0,
     queryFn: async () => {
       const { data } = await supabase
         .from("attendance_records")
         .select("kind, attendance_date")
         .eq("user_id", user!.userId)
-        .lt("attendance_date", today)
         .order("occurred_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       return data;
     },
   });
-  const forgotCheckout = !!lastBeforeToday && lastBeforeToday.kind !== "check_out";
+  const forgotCheckout = !!lastBeforeWindow && lastBeforeWindow.kind !== "check_out";
+  const lastBeforeToday = lastBeforeWindow; // banner text uses .attendance_date
 
   const isFieldStaff = (user?.profile as any)?.is_field_staff === true;
 
@@ -368,13 +386,13 @@ function CheckInFlow() {
         .from("attendance_records")
         .select("kind")
         .eq("user_id", user.userId)
-        .eq("attendance_date", localDateStr())
+        .gte("occurred_at", new Date(Date.now() - 20 * 3600 * 1000).toISOString())
         .order("occurred_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (latest && latest.kind === nextKind) {
         toast.error(`Your ${nextKind.replace("_", " ")} was already recorded — refreshing.`);
-        queryClient.invalidateQueries({ queryKey: ["today-records"] });
+        queryClient.invalidateQueries({ queryKey: ["recent-records"] });
         setSubmitting(false);
         return;
       }
@@ -402,14 +420,16 @@ function CheckInFlow() {
         face_verified: faceWasVerified,
         notes: antiCheat?.suspicious ? `anti-cheat: ${antiCheat.reasons.join("; ")}` : null,
         occurred_at: occurredAtLocal,
-        // Device-local date, NOT the UTC slice of the ISO timestamp — a
-        // 12:30 AM IST night-shift punch belongs to today, not yesterday.
-        attendance_date: localDateStr(),
+        // Session's date, not blindly the calendar date: a 6 AM checkout
+        // closing last night's 8 PM session carries the SESSION's
+        // attendance_date, keeping the check-in/check-out pair on one day
+        // (for a fresh check-in, sessionDate === today's local date).
+        attendance_date: sessionDate,
       });
       if (insErr) throw insErr;
 
       toast.success(`${nextKind.replace("_", " ")} recorded`);
-      queryClient.invalidateQueries({ queryKey: ["today-records"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-records"] });
       navigate({ to: "/app" });
     } catch (e: any) {
       // Network/upload failed even though navigator.onLine said we're connected
@@ -439,7 +459,7 @@ function CheckInFlow() {
           selfie_blob: selfieBlob!,
         });
         toast.success(`${nextKind.replace("_", " ")} saved — will sync once you're back online`, { duration: 5000 });
-        queryClient.invalidateQueries({ queryKey: ["today-records"] });
+        queryClient.invalidateQueries({ queryKey: ["recent-records"] });
         navigate({ to: "/app" });
       } catch (qErr: any) {
         toast.error("Could not save offline either: " + (qErr?.message ?? "unknown error"));
