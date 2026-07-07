@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   ArrowLeft, MessageCircle, Pencil, Landmark, IdCard, CalendarHeart,
-  Wallet, Download, ReceiptIndianRupee, Save,
+  Wallet, Download, ReceiptIndianRupee, Save, Loader2,
 } from "lucide-react";
 import { openWhatsapp } from "@/lib/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
@@ -135,6 +135,7 @@ function StaffDetailsPage() {
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="bank">Bank & account</TabsTrigger>
             <TabsTrigger value="salary">Salary & payments</TabsTrigger>
+            <TabsTrigger value="punches">Punches</TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile" className="mt-4">
@@ -147,6 +148,10 @@ function StaffDetailsPage() {
 
           <TabsContent value="salary" className="mt-4">
             <SalaryTab tenantId={tenantId} staff={s} companyName={user?.tenant?.name} />
+          </TabsContent>
+
+          <TabsContent value="punches" className="mt-4">
+            <PunchesTab staffId={s.id} />
           </TabsContent>
         </Tabs>
       </div>
@@ -578,5 +583,97 @@ function RecordPaymentForm({ tenantId, staff, payslip, onDone }: { tenantId: str
         <Button type="submit" disabled={loading} className="gap-2"><Wallet className="h-4 w-4" /> {loading ? "Saving…" : `Mark ₹${amount || 0} paid`}</Button>
       </DialogFooter>
     </form>
+  );
+}
+
+/* ───────────────────────── PUNCHES TAB ─────────────────────────
+ * Last 14 days of raw punches with admin correction: change a record's
+ * kind (e.g. a night-shift checkout that got recorded as a check-in by
+ * the pre-fix app). Corrections are audited into the record's notes, and
+ * turning a punch into a closing kind auto-re-homes its attendance_date
+ * onto the session it closes so hours/reports pair it correctly.
+ */
+function PunchesTab({ staffId }: { staffId: string }) {
+  const qc = useQueryClient();
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const { data: punches = [], isFetching } = useQuery({
+    queryKey: ["staff-punches", staffId],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+      const { data } = await supabase
+        .from("attendance_records")
+        .select("id, kind, occurred_at, attendance_date, notes")
+        .eq("user_id", staffId)
+        .gte("occurred_at", since)
+        .order("occurred_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+
+  const changeKind = async (recordId: string, newKind: string) => {
+    setSavingId(recordId);
+    try {
+      const { correctAttendanceKind } = await import("@/lib/attendance-admin.functions");
+      const res = await correctAttendanceKind({ data: { record_id: recordId, new_kind: newKind as any } });
+      toast.success(
+        res.attendance_date
+          ? `Corrected to ${newKind.replace("_", " ")} (moved to ${res.attendance_date})`
+          : `Corrected to ${newKind.replace("_", " ")}`
+      );
+      qc.invalidateQueries({ queryKey: ["staff-punches", staffId] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Correction failed");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return (
+    <Card className="p-4">
+      <div className="mb-3">
+        <p className="text-sm font-semibold">Recent punches (14 days)</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Change the type to correct a wrong record — e.g. a night-shift checkout that was saved as a check-in. Every correction is noted on the record.
+        </p>
+      </div>
+      {isFetching ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : punches.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">No punches in the last 14 days.</p>
+      ) : (
+        <div className="space-y-2">
+          {punches.map((p: any) => (
+            <div key={p.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">
+                  {new Date(p.occurred_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Day: {p.attendance_date}
+                  {p.notes?.includes("corrected by admin") && <span className="ml-1.5 text-amber-600 dark:text-amber-400">· corrected</span>}
+                </p>
+              </div>
+              <Select
+                value={p.kind}
+                onValueChange={(v) => changeKind(p.id, v)}
+                disabled={savingId === p.id}
+              >
+                <SelectTrigger className="w-40 h-8 text-xs capitalize">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="check_in">Check in</SelectItem>
+                  <SelectItem value="check_out">Check out</SelectItem>
+                  <SelectItem value="break_out">Break out</SelectItem>
+                  <SelectItem value="break_in">Break in</SelectItem>
+                </SelectContent>
+              </Select>
+              {savingId === p.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
