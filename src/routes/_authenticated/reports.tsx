@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser, primaryRole } from "@/hooks/useCurrentUser";
+import { localDateStr } from "@/lib/local-date";
 import { FileBarChart, Download, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/reports")({
@@ -42,23 +43,45 @@ function ReportsPage() {
   });
 
   const monthStart = `${year}-${month.padStart(2, "0")}-01`;
-  const monthEndDate = new Date(Number(year), Number(month), 0); // last day of month
-  const monthEnd = monthEndDate.toISOString().slice(0, 10);
+  const lastDayOfMonth = new Date(Number(year), Number(month), 0); // local last day
+  // localDateStr, NOT toISOString().slice(0,10) — the latter converts local
+  // midnight to UTC and yields the PREVIOUS day for IST (July 31 → July 30).
+  const monthEnd = localDateStr(lastDayOfMonth);
+  const todayStr = localDateStr();
+  // Reports must only judge days that have actually HAPPENED. For the
+  // current month, the window ends today — otherwise every remaining day
+  // of the month counts as "absent" for everyone (e.g. running the July
+  // report on July 7 showed 24 absent days for staff with perfect
+  // attendance). Past months use their full length; future months = 0 days.
+  const effectiveEnd = monthEnd <= todayStr ? monthEnd : todayStr;
+  const monthHasStarted = todayStr >= monthStart;
+  const effectiveDays = monthHasStarted
+    ? Math.min(Number(effectiveEnd.slice(8, 10)), lastDayOfMonth.getDate())
+    : 0;
 
   const exportAttendance = async () => {
     setGenerating("attendance");
     try {
+      if (effectiveDays === 0) { toast.error("That month hasn't started yet"); setGenerating(null); return; }
       let staffQuery = supabase.from("profiles").select("id, full_name, staff_id, designation, branches(name)").eq("tenant_id", tenantId!).eq("is_active", true);
       if (branchId !== "all") staffQuery = staffQuery.eq("branch_id", branchId);
-      const { data: staff } = await staffQuery;
-      if (!staff || staff.length === 0) { toast.error("No staff found"); return; }
+      const { data: allStaff } = await staffQuery;
+      // Exclude the owner/admin accounts — the client_admin (and any super
+      // admin) isn't an attendance-tracked employee, but was showing up in
+      // the report as a 0%-attendance staff row.
+      const { data: adminRoles } = await (supabase as any)
+        .from("user_roles").select("user_id").eq("tenant_id", tenantId!)
+        .in("role", ["client_admin", "super_admin"]);
+      const adminIds = new Set((adminRoles ?? []).map((r: any) => r.user_id));
+      const staff = (allStaff ?? []).filter((s: any) => !adminIds.has(s.id));
+      if (staff.length === 0) { toast.error("No staff found"); return; }
 
       const { data: records } = await supabase
         .from("attendance_records")
         .select("user_id, attendance_date, kind, occurred_at")
         .eq("tenant_id", tenantId!)
         .gte("attendance_date", monthStart)
-        .lte("attendance_date", monthEnd)
+        .lte("attendance_date", effectiveEnd)
         .in("user_id", staff.map((s: any) => s.id));
 
       const { data: leaves } = await supabase
@@ -66,23 +89,24 @@ function ReportsPage() {
         .select("user_id, start_date, end_date")
         .eq("tenant_id", tenantId!)
         .eq("status", "approved")
-        .lte("start_date", monthEnd)
+        .lte("start_date", effectiveEnd)
         .gte("end_date", monthStart);
 
-      const daysInMonth = monthEndDate.getDate();
       const rows = staff.map((s: any) => {
         const presentDates = new Set(
           (records ?? []).filter((r: any) => r.user_id === s.id && r.kind === "check_in").map((r: any) => r.attendance_date)
         );
         let leaveDays = 0;
-        for (let d = 1; d <= daysInMonth; d++) {
+        // Only judge days that have actually elapsed (1..effectiveDays) —
+        // future days of the current month are neither present nor absent.
+        for (let d = 1; d <= effectiveDays; d++) {
           const dateStr = `${year}-${month.padStart(2, "0")}-${String(d).padStart(2, "0")}`;
           if (presentDates.has(dateStr)) continue;
           const onLeave = (leaves ?? []).some((l: any) => l.user_id === s.id && l.start_date <= dateStr && l.end_date >= dateStr);
           if (onLeave) leaveDays++;
         }
         const present = presentDates.size;
-        const absent = daysInMonth - present - leaveDays;
+        const absent = effectiveDays - present - leaveDays;
         return {
           "Staff ID": s.staff_id ?? "",
           "Name": s.full_name ?? "",
@@ -91,8 +115,8 @@ function ReportsPage() {
           "Present days": present,
           "Leave days": leaveDays,
           "Absent days": Math.max(0, absent),
-          "Total days": daysInMonth,
-          "Attendance %": daysInMonth > 0 ? Math.round((present / daysInMonth) * 100) : 0,
+          "Days so far": effectiveDays,
+          "Attendance %": effectiveDays > 0 ? Math.round((present / effectiveDays) * 100) : 0,
         };
       });
 
@@ -113,8 +137,13 @@ function ReportsPage() {
     try {
       let staffQuery = supabase.from("profiles").select("id, full_name, staff_id, designation, monthly_salary, branches(name)").eq("tenant_id", tenantId!).eq("is_active", true);
       if (branchId !== "all") staffQuery = staffQuery.eq("branch_id", branchId);
-      const { data: staff } = await staffQuery;
-      if (!staff || staff.length === 0) { toast.error("No staff found"); return; }
+      const { data: allStaff } = await staffQuery;
+      const { data: adminRoles } = await (supabase as any)
+        .from("user_roles").select("user_id").eq("tenant_id", tenantId!)
+        .in("role", ["client_admin", "super_admin"]);
+      const adminIds = new Set((adminRoles ?? []).map((r: any) => r.user_id));
+      const staff = (allStaff ?? []).filter((s: any) => !adminIds.has(s.id));
+      if (staff.length === 0) { toast.error("No staff found"); return; }
 
       const { data: payslips } = await supabase
         .from("payslips")
