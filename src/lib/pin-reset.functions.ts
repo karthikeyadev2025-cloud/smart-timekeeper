@@ -103,28 +103,52 @@ export const resolvePinReset = createServerFn({ method: "POST" })
     if (!allowed) throw new Error("Not authorized");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const canon = req.phone.length > 10 && (req.phone.startsWith("91") || req.phone.startsWith("0"))
+      ? req.phone.slice(-10) : req.phone;
 
     // Find the user by phone if not linked. CRITICAL: filter by tenant_id so
     // a Company A admin can't accidentally (or maliciously) reset the PIN of
     // a Company B user who happens to share the same phone number.
     let targetUserId = req.user_id;
     if (!targetUserId) {
-      let q = supabaseAdmin.from("profiles").select("id").eq("phone", req.phone);
-      // Tenant admins are restricted to their own tenant. Super admins skip the filter
-      // because pin-reset requests without an explicit tenant_id can occur for
-      // users not yet linked to a tenant (rare but possible).
-      if (!isSuper && req.tenant_id) {
-        q = q.eq("tenant_id", req.tenant_id);
+      for (const p of Array.from(new Set([req.phone, canon]))) {
+        let q = supabaseAdmin.from("profiles").select("id").eq("phone", p);
+        if (!isSuper && req.tenant_id) q = q.eq("tenant_id", req.tenant_id);
+        const { data: profile } = await q.maybeSingle();
+        if (profile?.id) { targetUserId = profile.id; break; }
       }
-      const { data: profile } = await q.maybeSingle();
-      targetUserId = profile?.id ?? null;
     }
     if (!targetUserId) throw new Error("No staff account found for this phone in your tenant");
 
+    // 1) The critical part: set the new PIN as the auth password.
     const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
       password: data.new_pin,
     });
     if (updErr) throw new Error(updErr.message);
+
+    // 2) Best-effort repair of the login identity itself. The staff will
+    // type THIS phone + THIS pin — login only works if the auth email is
+    // `{canonical phone}@punchly.app` AND the email is confirmed. If the
+    // auth email drifted (phone edited after account creation) or was
+    // never confirmed, a perfectly correct new PIN still failed with
+    // 'Invalid login credentials' — the exact 'reset works but login
+    // doesn't' symptom. Failures here (e.g. email taken by a duplicate
+    // account) don't block the reset; the password above is already set.
+    try {
+      const { STAFF_EMAIL_DOMAIN } = await import("@/lib/staff.functions");
+      const wantedEmail = `${canon}@${STAFF_EMAIL_DOMAIN}`;
+      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
+      const currentEmail = authUser?.user?.email ?? "";
+      const confirmed = !!authUser?.user?.email_confirmed_at;
+      if (currentEmail !== wantedEmail || !confirmed) {
+        await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+          email: wantedEmail,
+          email_confirm: true,
+        });
+      }
+    } catch (e) {
+      console.warn("[pin-reset] email sync skipped:", e);
+    }
 
     const { error: resErr } = await supabaseAdmin
       .from("pin_reset_requests")

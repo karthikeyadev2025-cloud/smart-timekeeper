@@ -12,7 +12,7 @@ import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Phone, Mail } from "lucide-react";
-import { phoneToStaffEmail, isValidPhone } from "@/lib/phone-auth";
+import { phoneToStaffEmail, isValidPhone, canonicalPhone } from "@/lib/phone-auth";
 import { requestPinReset } from "@/lib/pin-reset.functions";
 
 export const Route = createFileRoute("/auth")({
@@ -54,7 +54,25 @@ function AuthPage() {
   const handleStaffPhoneSignIn = async (phone: string, password: string) => {
     if (!isValidPhone(phone)) { toast.error("Enter a valid phone number"); return; }
     if (password.length < 4) { toast.error("Password too short"); return; }
-    await signInWithEmail(phoneToStaffEmail(phone), password);
+    // Staff often type their number with +91 / 0 prefixes; the account's
+    // synthetic email was created from the number WITHOUT them. Try the
+    // typed form first, then silently retry with the canonical 10-digit
+    // form — otherwise a correct PIN "doesn't work" for no visible reason.
+    const rawEmail = phoneToStaffEmail(phone);
+    const canonEmail = phoneToStaffEmail(canonicalPhone(phone));
+    setLoading(true);
+    try {
+      let { error } = await supabase.auth.signInWithPassword({ email: rawEmail, password });
+      if (error && canonEmail !== rawEmail) {
+        ({ error } = await supabase.auth.signInWithPassword({ email: canonEmail, password }));
+      }
+      if (error) throw error;
+      window.location.href = "/app";
+    } catch (e: any) {
+      toast.error(e.message === "Invalid login credentials" ? "Phone number or PIN is incorrect" : (e.message ?? "Sign in failed"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEmailAuth = async (
