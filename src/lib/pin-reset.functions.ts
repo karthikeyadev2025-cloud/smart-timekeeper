@@ -3,7 +3,11 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { canonicalPhone } from "@/lib/phone-auth";
 
-const phoneSchema = z.string().trim().regex(/^[0-9]{6,15}$/, "Phone must be 6-15 digits");
+// Accepts a typed +91/leading-0 prefix but requires exactly 10 digits once
+// canonicalized — matches the tightened schema in staff.functions.ts.
+const phoneSchema = z.string().trim()
+  .transform((v) => canonicalPhone(v))
+  .refine((v) => /^[0-9]{10}$/.test(v), "Enter a 10-digit phone number");
 
 // PUBLIC: staff submits a forgot-PIN request by phone number
 export const requestPinReset = createServerFn({ method: "POST" })

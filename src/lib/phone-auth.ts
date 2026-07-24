@@ -16,7 +16,11 @@ export function canonicalPhone(phone: string): string {
   return d;
 }
 
+/** True only for a genuine 10-digit Indian mobile number. Accepts a typed
+ * +91 / leading-0 prefix (canonicalized first) so the earlier +91 login
+ * fix keeps working — but anything that still isn't exactly 10 digits
+ * after stripping that prefix is rejected (no 6-digit test numbers, no
+ * 15-digit garbage, no half-typed numbers). */
 export function isValidPhone(phone: string): boolean {
-  const digits = phone.replace(/\D/g, "");
-  return digits.length >= 6 && digits.length <= 15;
+  return canonicalPhone(phone).length === 10;
 }

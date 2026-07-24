@@ -3,9 +3,18 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireActiveSubscription } from "@/lib/subscription-gate";
 
+import { canonicalPhone } from "@/lib/phone-auth";
+
 export const STAFF_EMAIL_DOMAIN = "punchly.app";
 
-const phoneSchema = z.string().trim().regex(/^[0-9]{6,15}$/, "Phone must be 6-15 digits");
+// Accepts a typed +91/leading-0 prefix (so admins can paste a number
+// straight off a business card) but requires EXACTLY 10 digits once
+// canonicalized — the previous 6-15 digit range let obviously-wrong
+// numbers (6 digits, 15 digits) through, which then couldn't ever
+// receive a call/SMS and silently broke login (see Sai's 9-digit case).
+const phoneSchema = z.string().trim()
+  .transform((v) => canonicalPhone(v))
+  .refine((v) => /^[0-9]{10}$/.test(v), "Enter a 10-digit phone number");
 
 const input = z.object({
   tenant_id: z.string().uuid(),
@@ -91,7 +100,7 @@ const updateInput = z.object({
   full_name: z.string().trim().min(1).max(100).optional(),
   // Login identity correction — see the phone-change block below for why
   // this needs more than a plain column update.
-  phone: z.string().trim().regex(/^[0-9]{6,15}$/, "Phone must be 6-15 digits").optional(),
+  phone: phoneSchema.optional(),
   designation: z.string().trim().max(100).optional(),
   monthly_salary: z.number().min(0).optional(),
   shift_id: z.string().uuid().nullable().optional(),
@@ -136,7 +145,6 @@ export const updateStaff = createServerFn({ method: "POST" })
     // work end-to-end: the profiles.phone column, the auth user's email,
     // and its confirmed status.
     if (data.phone !== undefined) {
-      const { canonicalPhone } = await import("@/lib/phone-auth");
       const newPhone = canonicalPhone(data.phone);
 
       // Same tenant can't have two staff sharing a login phone.

@@ -19,6 +19,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useBranchFilter } from "@/hooks/useBranchFilter";
 import { toast } from "sonner";
 import { createStaff, updateStaff, deleteStaff } from "@/lib/staff.functions";
+import { isValidPhone } from "@/lib/phone-auth";
 import { StaffImportExportDialog } from "@/components/StaffImportExportDialog";
 import { formatTime12h } from "@/components/ui/time-input";
 
@@ -402,7 +403,7 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!/^[0-9]{6,15}$/.test(phone)) { toast.error("Enter a valid phone (digits only)"); return; }
+    if (!isValidPhone(phone)) { toast.error("Enter a 10-digit phone number"); return; }
     if (password.length < 4) { toast.error("Password must be at least 4 characters"); return; }
     if (mode === "branch_manager" && !branchIdSel) { toast.error(`Pick a ${branchLabel.toLowerCase()} to manage`); return; }
     setLoading(true);
@@ -453,7 +454,7 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
         <Label>Phone number</Label>
         <div className="relative">
           <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input type="tel" inputMode="numeric" value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9]/g, ""))} required placeholder="9876543210" className="pl-9 font-mono tracking-wider" />
+          <Input type="tel" inputMode="numeric" maxLength={12} value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 12))} required placeholder="9876543210" className="pl-9 font-mono tracking-wider" />
         </div>
       </div>
       <div className="space-y-1">

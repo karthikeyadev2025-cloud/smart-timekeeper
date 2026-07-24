@@ -209,7 +209,7 @@ function StaffPhoneForm({ loading, onSubmit }: { loading: boolean; onSubmit: (ph
               autoComplete="tel"
               placeholder="98765 43210"
               value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
+              onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 12))}
               className="h-14 pl-11 text-lg tracking-wider"
               required
               autoFocus
@@ -357,7 +357,7 @@ function ForgotPinDialog() {
             inputMode="numeric"
             placeholder="98765 43210"
             value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
+            onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 12))}
             className="h-12 text-lg"
             autoFocus
           />

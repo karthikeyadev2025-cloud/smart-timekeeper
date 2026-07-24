@@ -232,8 +232,9 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
             <Label>Phone (login number)</Label>
             <Input
               value={form.phone}
-              onChange={(e) => set("phone")(e.target.value.replace(/[^\d+ ]/g, ""))}
+              onChange={(e) => set("phone")(e.target.value.replace(/[^\d+ ]/g, "").slice(0, 15))}
               placeholder="10-digit mobile number"
+              maxLength={15}
             />
             <p className="text-[11px] text-muted-foreground">
               This is what the staff member logs in with — changing it updates their login immediately. {staff.email ? `Email: ${staff.email}` : ""}
