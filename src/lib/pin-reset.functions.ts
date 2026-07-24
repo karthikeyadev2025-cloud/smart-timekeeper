@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { canonicalPhone } from "@/lib/phone-auth";
 
 const phoneSchema = z.string().trim().regex(/^[0-9]{6,15}$/, "Phone must be 6-15 digits");
 
@@ -11,6 +12,13 @@ export const requestPinReset = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Staff routinely type +91 / a leading 0 before their number. Every
+    // profile is stored with the bare 10-digit number, so looking up by
+    // whatever was typed silently failed to find the profile — the request
+    // still got created, but with tenant_id/user_id left NULL, making it
+    // invisible to every tenant admin (only super admin's fallback view
+    // could see it, with no company name attached). Canonicalize FIRST.
+    const phone = canonicalPhone(data.phone);
 
     // Cheap rate limit: don't accept more than 1 reset request per phone per hour.
     // Stops abusers spamming the admin's queue and slows phone-enumeration.
@@ -18,7 +26,7 @@ export const requestPinReset = createServerFn({ method: "POST" })
     const { data: recent } = await supabaseAdmin
       .from("pin_reset_requests")
       .select("id")
-      .eq("phone", data.phone)
+      .eq("phone", phone)
       .gte("created_at", oneHourAgo)
       .maybeSingle();
     if (recent) {
@@ -31,20 +39,20 @@ export const requestPinReset = createServerFn({ method: "POST" })
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("id, tenant_id")
-      .eq("phone", data.phone)
+      .eq("phone", phone)
       .maybeSingle();
 
     // Avoid duplicate pending requests for same phone
     const { data: existing } = await supabaseAdmin
       .from("pin_reset_requests")
       .select("id")
-      .eq("phone", data.phone)
+      .eq("phone", phone)
       .eq("status", "pending")
       .maybeSingle();
 
     if (!existing) {
       const { error } = await supabaseAdmin.from("pin_reset_requests").insert({
-        phone: data.phone,
+        phone,
         tenant_id: profile?.tenant_id ?? null,
         user_id: profile?.id ?? null,
         status: "pending",
