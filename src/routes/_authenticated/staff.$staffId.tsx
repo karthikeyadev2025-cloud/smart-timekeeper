@@ -165,6 +165,7 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
   const updateStaffFn = useServerFn(updateStaff);
   const [form, setForm] = useState({
     full_name: staff.full_name ?? "",
+    phone: staff.phone ?? "",
     designation: staff.designation ?? "",
     monthly_salary: staff.monthly_salary?.toString() ?? "",
     date_of_birth: staff.date_of_birth ?? "",
@@ -188,6 +189,7 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
           tenant_id: tenantId,
           user_id: staff.id,
           full_name: form.full_name.trim() || undefined,
+          phone: form.phone.trim() !== staff.phone ? form.phone.trim() : undefined,
           designation: form.designation,
           monthly_salary: Number(form.monthly_salary) || 0,
           date_of_birth: form.date_of_birth || null,
@@ -226,7 +228,17 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
           <div className="space-y-1 col-span-2"><Label>Full name</Label><Input value={form.full_name} onChange={(e) => set("full_name")(e.target.value)} /></div>
           <div className="space-y-1"><Label>Designation</Label><Input value={form.designation} onChange={(e) => set("designation")(e.target.value)} /></div>
           <div className="space-y-1"><Label>Monthly salary (₹)</Label><Input type="number" min={0} value={form.monthly_salary} onChange={(e) => set("monthly_salary")(e.target.value)} /></div>
-          <div className="space-y-1 col-span-2 text-xs text-muted-foreground font-mono">{staff.phone} {staff.email ? `· ${staff.email}` : ""}</div>
+          <div className="space-y-1 col-span-2">
+            <Label>Phone (login number)</Label>
+            <Input
+              value={form.phone}
+              onChange={(e) => set("phone")(e.target.value.replace(/[^\d+ ]/g, ""))}
+              placeholder="10-digit mobile number"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              This is what the staff member logs in with — changing it updates their login immediately. {staff.email ? `Email: ${staff.email}` : ""}
+            </p>
+          </div>
         </div>
       </Card>
 

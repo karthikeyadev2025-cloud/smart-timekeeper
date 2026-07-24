@@ -89,6 +89,9 @@ const updateInput = z.object({
   tenant_id: z.string().uuid(),
   user_id: z.string().uuid(),
   full_name: z.string().trim().min(1).max(100).optional(),
+  // Login identity correction — see the phone-change block below for why
+  // this needs more than a plain column update.
+  phone: z.string().trim().regex(/^[0-9]{6,15}$/, "Phone must be 6-15 digits").optional(),
   designation: z.string().trim().max(100).optional(),
   monthly_salary: z.number().min(0).optional(),
   shift_id: z.string().uuid().nullable().optional(),
@@ -125,6 +128,37 @@ export const updateStaff = createServerFn({ method: "POST" })
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Phone is the staff member's LOGIN IDENTITY (synthetic email is
+    // {phone}@punchly.app), not just a contact field — so correcting a
+    // typo here (like Sai's account being created with a 9-digit number)
+    // must update THREE places atomically, or the fix silently doesn't
+    // work end-to-end: the profiles.phone column, the auth user's email,
+    // and its confirmed status.
+    if (data.phone !== undefined) {
+      const { canonicalPhone } = await import("@/lib/phone-auth");
+      const newPhone = canonicalPhone(data.phone);
+
+      // Same tenant can't have two staff sharing a login phone.
+      const { data: clash } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("tenant_id", data.tenant_id)
+        .eq("phone", newPhone)
+        .neq("id", data.user_id)
+        .maybeSingle();
+      if (clash) throw new Error(`Another staff member already uses phone ${newPhone}`);
+
+      const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
+        email: `${newPhone}@${STAFF_EMAIL_DOMAIN}`,
+        email_confirm: true,
+      });
+      if (authErr) throw new Error(`Could not update login phone: ${authErr.message}`);
+
+      const { error: phoneErr } = await supabaseAdmin
+        .from("profiles").update({ phone: newPhone }).eq("id", data.user_id);
+      if (phoneErr) throw new Error(`Phone saved to login but not to profile: ${phoneErr.message}`);
+    }
 
     // Profile updates (only set fields that were passed)
     const profileUpdate: Record<string, unknown> = {};
