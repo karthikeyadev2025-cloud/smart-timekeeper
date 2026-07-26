@@ -46,7 +46,8 @@ export const correctAttendanceKind = createServerFn({ method: "POST" })
     // 'check_out' moves onto last night's date, closing that session).
     let newDate = rec.attendance_date;
     if (data.new_kind === "check_out" || data.new_kind === "break_in") {
-      const openerKinds = data.new_kind === "check_out" ? ["check_in", "break_in"] : ["break_out"];
+      const openerKinds: ("check_in" | "check_out" | "break_out" | "break_in")[] =
+        data.new_kind === "check_out" ? ["check_in", "break_in"] : ["break_out"];
       const since = new Date(new Date(rec.occurred_at).getTime() - 20 * 3600 * 1000).toISOString();
       const { data: opener } = await supabaseAdmin
         .from("attendance_records")

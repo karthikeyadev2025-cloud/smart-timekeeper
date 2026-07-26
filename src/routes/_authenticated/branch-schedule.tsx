@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/branch-schedule")({
 
 type Seg = {
   user_id: string; full_name: string | null; staff_id: string | null;
-  seq: number; shift_name: string | null;
+  seq: number; shift_id: string; shift_name: string | null;
   branch_id: string | null; branch_name: string | null;
   start_time: string; end_time: string;
   first_check_in: string | null; last_check_out: string | null;
