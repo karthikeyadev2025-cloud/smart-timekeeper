@@ -71,7 +71,7 @@ function Payroll() {
         (branchRows ?? []).map((b: any) => [b.id, b.partial_day_policy ?? null]),
       );
 
-      let sq = supabase.from("profiles").select("id, full_name, monthly_salary, branch_id, monthly_working_days, date_of_joining").eq("tenant_id", tenantId).eq("is_active", true);
+      let sq = supabase.from("profiles").select("id, full_name, monthly_salary, branch_id, monthly_working_days, date_of_joining, created_at").eq("tenant_id", tenantId).eq("is_active", true);
       if (branchId !== "all") sq = sq.eq("branch_id", branchId);
       const { data: staff } = await sq;
       if (!staff?.length) throw new Error("No active staff");
@@ -142,7 +142,14 @@ function Payroll() {
         // 25th was therefore marked absent for the preceding 24 days and
         // deducted for a job they had not started — e.g. a new ₹20,000 hire
         // took home ₹4,348. Clamp the window to their joining date.
-        const joinRaw = (s as any).date_of_joining as string | null;
+        // date_of_joining is optional and in practice often unset. Treating a
+        // NULL as "employed since forever" makes a brand-new tenant's FIRST
+        // payroll maximally wrong: every staff member is judged from the 1st
+        // and deducted for days before the company even onboarded. Fall back
+        // to when their profile was created — they cannot have been employed
+        // before their record existed.
+        const joinRaw = ((s as any).date_of_joining
+          ?? ((s as any).created_at ? String((s as any).created_at).slice(0, 10) : null)) as string | null;
         let firstDay = 1;
         if (joinRaw) {
           const jd = new Date(joinRaw + "T00:00:00");

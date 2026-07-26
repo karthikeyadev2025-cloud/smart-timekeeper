@@ -32,7 +32,7 @@ cal AS (
 ),
 staff AS (
   SELECT
-    pr.id, pr.full_name, pr.staff_id, pr.tenant_id, pr.date_of_joining,
+    pr.id, pr.full_name, pr.staff_id, pr.tenant_id, COALESCE(pr.date_of_joining, pr.created_at::date) AS date_of_joining,
     COALESCE(pr.monthly_salary, 0)::numeric AS base,
     -- expected-days resolution, in the same order the app uses
     COALESCE(
@@ -53,7 +53,7 @@ staff AS (
   WHERE pr.is_active
     AND COALESCE(pr.monthly_salary,0) > 0
     -- exclude anyone who had not joined by the end of the judged window
-    AND (pr.date_of_joining IS NULL OR pr.date_of_joining <= c.effective_end)
+    AND COALESCE(pr.date_of_joining, pr.created_at::date) <= c.effective_end
     AND NOT EXISTS (SELECT 1 FROM public.user_roles ur
                     WHERE ur.user_id = pr.id
                       AND ur.role IN ('client_admin','super_admin'))
