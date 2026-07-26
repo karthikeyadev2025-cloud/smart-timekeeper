@@ -116,7 +116,7 @@ UNION ALL SELECT '3.4', 'Payslips generated before the payroll fixes',
   (SELECT CASE WHEN count(*) = 0 THEN 'PASS - none'
           ELSE 'ACTION - ' || count(*) || ' payslip(s) hold pre-fix numbers. Re-generate them '
                || '(weekend deductions / future-day absences / unpaid leave were all wrong).' END
-   FROM public.payslips WHERE created_at < DATE '2026-07-05')
+   FROM public.payslips WHERE generated_at < DATE '2026-07-05')
 
 -- ─── 4. MULTI-BRANCH SPLIT SHIFTS ────────────────────────────────────────────
 
