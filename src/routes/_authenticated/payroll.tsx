@@ -71,7 +71,7 @@ function Payroll() {
         (branchRows ?? []).map((b: any) => [b.id, b.partial_day_policy ?? null]),
       );
 
-      let sq = supabase.from("profiles").select("id, full_name, monthly_salary, branch_id, monthly_working_days").eq("tenant_id", tenantId).eq("is_active", true);
+      let sq = supabase.from("profiles").select("id, full_name, monthly_salary, branch_id, monthly_working_days, date_of_joining").eq("tenant_id", tenantId).eq("is_active", true);
       if (branchId !== "all") sq = sq.eq("branch_id", branchId);
       const { data: staff } = await sq;
       if (!staff?.length) throw new Error("No active staff");
@@ -136,20 +136,39 @@ function Payroll() {
         // pattern applies (7-day operations with a rotating weekly off).
         // Without this, every non-attended day counts as unpaid absence and
         // legitimate rest days get deducted.
+        // ── Employment window ──────────────────────────────────────────
+        // Payroll previously judged EVERY staff member from the 1st of the
+        // month, ignoring date_of_joining. A staff member who joined on the
+        // 25th was therefore marked absent for the preceding 24 days and
+        // deducted for a job they had not started — e.g. a new ₹20,000 hire
+        // took home ₹4,348. Clamp the window to their joining date.
+        const joinRaw = (s as any).date_of_joining as string | null;
+        let firstDay = 1;
+        if (joinRaw) {
+          const jd = new Date(joinRaw + "T00:00:00");
+          const jY = jd.getFullYear(), jM = jd.getMonth() + 1;
+          if (jY > year || (jY === year && jM > month)) continue; // not employed yet
+          if (jY === year && jM === month) firstDay = jd.getDate();
+        }
+        if (firstDay > lastCountedDay) continue; // joined after the judged window
+
         const expectedDays: number | null =
           (s as any).monthly_working_days ?? tenantExpectedDays ?? null;
 
         let workingDays = 0;
         let fullMonthWorkingDays = 0;
+        // Days actually judged = elapsed AND employed.
+        const employedElapsed = lastCountedDay - firstDay + 1;
         if (expectedDays && expectedDays > 0) {
           fullMonthWorkingDays = Math.min(expectedDays, lastDay);
-          // Pro-rate the expected days across the part of the month judged so
-          // far, so a mid-month run doesn't demand a full month of attendance.
-          workingDays = Math.round((fullMonthWorkingDays * lastCountedDay) / lastDay);
+          // Pro-rate the expected days across the employed, elapsed portion —
+          // not the whole month — so neither a mid-month run nor a mid-month
+          // joining date demands a full month of attendance.
+          workingDays = Math.round((fullMonthWorkingDays * employedElapsed) / lastDay);
         } else {
-          for (let d = 1; d <= lastCountedDay; d++) if (isWorkingDay(d)) workingDays++;
-          // Per-day rate uses the month's FULL working-day count so a
-          // mid-month run doesn't inflate the daily rate.
+          for (let d = firstDay; d <= lastCountedDay; d++) if (isWorkingDay(d)) workingDays++;
+          // Per-day rate uses the month's FULL working-day count so neither a
+          // mid-month run nor a joining date inflates the daily rate.
           for (let d = 1; d <= lastDay; d++) if (isWorkingDay(d)) fullMonthWorkingDays++;
         }
         if (fullMonthWorkingDays === 0) continue;
@@ -200,7 +219,7 @@ function Payroll() {
         let presentCredit = 0;   // fractional days actually earned
         let presentDays = 0;     // whole days with any attendance (for display)
         let partialDays = 0;
-        for (let d = 1; d <= lastCountedDay; d++) {
+        for (let d = firstDay; d <= lastCountedDay; d++) {
           if (!countsAsWorkDay(d)) continue;
           const ds = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
           const dayIns = insByDate.get(ds) ?? [];
@@ -248,7 +267,7 @@ function Payroll() {
         // silently paid in full (unpaid_leave_days was hardcoded to 0).
         let paidLeave = 0;
         let unpaidLeave = 0;
-        for (let d = 1; d <= lastCountedDay; d++) {
+        for (let d = firstDay; d <= lastCountedDay; d++) {
           if (!countsAsWorkDay(d)) continue;
           const ds = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
           const hit = (approvedLeaves ?? []).find((l: any) => l.start_date <= ds && l.end_date >= ds);

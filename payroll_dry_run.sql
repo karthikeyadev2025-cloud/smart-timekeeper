@@ -32,18 +32,18 @@ cal AS (
 ),
 staff AS (
   SELECT
-    pr.id, pr.full_name, pr.staff_id, pr.tenant_id,
+    pr.id, pr.full_name, pr.staff_id, pr.tenant_id, pr.date_of_joining,
     COALESCE(pr.monthly_salary, 0)::numeric AS base,
     -- expected-days resolution, in the same order the app uses
     COALESCE(
       pr.monthly_working_days,
       t.default_monthly_working_days,
-      (SELECT COUNT(*)::int FROM generate_series(c.month_start, c.month_end, '1 day') d
+      NULLIF((SELECT COUNT(*)::int FROM generate_series(c.month_start, c.month_end, '1 day') d
        WHERE EXISTS (
          SELECT 1 FROM public.staff_shifts ss JOIN public.shifts sh ON sh.id = ss.shift_id
          WHERE ss.user_id = pr.id AND sh.is_active
            AND (sh.working_days IS NULL
-                OR EXTRACT(ISODOW FROM d)::int = ANY (sh.working_days)))),
+                OR EXTRACT(ISODOW FROM d)::int = ANY (sh.working_days)))), 0),
       c.last_day
     ) AS expected_days_raw,
     t.name AS company
@@ -52,16 +52,23 @@ staff AS (
   CROSS JOIN cal c
   WHERE pr.is_active
     AND COALESCE(pr.monthly_salary,0) > 0
+    -- exclude anyone who had not joined by the end of the judged window
+    AND (pr.date_of_joining IS NULL OR pr.date_of_joining <= c.effective_end)
     AND NOT EXISTS (SELECT 1 FROM public.user_roles ur
                     WHERE ur.user_id = pr.id
                       AND ur.role IN ('client_admin','super_admin'))
 ),
 calc AS (
-  SELECT s.*, c.month_start, c.effective_end, c.last_day,
+  SELECT s.*, c.last_day,
+    -- clamp to the employment start date: judging a new hire from the 1st
+    -- deducts them for days before they were employed
+    GREATEST(c.month_start, COALESCE(s.date_of_joining, c.month_start)) AS month_start,
+    c.effective_end,
     LEAST(s.expected_days_raw, c.last_day) AS full_month_days,
     GREATEST(1, ROUND(
       LEAST(s.expected_days_raw, c.last_day)::numeric
-      * EXTRACT(DAY FROM c.effective_end)::numeric
+      * (EXTRACT(DAY FROM c.effective_end)
+         - EXTRACT(DAY FROM GREATEST(c.month_start, COALESCE(s.date_of_joining, c.month_start))) + 1)::numeric
       / c.last_day::numeric))::int AS judged_days,
     (SELECT COUNT(DISTINCT ar.attendance_date) FROM public.attendance_records ar
      WHERE ar.user_id = s.id AND ar.kind='check_in'
@@ -90,6 +97,7 @@ SELECT
   company,
   staff_id,
   full_name,
+  date_of_joining AS joined,
   base                                   AS salary,
   full_month_days                        AS expected_per_month,
   judged_days                            AS days_judged_so_far,
