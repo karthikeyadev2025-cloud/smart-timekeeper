@@ -1,3 +1,4 @@
+import { localDateStr } from "@/lib/local-date";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,7 +23,7 @@ function MarkAttendancePage() {
   const { data: user } = useCurrentUser();
   const qc = useQueryClient();
   const tenantId = user?.tenant?.id;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const [classId, setClassId] = useState<string>("");
   const [date, setDate] = useState(today);
   const [marks, setMarks] = useState<Record<string, Status>>({});

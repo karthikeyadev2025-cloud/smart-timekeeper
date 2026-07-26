@@ -180,6 +180,12 @@ export const kioskPunch = createServerFn({ method: "POST" })
 
     // Selfie upload (service role) under the STAFF member's folder so all
     // existing selfie-viewing policies/paths keep working unchanged.
+    // Resolve the staff member's shift so the punch carries it — same
+    // reason as the check-in page: punctuality stats have nothing to
+    // compare against when shift_id is NULL.
+    const { data: shiftLink } = await supabaseAdmin
+      .from("staff_shifts").select("shift_id").eq("user_id", staffProfile.id).limit(1).maybeSingle();
+
     const jpegBytes = Buffer.from(data.selfie_base64, "base64");
     const selfiePath = `${staffProfile.id}/${Date.now()}.jpg`;
     const { error: upErr } = await supabaseAdmin.storage
@@ -192,6 +198,7 @@ export const kioskPunch = createServerFn({ method: "POST" })
       user_id: staffProfile.id,
       office_location_id: officeLocationId,
       branch_id: staffProfile.branch_id,
+      shift_id: (shiftLink as any)?.shift_id ?? null,
       kind: data.kind,
       latitude: data.latitude,
       longitude: data.longitude,

@@ -410,6 +410,11 @@ function CheckInFlow() {
         office_location_id: matchedLocation?.id ?? null,
         branch_id: activeBranchId,
         kind: nextKind,
+        // Stamp the shift this punch belongs to. Nothing wrote this before,
+        // so punctuality stats had no shift to compare against and always
+        // came out empty/0% (the RPCs now fall back to the staff member's
+        // assignment for historical rows; new rows carry it directly).
+        shift_id: (myShift as any)?.id ?? null,
         latitude: coords.latitude,
         longitude: coords.longitude,
         accuracy_meters: coords.accuracy ?? null,

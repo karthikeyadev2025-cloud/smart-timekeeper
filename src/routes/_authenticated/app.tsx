@@ -1,3 +1,4 @@
+import { localDateStr } from "@/lib/local-date";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -322,7 +323,7 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
     queryKey: ["admin-stats", tenantId, adminUserIds?.size ?? 0],
     enabled: !!tenantId && !!adminUserIds,
     queryFn: async () => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateStr();
       const adminIds = Array.from(adminUserIds ?? []);
       // Build a "not in admin ids" filter for the staff count
       let staffQ = supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!).eq("is_active", true);
@@ -344,7 +345,7 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
       const days: { date: string; label: string }[] = [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date(); d.setDate(d.getDate() - i);
-        days.push({ date: d.toISOString().slice(0, 10), label: d.toLocaleDateString("en-IN", { weekday: "short" }) });
+        days.push({ date: localDateStr(d), label: d.toLocaleDateString("en-IN", { weekday: "short" }) });
       }
       const { data } = await supabase
         .from("attendance_records")
@@ -364,7 +365,7 @@ function ClientAdminHome({ tenantId, branchManagerMode }: { tenantId?: string; b
     queryKey: ["admin-absent-today", tenantId, branchManagerMode, user?.userId, adminUserIds?.size ?? 0],
     enabled: !!tenantId && !!adminUserIds,
     queryFn: async () => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateStr();
       // Branch managers only see staff in their own branch
       let staffQ = supabase
         .from("profiles")
@@ -775,7 +776,7 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
   const qc = useQueryClient();
   const [avatarUploading, setAvatarUploading] = useState(false);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const { data: todayRecords } = useQuery({
     queryKey: ["today-records", userId, today],
     enabled: !!userId,
@@ -827,7 +828,7 @@ function StaffHome({ userId, tenantId }: { userId?: string; tenantId?: string })
 
   // This month's worked-days summary
   const monthStart = new Date(); monthStart.setDate(1);
-  const monthStartStr = monthStart.toISOString().slice(0, 10);
+  const monthStartStr = localDateStr(monthStart);
   const { data: monthRecords } = useQuery({
     queryKey: ["my-month-records", userId, monthStartStr],
     enabled: !!userId,

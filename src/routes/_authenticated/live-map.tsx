@@ -1,3 +1,4 @@
+import { localDateStr } from "@/lib/local-date";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -48,7 +49,7 @@ const officeIcon = L.divIcon({
 function LiveMapPage() {
   const { data: user } = useCurrentUser();
   const tenantId = user?.tenant?.id;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const [viewingPhoto, setViewingPhoto] = useState<{ path: string; staffName: string; time: string; faceVerified?: boolean } | null>(null);
 
   const { data: punches, refetch, isFetching } = useQuery({

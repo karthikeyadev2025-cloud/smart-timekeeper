@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useServerFn } from "@tanstack/react-start";
 import { recordSalaryPayment } from "@/lib/payments.functions";
+import { localDateStr } from "@/lib/local-date";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useBranchFilter } from "@/hooks/useBranchFilter";
@@ -67,56 +68,122 @@ function Payroll() {
       const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
       const lastDay = new Date(year, month, 0).getDate();
       const monthEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-      const workingDays = lastDay;
+
+      // Only judge days that have ACTUALLY ELAPSED. Generating payroll
+      // mid-month previously treated every remaining day of the month as an
+      // absence and deducted for it — running July payroll on the 7th
+      // deducted ~24 days of salary from staff with perfect attendance.
+      const todayLocal = localDateStr();
+      const effectiveEnd = monthEnd <= todayLocal ? monthEnd : todayLocal;
+      if (effectiveEnd < monthStart) throw new Error("That month hasn't started yet");
+      const lastCountedDay = Number(effectiveEnd.slice(8, 10));
 
       let count = 0;
       for (const s of staff) {
         const base = Number(s.monthly_salary ?? 0);
         if (base <= 0) continue;
 
+        // Resolve the staff member's shift FIRST — its working_days drives
+        // the whole salary calculation, not just late fines.
+        const { data: shiftLink } = await supabase
+          .from("staff_shifts")
+          .select("shifts(start_time, grace_minutes, late_fine_type, late_fine_amount, half_day_after_minutes, working_days)")
+          .eq("user_id", s.id)
+          .limit(1)
+          .maybeSingle();
+        const shiftRule = (shiftLink as any)?.shifts;
+
+        // shifts.working_days is an ISO-dow array (1=Mon … 7=Sun), default
+        // Mon-Fri. Payroll previously used the raw calendar-day count, so
+        // anyone on a Mon-Fri shift was marked ABSENT and DEDUCTED for every
+        // Saturday and Sunday — roughly 8-9 days of pay every month.
+        // No shift assigned → keep the old all-days behaviour (correct for
+        // shops that genuinely operate 7 days).
+        const shiftDows: number[] | null = Array.isArray(shiftRule?.working_days) && shiftRule.working_days.length
+          ? shiftRule.working_days.map(Number)
+          : null;
+        const isWorkingDay = (d: number) => {
+          if (!shiftDows) return true;
+          const js = new Date(year, month - 1, d).getDay(); // 0=Sun … 6=Sat
+          return shiftDows.includes(js === 0 ? 7 : js);
+        };
+
+        let workingDays = 0;
+        for (let d = 1; d <= lastCountedDay; d++) if (isWorkingDay(d)) workingDays++;
+        // Per-day rate uses the month's FULL working-day count so a
+        // mid-month run doesn't inflate the daily rate.
+        let fullMonthWorkingDays = 0;
+        for (let d = 1; d <= lastDay; d++) if (isWorkingDay(d)) fullMonthWorkingDays++;
+        if (fullMonthWorkingDays === 0) continue;
+
         const { data: recs } = await supabase
           .from("attendance_records")
           .select("attendance_date, kind, occurred_at")
           .eq("user_id", s.id)
           .gte("attendance_date", monthStart)
-          .lte("attendance_date", monthEnd);
+          .lte("attendance_date", effectiveEnd);
 
         const checkIns = (recs ?? []).filter(r => r.kind === "check_in");
-        const presentDays = new Set(checkIns.map(r => r.attendance_date)).size;
+        // Only count presence on days that are actually working days —
+        // someone who came in on their day off shouldn't inflate the count
+        // past the number of days being judged.
+        const presentDays = new Set(
+          checkIns
+            .map(r => r.attendance_date)
+            .filter(d => isWorkingDay(Number(String(d).slice(8, 10))))
+        ).size;
 
+        // OVERLAP test, not containment. The old filter required the leave to
+        // START and END inside the month, so a leave running 28 Jun–3 Jul was
+        // dropped from July entirely and those days were deducted as absence.
         const { data: approvedLeaves } = await supabase
           .from("leave_requests")
-          .select("days")
+          .select("start_date, end_date, leave_types(is_paid)")
           .eq("user_id", s.id)
           .eq("status", "approved")
-          .gte("start_date", monthStart)
-          .lte("end_date", monthEnd);
+          .lte("start_date", effectiveEnd)
+          .gte("end_date", monthStart);
 
-        const paidLeave = (approvedLeaves ?? []).reduce((a, l) => a + Number(l.days), 0);
+        // Count leave DAY BY DAY, clamped to this month's elapsed working
+        // days, and split by whether the leave type is paid. Previously the
+        // full `days` value of a cross-month leave was charged to one month,
+        // and leave_types.is_paid was ignored entirely — unpaid leave was
+        // silently paid in full (unpaid_leave_days was hardcoded to 0).
+        let paidLeave = 0;
+        let unpaidLeave = 0;
+        for (let d = 1; d <= lastCountedDay; d++) {
+          if (!isWorkingDay(d)) continue;
+          const ds = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const hit = (approvedLeaves ?? []).find((l: any) => l.start_date <= ds && l.end_date >= ds);
+          if (!hit) continue;
+          // Missing leave type → treat as paid (matches previous behaviour).
+          if ((hit as any).leave_types?.is_paid === false) unpaidLeave++;
+          else paidLeave++;
+        }
+
         const effective = presentDays + paidLeave;
-        const absent = Math.max(0, workingDays - effective);
-        const perDay = base / workingDays;
-        const absenceDeduction = absent * perDay;
+        const absent = Math.max(0, workingDays - effective - unpaidLeave);
+        const perDay = base / fullMonthWorkingDays;
+        // Unpaid leave is deducted just like absence — that's what makes it
+        // unpaid.
+        const absenceDeduction = (absent + unpaidLeave) * perDay;
 
         // Late-fine deduction, using the staff's assigned shift rules (if any).
         // Check-in is NEVER blocked by these rules — this is payroll-only math.
         let lateFine = 0;
         let lateDaysCount = 0;
-        const { data: shiftLink } = await supabase
-          .from("staff_shifts")
-          .select("shifts(start_time, grace_minutes, late_fine_type, late_fine_amount, half_day_after_minutes)")
-          .eq("user_id", s.id)
-          .limit(1)
-          .maybeSingle();
-        const shiftRule = (shiftLink as any)?.shifts;
         if (shiftRule && shiftRule.late_fine_type !== "none" && shiftRule.start_time) {
           const [sh, sm] = String(shiftRule.start_time).slice(0, 5).split(":").map(Number);
           const shiftStartMin = sh * 60 + sm;
           const grace = shiftRule.grace_minutes ?? 10;
 
           for (const ci of checkIns) {
-            const t = new Date(ci.occurred_at);
-            const minutesIn = t.getHours() * 60 + t.getMinutes();
+            // Explicit IST. shift start_time is IST wall-clock; reading the
+            // timestamp with the ADMIN's browser timezone happened to work
+            // only because admins are in India — it silently produced wrong
+            // fines for anyone running payroll from another timezone.
+            const ist = new Date(new Date(ci.occurred_at).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+            const minutesIn = ist.getHours() * 60 + ist.getMinutes();
             const lateBy = minutesIn - (shiftStartMin + grace);
             if (lateBy > 0) {
               lateDaysCount++;
@@ -140,7 +207,7 @@ function Payroll() {
           tenant_id: tenantId, user_id: s.id, branch_id: s.branch_id ?? null,
           period_year: year, period_month: month,
           base_salary: base, present_days: presentDays, absent_days: absent,
-          paid_leave_days: paidLeave, unpaid_leave_days: 0, working_days: workingDays,
+          paid_leave_days: paidLeave, unpaid_leave_days: unpaidLeave, working_days: workingDays,
           overtime_hours: 0, deductions, net_pay: net,
           late_days: lateDaysCount, late_fine: lateFine,
         }, { onConflict: "user_id,period_year,period_month" });
