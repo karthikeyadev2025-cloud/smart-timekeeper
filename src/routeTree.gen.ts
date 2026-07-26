@@ -22,6 +22,7 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/ap
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedBankApprovalsRouteImport } from './routes/_authenticated/bank-approvals'
 import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
+import { Route as AuthenticatedBranchScheduleRouteImport } from './routes/_authenticated/branch-schedule'
 import { Route as AuthenticatedBranchesRouteImport } from './routes/_authenticated/branches'
 import { Route as AuthenticatedCheckInRouteImport } from './routes/_authenticated/check-in'
 import { Route as AuthenticatedClassesRouteImport } from './routes/_authenticated/classes'
@@ -117,6 +118,12 @@ const AuthenticatedBillingRoute = AuthenticatedBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBranchScheduleRoute =
+  AuthenticatedBranchScheduleRouteImport.update({
+    id: '/branch-schedule',
+    path: '/branch-schedule',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedBranchesRoute = AuthenticatedBranchesRouteImport.update({
   id: '/branches',
   path: '/branches',
@@ -278,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AuthenticatedAuditRoute
   '/bank-approvals': typeof AuthenticatedBankApprovalsRoute
   '/billing': typeof AuthenticatedBillingRoute
+  '/branch-schedule': typeof AuthenticatedBranchScheduleRoute
   '/branches': typeof AuthenticatedBranchesRoute
   '/check-in': typeof AuthenticatedCheckInRoute
   '/classes': typeof AuthenticatedClassesRoute
@@ -320,6 +328,7 @@ export interface FileRoutesByTo {
   '/audit': typeof AuthenticatedAuditRoute
   '/bank-approvals': typeof AuthenticatedBankApprovalsRoute
   '/billing': typeof AuthenticatedBillingRoute
+  '/branch-schedule': typeof AuthenticatedBranchScheduleRoute
   '/branches': typeof AuthenticatedBranchesRoute
   '/check-in': typeof AuthenticatedCheckInRoute
   '/classes': typeof AuthenticatedClassesRoute
@@ -364,6 +373,7 @@ export interface FileRoutesById {
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/bank-approvals': typeof AuthenticatedBankApprovalsRoute
   '/_authenticated/billing': typeof AuthenticatedBillingRoute
+  '/_authenticated/branch-schedule': typeof AuthenticatedBranchScheduleRoute
   '/_authenticated/branches': typeof AuthenticatedBranchesRoute
   '/_authenticated/check-in': typeof AuthenticatedCheckInRoute
   '/_authenticated/classes': typeof AuthenticatedClassesRoute
@@ -408,6 +418,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/bank-approvals'
     | '/billing'
+    | '/branch-schedule'
     | '/branches'
     | '/check-in'
     | '/classes'
@@ -450,6 +461,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/bank-approvals'
     | '/billing'
+    | '/branch-schedule'
     | '/branches'
     | '/check-in'
     | '/classes'
@@ -493,6 +505,7 @@ export interface FileRouteTypes {
     | '/_authenticated/audit'
     | '/_authenticated/bank-approvals'
     | '/_authenticated/billing'
+    | '/_authenticated/branch-schedule'
     | '/_authenticated/branches'
     | '/_authenticated/check-in'
     | '/_authenticated/classes'
@@ -625,6 +638,13 @@ declare module '@tanstack/react-router' {
       path: '/billing'
       fullPath: '/billing'
       preLoaderRoute: typeof AuthenticatedBillingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/branch-schedule': {
+      id: '/_authenticated/branch-schedule'
+      path: '/branch-schedule'
+      fullPath: '/branch-schedule'
+      preLoaderRoute: typeof AuthenticatedBranchScheduleRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/branches': {
@@ -833,6 +853,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedBankApprovalsRoute: typeof AuthenticatedBankApprovalsRoute
   AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
+  AuthenticatedBranchScheduleRoute: typeof AuthenticatedBranchScheduleRoute
   AuthenticatedBranchesRoute: typeof AuthenticatedBranchesRoute
   AuthenticatedCheckInRoute: typeof AuthenticatedCheckInRoute
   AuthenticatedClassesRoute: typeof AuthenticatedClassesRoute
@@ -869,6 +890,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedBankApprovalsRoute: AuthenticatedBankApprovalsRoute,
   AuthenticatedBillingRoute: AuthenticatedBillingRoute,
+  AuthenticatedBranchScheduleRoute: AuthenticatedBranchScheduleRoute,
   AuthenticatedBranchesRoute: AuthenticatedBranchesRoute,
   AuthenticatedCheckInRoute: AuthenticatedCheckInRoute,
   AuthenticatedClassesRoute: AuthenticatedClassesRoute,

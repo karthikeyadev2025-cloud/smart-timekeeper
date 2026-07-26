@@ -143,13 +143,35 @@ function CheckInFlow() {
     queryKey: ["my-shift", user?.userId],
     enabled: !!user?.userId,
     queryFn: async () => {
+      // A staff member can hold SEVERAL shift assignments in one day — one
+      // per branch for split/multi-branch duty (Branch A 9-1, B 2-4,
+      // C 4-6). This used to `.limit(1)` and always grab the same leg, so
+      // the other branches were invisible: wrong shift stamped on the
+      // punch, wrong late calculation, wrong "your shift" display.
+      // Pick the leg whose window is closest to now instead.
       const { data } = await supabase
         .from("staff_shifts")
-        .select("shifts(id, name, start_time, end_time, break_minutes)")
-        .eq("user_id", user!.userId)
-        .limit(1)
-        .maybeSingle();
-      return (data as any)?.shifts ?? null;
+        .select("shifts(id, name, start_time, end_time, break_minutes, branch_id)")
+        .eq("user_id", user!.userId);
+      const legs = (data ?? [])
+        .map((r: any) => r.shifts)
+        .filter(Boolean)
+        .sort((a: any, b: any) => String(a.start_time).localeCompare(String(b.start_time)));
+      if (legs.length === 0) return null;
+      if (legs.length === 1) return legs[0];
+
+      const now = new Date();
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const mins = (t: string) => {
+        const [h, m] = String(t).slice(0, 5).split(":").map(Number);
+        return h * 60 + m;
+      };
+      // Prefer a leg we're currently inside (with an hour's slack either
+      // side, so arriving early or finishing late still resolves correctly).
+      const inside = legs.find((l: any) => nowMin >= mins(l.start_time) - 60 && nowMin <= mins(l.end_time) + 60);
+      if (inside) return inside;
+      // Otherwise the next upcoming leg today, else the last one.
+      return legs.find((l: any) => mins(l.start_time) > nowMin) ?? legs[legs.length - 1];
     },
   });
 
