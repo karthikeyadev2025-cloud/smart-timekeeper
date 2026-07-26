@@ -183,8 +183,22 @@ export const kioskPunch = createServerFn({ method: "POST" })
     // Resolve the staff member's shift so the punch carries it — same
     // reason as the check-in page: punctuality stats have nothing to
     // compare against when shift_id is NULL.
-    const { data: shiftLink } = await supabaseAdmin
-      .from("staff_shifts").select("shift_id").eq("user_id", staffProfile.id).limit(1).maybeSingle();
+    // All legs, then pick the one this punch falls in — a multi-branch
+    // staff member punching at 2 PM belongs to their Branch B leg, not
+    // whichever row happened to come back first.
+    const { data: shiftLinks } = await supabaseAdmin
+      .from("staff_shifts").select("shifts(id, start_time, end_time)").eq("user_id", staffProfile.id);
+    const kLegs: any[] = (shiftLinks ?? []).map((r: any) => r.shifts).filter(Boolean);
+    const nowIst = new Date(new Date(data.occurred_at).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const nowMin = nowIst.getHours() * 60 + nowIst.getMinutes();
+    const legMin = (t: string) => {
+      const [h, m] = String(t).slice(0, 5).split(":").map(Number);
+      return h * 60 + m;
+    };
+    const matchedLeg = kLegs.length
+      ? (kLegs.find((l) => nowMin >= legMin(l.start_time) - 60 && nowMin <= legMin(l.end_time) + 60)
+         ?? kLegs.reduce((b, l) => Math.abs(nowMin - legMin(l.start_time)) < Math.abs(nowMin - legMin(b.start_time)) ? l : b))
+      : null;
 
     const jpegBytes = Buffer.from(data.selfie_base64, "base64");
     const selfiePath = `${staffProfile.id}/${Date.now()}.jpg`;
@@ -198,7 +212,7 @@ export const kioskPunch = createServerFn({ method: "POST" })
       user_id: staffProfile.id,
       office_location_id: officeLocationId,
       branch_id: staffProfile.branch_id,
-      shift_id: (shiftLink as any)?.shift_id ?? null,
+      shift_id: matchedLeg?.id ?? null,
       kind: data.kind,
       latitude: data.latitude,
       longitude: data.longitude,

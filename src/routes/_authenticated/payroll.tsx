@@ -85,13 +85,20 @@ function Payroll() {
 
         // Resolve the staff member's shift FIRST — its working_days drives
         // the whole salary calculation, not just late fines.
-        const { data: shiftLink } = await supabase
+        // ALL legs, not just the first. A staff member on multi-branch split
+        // duty holds several shifts in a day (Branch A 9-1, B 2-4, C 4-6);
+        // reading only one meant his 2 PM arrival at Branch B was judged
+        // against Branch A's 9 AM start — hours of phantom lateness, and
+        // with a per-minute fine that silently ate his salary.
+        const { data: shiftLinks } = await supabase
           .from("staff_shifts")
-          .select("shifts(start_time, grace_minutes, late_fine_type, late_fine_amount, half_day_after_minutes, working_days)")
-          .eq("user_id", s.id)
-          .limit(1)
-          .maybeSingle();
-        const shiftRule = (shiftLink as any)?.shifts;
+          .select("shifts(id, branch_id, start_time, grace_minutes, late_fine_type, late_fine_amount, half_day_after_minutes, working_days)")
+          .eq("user_id", s.id);
+        const legs: any[] = (shiftLinks ?? [])
+          .map((r: any) => r.shifts)
+          .filter(Boolean)
+          .sort((a: any, b: any) => String(a.start_time).localeCompare(String(b.start_time)));
+        const shiftRule = legs[0] ?? null;
 
         // shifts.working_days is an ISO-dow array (1=Mon … 7=Sun), default
         // Mon-Fri. Payroll previously used the raw calendar-day count, so
@@ -99,9 +106,10 @@ function Payroll() {
         // Saturday and Sunday — roughly 8-9 days of pay every month.
         // No shift assigned → keep the old all-days behaviour (correct for
         // shops that genuinely operate 7 days).
-        const shiftDows: number[] | null = Array.isArray(shiftRule?.working_days) && shiftRule.working_days.length
-          ? shiftRule.working_days.map(Number)
-          : null;
+        // A day counts as a working day if ANY leg is scheduled on it.
+        const dowSet = new Set<number>();
+        for (const l of legs) for (const d of (l.working_days ?? [])) dowSet.add(Number(d));
+        const shiftDows: number[] | null = dowSet.size ? Array.from(dowSet) : null;
         const isWorkingDay = (d: number) => {
           if (!shiftDows) return true;
           const js = new Date(year, month - 1, d).getDay(); // 0=Sun … 6=Sat
@@ -118,7 +126,7 @@ function Payroll() {
 
         const { data: recs } = await supabase
           .from("attendance_records")
-          .select("attendance_date, kind, occurred_at")
+          .select("attendance_date, kind, occurred_at, branch_id")
           .eq("user_id", s.id)
           .gte("attendance_date", monthStart)
           .lte("attendance_date", effectiveEnd);
@@ -172,27 +180,42 @@ function Payroll() {
         // Check-in is NEVER blocked by these rules — this is payroll-only math.
         let lateFine = 0;
         let lateDaysCount = 0;
-        if (shiftRule && shiftRule.late_fine_type !== "none" && shiftRule.start_time) {
-          const [sh, sm] = String(shiftRule.start_time).slice(0, 5).split(":").map(Number);
-          const shiftStartMin = sh * 60 + sm;
-          const grace = shiftRule.grace_minutes ?? 10;
-
-          for (const ci of checkIns) {
+        const toMin = (t: string) => {
+          const [h, m] = String(t).slice(0, 5).split(":").map(Number);
+          return h * 60 + m;
+        };
+        if (legs.length > 0) {
+          for (const ci of checkIns as any[]) {
             // Explicit IST. shift start_time is IST wall-clock; reading the
             // timestamp with the ADMIN's browser timezone happened to work
             // only because admins are in India — it silently produced wrong
             // fines for anyone running payroll from another timezone.
             const ist = new Date(new Date(ci.occurred_at).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
             const minutesIn = ist.getHours() * 60 + ist.getMinutes();
-            const lateBy = minutesIn - (shiftStartMin + grace);
+
+            // Judge this punch against the leg it actually belongs to:
+            // prefer the leg whose branch matches, then the one whose start
+            // time is nearest. Otherwise a Branch B 2 PM check-in gets
+            // measured against Branch A's 9 AM start.
+            const branchLegs = ci.branch_id
+              ? legs.filter((l) => !l.branch_id || l.branch_id === ci.branch_id)
+              : legs;
+            const pool = branchLegs.length ? branchLegs : legs;
+            const leg = pool.reduce((best, l) =>
+              Math.abs(minutesIn - toMin(l.start_time)) < Math.abs(minutesIn - toMin(best.start_time)) ? l : best
+            );
+
+            if (!leg || leg.late_fine_type === "none" || !leg.start_time) continue;
+            const grace = leg.grace_minutes ?? 10;
+            const lateBy = minutesIn - (toMin(leg.start_time) + grace);
             if (lateBy > 0) {
               lateDaysCount++;
-              if (shiftRule.late_fine_type === "fixed_per_occurrence") {
-                lateFine += Number(shiftRule.late_fine_amount ?? 0);
-              } else if (shiftRule.late_fine_type === "per_minute") {
-                lateFine += lateBy * Number(shiftRule.late_fine_amount ?? 0);
-              } else if (shiftRule.late_fine_type === "half_day_after_minutes") {
-                if (lateBy >= (shiftRule.half_day_after_minutes ?? 120)) {
+              if (leg.late_fine_type === "fixed_per_occurrence") {
+                lateFine += Number(leg.late_fine_amount ?? 0);
+              } else if (leg.late_fine_type === "per_minute") {
+                lateFine += lateBy * Number(leg.late_fine_amount ?? 0);
+              } else if (leg.late_fine_type === "half_day_after_minutes") {
+                if (lateBy >= (leg.half_day_after_minutes ?? 120)) {
                   lateFine += perDay / 2;
                 }
               }

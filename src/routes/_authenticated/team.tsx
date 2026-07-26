@@ -521,11 +521,17 @@ function EditStaffForm({
   const [newPin, setNewPin] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Load currently assigned shift
+  // Load currently assigned shift(s). A staff member on multi-branch split
+  // duty holds SEVERAL — this quick-edit dialog only has one dropdown, so
+  // saving it would collapse three legs into one. Detect that case and
+  // leave shifts untouched instead, pointing the admin at the full editor.
+  const [multiShiftCount, setMultiShiftCount] = useState(0);
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("staff_shifts").select("shift_id").eq("user_id", staff.id).limit(1).maybeSingle();
-      if (data?.shift_id) setShiftId(data.shift_id);
+      const { data } = await supabase.from("staff_shifts").select("shift_id").eq("user_id", staff.id);
+      const ids = (data ?? []).map((r: any) => r.shift_id);
+      setMultiShiftCount(ids.length);
+      if (ids.length === 1) setShiftId(ids[0]);
     })();
   }, [staff.id]);
 
@@ -542,7 +548,9 @@ function EditStaffForm({
           designation,
           monthly_salary: Number(salary) || 0,
           branch_id: branchIdSel || null,
-          shift_id: shiftId || null,
+          // Omit shift entirely when the person has multiple legs — sending
+          // a single shift_id here would delete the other branches.
+          ...(multiShiftCount > 1 ? {} : { shift_id: shiftId || null }),
           is_field_staff: isField,
           new_password: newPin.trim() ? newPin.trim() : null,
         },
@@ -587,7 +595,12 @@ function EditStaffForm({
 
       <div className="space-y-1">
         <Label>Shift</Label>
-        {shifts.length > 0 ? (
+        {multiShiftCount > 1 ? (
+          <p className="rounded-md border border-primary/30 bg-primary/5 p-2.5 text-xs">
+            This person works <strong>{multiShiftCount} shifts</strong> across branches. Shifts are left unchanged
+            here — open their profile and use the <strong>Shifts</strong> tab to edit the full set.
+          </p>
+        ) : shifts.length > 0 ? (
           <Select value={shiftId || "none"} onValueChange={(v) => setShiftId(v === "none" ? "" : v)}>
             <SelectTrigger><SelectValue placeholder="No shift assigned" /></SelectTrigger>
             <SelectContent>

@@ -135,6 +135,7 @@ function StaffDetailsPage() {
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="bank">Bank & account</TabsTrigger>
             <TabsTrigger value="salary">Salary & payments</TabsTrigger>
+            <TabsTrigger value="shifts">Shifts</TabsTrigger>
             <TabsTrigger value="punches">Punches</TabsTrigger>
           </TabsList>
 
@@ -148,6 +149,10 @@ function StaffDetailsPage() {
 
           <TabsContent value="salary" className="mt-4">
             <SalaryTab tenantId={tenantId} staff={s} companyName={user?.tenant?.name} />
+          </TabsContent>
+
+          <TabsContent value="shifts" className="mt-4">
+            <ShiftsTab tenantId={tenantId} staffId={s.id} />
           </TabsContent>
 
           <TabsContent value="punches" className="mt-4">
@@ -687,6 +692,147 @@ function PunchesTab({ staffId }: { staffId: string }) {
           ))}
         </div>
       )}
+    </Card>
+  );
+}
+
+/* ──────────────── SHIFTS & BRANCHES (multi-branch split duty) ────────────────
+ * A staff member can work several branches in one day — Branch A 9-1,
+ * Branch B 2-4, Branch C 4-6. Each leg is a separate shift (each shift
+ * carries its own branch, timing, working days and grace), and a staff
+ * member simply holds all of them at once.
+ *
+ * The old edit dialog offered a SINGLE shift dropdown and the server
+ * deleted every existing assignment before inserting the chosen one, so
+ * picking Branch B silently wiped Branch A — multi-branch duty was
+ * impossible to configure even though the data model allowed it.
+ */
+function ShiftsTab({ tenantId, staffId }: { tenantId: string; staffId: string }) {
+  const qc = useQueryClient();
+  const updateStaffFn = useServerFn(updateStaff);
+  const [saving, setSaving] = useState(false);
+  const [selected, setSelected] = useState<string[] | null>(null);
+
+  const { data: shifts = [] } = useQuery({
+    queryKey: ["tenant-shifts-all", tenantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("shifts")
+        .select("id, name, start_time, end_time, branch_id, working_days, branches(name)")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .order("start_time");
+      return data ?? [];
+    },
+  });
+
+  const { data: assigned = [] } = useQuery({
+    queryKey: ["staff-shift-ids", staffId],
+    queryFn: async () => {
+      const { data } = await supabase.from("staff_shifts").select("shift_id").eq("user_id", staffId);
+      return (data ?? []).map((r: any) => r.shift_id as string);
+    },
+  });
+
+  const current = selected ?? assigned;
+  const dirty = selected !== null && (
+    selected.length !== assigned.length || selected.some((id) => !assigned.includes(id))
+  );
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const base = prev ?? assigned;
+      return base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
+    });
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await updateStaffFn({ data: { tenant_id: tenantId, user_id: staffId, shift_ids: current } });
+      toast.success(current.length > 1 ? `${current.length} shifts assigned` : "Shift saved");
+      setSelected(null);
+      qc.invalidateQueries({ queryKey: ["staff-shift-ids", staffId] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not save shifts");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const t12 = (t: string) => {
+    const [h, m] = String(t).slice(0, 5).split(":").map(Number);
+    return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+  };
+  const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  // Show the day in time order so a split shift reads like a route.
+  const chosen = shifts
+    .filter((s: any) => current.includes(s.id))
+    .sort((a: any, b: any) => String(a.start_time).localeCompare(String(b.start_time)));
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div>
+        <h3 className="font-semibold">Shifts & branches</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Tick every shift this person works. Assign more than one to cover several branches in a day — check-in
+          automatically picks the right one based on the time.
+        </p>
+      </div>
+
+      {shifts.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4">
+          No shifts created yet. Create shifts first (one per branch visit, each with its own branch and timing).
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {shifts.map((s: any) => {
+            const on = current.includes(s.id);
+            return (
+              <label
+                key={s.id}
+                className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 transition-colors ${on ? "border-primary/40 bg-primary/5" : "hover:bg-muted/40"}`}
+              >
+                <input type="checkbox" checked={on} onChange={() => toggle(s.id)} className="h-4 w-4 accent-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">
+                    {s.name}
+                    {s.branches?.name && <span className="text-muted-foreground font-normal"> · {s.branches.name}</span>}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {t12(s.start_time)} – {t12(s.end_time)}
+                    {Array.isArray(s.working_days) && s.working_days.length > 0 && (
+                      <> · {s.working_days.map((d: number) => DOW[d - 1]).join(", ")}</>
+                    )}
+                  </p>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      )}
+
+      {chosen.length > 1 && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+          <p className="text-xs font-semibold mb-1.5">Their day, in order</p>
+          <ol className="space-y-1">
+            {chosen.map((s: any, i: number) => (
+              <li key={s.id} className="text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">{i + 1}.</span>{" "}
+                {t12(s.start_time)}–{t12(s.end_time)} · {s.branches?.name ?? s.name}
+              </li>
+            ))}
+          </ol>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            If a branch is skipped, it shows on Branch schedule and admins get an alert that evening.
+          </p>
+        </div>
+      )}
+
+      <Button onClick={save} disabled={!dirty || saving} className="gap-2">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+        Save shifts
+      </Button>
     </Card>
   );
 }

@@ -104,6 +104,10 @@ const updateInput = z.object({
   designation: z.string().trim().max(100).optional(),
   monthly_salary: z.number().min(0).optional(),
   shift_id: z.string().uuid().nullable().optional(),
+  // Multi-branch split duty: a staff member can hold SEVERAL shifts at once
+  // (Branch A 9-1, Branch B 2-4, Branch C 4-6). shift_id stays for the
+  // single-shift path; shift_ids replaces the whole set when provided.
+  shift_ids: z.array(z.string().uuid()).optional(),
   branch_id: z.string().uuid().nullable().optional(),
   is_field_staff: z.boolean().optional(),
   new_password: z.string().min(4).max(72).optional().nullable(),
@@ -199,8 +203,30 @@ export const updateStaff = createServerFn({ method: "POST" })
       if (error) throw new Error(`Profile update failed: ${error.message}`);
     }
 
-    // Shift change — replace any existing staff_shift row
-    if (data.shift_id !== undefined) {
+    // Shift assignment. Two paths:
+    //   shift_ids (array) — multi-branch split duty, replaces the whole set
+    //   shift_id  (single) — legacy single-shift path, unchanged
+    // Both replace-then-insert so removing a leg actually removes it.
+    if (data.shift_ids !== undefined) {
+      await supabaseAdmin
+        .from("staff_shifts")
+        .delete()
+        .eq("user_id", data.user_id)
+        .eq("tenant_id", data.tenant_id);
+      if (data.shift_ids.length > 0) {
+        // De-dupe: the same shift twice would double-count the leg in
+        // /branch-schedule and in the missed-branch alert.
+        const unique = Array.from(new Set(data.shift_ids));
+        const { error: sErr } = await supabaseAdmin.from("staff_shifts").insert(
+          unique.map((sid) => ({
+            tenant_id: data.tenant_id,
+            user_id: data.user_id,
+            shift_id: sid,
+          })),
+        );
+        if (sErr) throw new Error(`Could not save shifts: ${sErr.message}`);
+      }
+    } else if (data.shift_id !== undefined) {
       await supabaseAdmin
         .from("staff_shifts")
         .delete()
