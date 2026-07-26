@@ -32,7 +32,7 @@ function CompanyProfilePage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("tenants")
-        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent")
+        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent, partial_day_policy")
         .eq("id", tenantId!)
         .maybeSingle();
       return data;
@@ -47,6 +47,7 @@ function CompanyProfilePage() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [cardTemplate, setCardTemplate] = useState<"corporate" | "modern" | "compact" | "minimal" | "bold" | "formal" | "badge">("corporate");
+  const [partialPolicy, setPartialPolicy] = useState<string>("full_day");
   const [cardAccent, setCardAccent] = useState<string>("#4F46E5");
 
   // Sync state when tenant loads
@@ -59,6 +60,7 @@ function CompanyProfilePage() {
     setLogoUrl(tenant.logo_url ?? "");
     setCardTemplate(((tenant as any).id_card_template ?? "corporate") as any);
     setCardAccent((tenant as any).id_card_accent ?? "#4F46E5");
+    setPartialPolicy((tenant as any).partial_day_policy ?? "full_day");
   }, [tenant]);
 
   if (!tenantId) {
@@ -102,6 +104,7 @@ function CompanyProfilePage() {
           contact_phone: contactPhone || null,
           id_card_template: cardTemplate,
           id_card_accent: cardAccent || null,
+          partial_day_policy: partialPolicy,
         },
       });
       toast.success("Company profile updated");
@@ -199,6 +202,25 @@ function CompanyProfilePage() {
           <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
             <p><span className="font-medium text-foreground">Slug:</span> <span className="font-mono">{tenant?.slug ?? "—"}</span></p>
             <p><span className="font-medium text-foreground">Type:</span> {tenant?.tenant_type === "school" ? "School / college / coaching" : "Business"}</p>
+          </div>
+
+          {/* ─── Partial day pay policy ─── */}
+          <div className="space-y-2 border-t pt-5">
+            <Label className="text-sm">Partial day pay</Label>
+            <p className="text-xs text-muted-foreground">
+              For staff who work several branches in a day — how a day is paid when some scheduled
+              branch visits were missed. Individual branches can override this.
+            </p>
+            <select
+              value={partialPolicy}
+              onChange={(e) => setPartialPolicy(e.target.value)}
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm sm:max-w-sm"
+            >
+              <option value="full_day">Pay full day (just flag it)</option>
+              <option value="proportional">Pay for the hours actually worked</option>
+              <option value="half_day">Pay half day</option>
+              <option value="absent">Treat the day as absent</option>
+            </select>
           </div>
 
           {/* ─── ID card template picker ─── */}

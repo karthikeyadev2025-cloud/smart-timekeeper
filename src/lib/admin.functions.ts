@@ -315,6 +315,7 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     contact_phone?: string | null;
     id_card_template?: "corporate" | "modern" | "compact" | "minimal" | "bold" | "formal" | "badge" | null;
     id_card_accent?: string | null;
+    partial_day_policy?: string | null;
   }) => data)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -344,6 +345,13 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
         throw new Error("Invalid ID card template");
       }
       update.id_card_template = data.id_card_template || "corporate";
+    }
+    if (data.partial_day_policy !== undefined && data.partial_day_policy) {
+      const allowed = ["proportional", "half_day", "full_day", "absent"];
+      if (!allowed.includes(data.partial_day_policy)) {
+        throw new Error("Invalid partial day policy");
+      }
+      update.partial_day_policy = data.partial_day_policy;
     }
     if (data.id_card_accent !== undefined) {
       // Basic hex validation. NULL clears it (falls back to the app's indigo).

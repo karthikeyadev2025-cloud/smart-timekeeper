@@ -184,6 +184,8 @@ function BranchSettingsForm({ branch, noun, onDone }: { branch: Branch; noun: st
   const [name, setName] = useState<string>(branch.name ?? "");
   const [address, setAddress] = useState<string>((branch as any).address ?? "");
   const [radius, setRadius] = useState<number>(branch.default_radius_meters ?? 100);
+  // Partial-day pay policy — "" means inherit the company default.
+  const [partialPolicy, setPartialPolicy] = useState<string>((branch as any).partial_day_policy ?? "");
   const [ciStart, setCiStart] = useState<string>(toTime(branch.checkin_window_start));
   const [ciEnd, setCiEnd] = useState<string>(toTime(branch.checkin_window_end));
   const [coStart, setCoStart] = useState<string>(toTime(branch.checkout_window_start));
@@ -222,6 +224,7 @@ function BranchSettingsForm({ branch, noun, onDone }: { branch: Branch; noun: st
       checkin_window_end: ciEnd || null,
       checkout_window_start: coStart || null,
       checkout_window_end: coEnd || null,
+      partial_day_policy: partialPolicy || null,
     }).eq("id", branch.id);
     if (error) { setLoading(false); toast.error(error.message); return; }
 
@@ -278,6 +281,31 @@ function BranchSettingsForm({ branch, noun, onDone }: { branch: Branch; noun: st
           <div className="space-y-1"><Label className="text-xs">From</Label><TimeInput12h value={coStart} onChange={setCoStart} /></div>
           <div className="space-y-1"><Label className="text-xs">To</Label><TimeInput12h value={coEnd} onChange={setCoEnd} /></div>
         </div>
+      </section>
+
+      <section className="space-y-2">
+        <div>
+          <h4 className="text-sm font-semibold">Partial day pay</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            For staff who work several branches in a day — how a day is paid when some scheduled
+            branch visits were missed.
+          </p>
+        </div>
+        <select
+          value={partialPolicy}
+          onChange={(e) => setPartialPolicy(e.target.value)}
+          className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+        >
+          <option value="">Use company default</option>
+          <option value="full_day">Pay full day (just flag it)</option>
+          <option value="proportional">Pay for the hours actually worked</option>
+          <option value="half_day">Pay half day</option>
+          <option value="absent">Treat the day as absent</option>
+        </select>
+        <p className="text-[11px] text-muted-foreground">
+          Missed visits always show on <strong>Branch schedule</strong> and trigger an evening alert,
+          whichever option you pick.
+        </p>
       </section>
 
       <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Saving…" : "Save settings"}</Button></DialogFooter>

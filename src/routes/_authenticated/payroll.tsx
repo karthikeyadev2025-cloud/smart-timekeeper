@@ -60,6 +60,16 @@ function Payroll() {
     if (!tenantId) return;
     setGenerating(true);
     try {
+      // Partial-day pay policy: branch override, else company default.
+      const [{ data: tenantRow }, { data: branchRows }] = await Promise.all([
+        (supabase as any).from("tenants").select("partial_day_policy").eq("id", tenantId).maybeSingle(),
+        (supabase as any).from("branches").select("id, partial_day_policy").eq("tenant_id", tenantId),
+      ]);
+      const tenantPolicy: string = tenantRow?.partial_day_policy ?? "full_day";
+      const branchPolicy = new Map<string, string | null>(
+        (branchRows ?? []).map((b: any) => [b.id, b.partial_day_policy ?? null]),
+      );
+
       let sq = supabase.from("profiles").select("id, full_name, monthly_salary, branch_id").eq("tenant_id", tenantId).eq("is_active", true);
       if (branchId !== "all") sq = sq.eq("branch_id", branchId);
       const { data: staff } = await sq;
@@ -132,14 +142,66 @@ function Payroll() {
           .lte("attendance_date", effectiveEnd);
 
         const checkIns = (recs ?? []).filter(r => r.kind === "check_in");
-        // Only count presence on days that are actually working days —
-        // someone who came in on their day off shouldn't inflate the count
-        // past the number of days being judged.
-        const presentDays = new Set(
-          checkIns
-            .map(r => r.attendance_date)
-            .filter(d => isWorkingDay(Number(String(d).slice(8, 10))))
-        ).size;
+
+        // ── Day credit, honouring the partial-day policy ──
+        // A multi-branch staff member can complete some legs and skip
+        // others. How much of the day that earns is a business decision the
+        // branch admin sets; payroll must not assume it.
+        const policy = (branchPolicy.get(s.branch_id ?? "") ?? null) || tenantPolicy;
+        const legMinutes = (l: any) => {
+          const [h1, m1] = String(l.start_time).slice(0, 5).split(":").map(Number);
+          const [h2, m2] = String(l.end_time ?? l.start_time).slice(0, 5).split(":").map(Number);
+          return Math.max(0, (h2 * 60 + m2) - (h1 * 60 + m1));
+        };
+        const dowOf = (d: number) => {
+          const js = new Date(year, month - 1, d).getDay();
+          return js === 0 ? 7 : js;
+        };
+        const legsOnDay = (d: number) =>
+          legs.length
+            ? legs.filter((l: any) => !Array.isArray(l.working_days) || l.working_days.length === 0 || l.working_days.map(Number).includes(dowOf(d)))
+            : [];
+
+        // Group the day's check-ins so a leg can be tested for attendance.
+        const insByDate = new Map<string, any[]>();
+        for (const ci of checkIns as any[]) {
+          const arr = insByDate.get(ci.attendance_date) ?? [];
+          arr.push(ci);
+          insByDate.set(ci.attendance_date, arr);
+        }
+
+        let presentCredit = 0;   // fractional days actually earned
+        let presentDays = 0;     // whole days with any attendance (for display)
+        let partialDays = 0;
+        for (let d = 1; d <= lastCountedDay; d++) {
+          if (!isWorkingDay(d)) continue;
+          const ds = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const dayIns = insByDate.get(ds) ?? [];
+          if (dayIns.length === 0) continue;
+          presentDays++;
+
+          const todaysLegs = legsOnDay(d);
+          // Single-shift staff (or none configured) behave exactly as before.
+          if (todaysLegs.length <= 1) { presentCredit += 1; continue; }
+
+          const attended = todaysLegs.filter((l: any) =>
+            dayIns.some((ci) => !l.branch_id || !ci.branch_id || ci.branch_id === l.branch_id),
+          );
+          if (attended.length === todaysLegs.length) { presentCredit += 1; continue; }
+
+          partialDays++;
+          if (policy === "absent") {
+            presentCredit += 0;
+          } else if (policy === "half_day") {
+            presentCredit += 0.5;
+          } else if (policy === "proportional") {
+            const total = todaysLegs.reduce((a: number, l: any) => a + legMinutes(l), 0);
+            const done = attended.reduce((a: number, l: any) => a + legMinutes(l), 0);
+            presentCredit += total > 0 ? done / total : 1;
+          } else {
+            presentCredit += 1; // full_day — paid in full, flagged on /branch-schedule
+          }
+        }
 
         // OVERLAP test, not containment. The old filter required the leave to
         // START and END inside the month, so a leave running 28 Jun–3 Jul was
@@ -169,7 +231,7 @@ function Payroll() {
           else paidLeave++;
         }
 
-        const effective = presentDays + paidLeave;
+        const effective = presentCredit + paidLeave;
         const absent = Math.max(0, workingDays - effective - unpaidLeave);
         const perDay = base / fullMonthWorkingDays;
         // Unpaid leave is deducted just like absence — that's what makes it
@@ -229,7 +291,8 @@ function Payroll() {
         await supabase.from("payslips").upsert({
           tenant_id: tenantId, user_id: s.id, branch_id: s.branch_id ?? null,
           period_year: year, period_month: month,
-          base_salary: base, present_days: presentDays, absent_days: absent,
+          base_salary: base, present_days: presentDays,
+          absent_days: Math.round(absent * 100) / 100,
           paid_leave_days: paidLeave, unpaid_leave_days: unpaidLeave, working_days: workingDays,
           overtime_hours: 0, deductions, net_pay: net,
           late_days: lateDaysCount, late_fine: lateFine,
