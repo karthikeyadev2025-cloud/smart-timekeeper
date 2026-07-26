@@ -50,6 +50,7 @@ import { Route as AuthenticatedShiftsRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedSignatureApprovalsRouteImport } from './routes/_authenticated/signature-approvals'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
 import { Route as BiometricAttendanceCityRouteImport } from './routes/biometric-attendance.$city'
+import { Route as VerifyStaffIdRouteImport } from './routes/verify.$staffId'
 import { Route as AuthenticatedStaffStaffIdRouteImport } from './routes/_authenticated/staff.$staffId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -265,6 +266,11 @@ const BiometricAttendanceCityRoute = BiometricAttendanceCityRouteImport.update({
   path: '/biometric-attendance/$city',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerifyStaffIdRoute = VerifyStaffIdRouteImport.update({
+  id: '/verify/$staffId',
+  path: '/verify/$staffId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedStaffStaffIdRoute =
   AuthenticatedStaffStaffIdRouteImport.update({
     id: '/staff/$staffId',
@@ -313,6 +319,7 @@ export interface FileRoutesByFullPath {
   '/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/team': typeof AuthenticatedTeamRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
+  '/verify/$staffId': typeof VerifyStaffIdRoute
   '/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
 }
 export interface FileRoutesByTo {
@@ -356,6 +363,7 @@ export interface FileRoutesByTo {
   '/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/team': typeof AuthenticatedTeamRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
+  '/verify/$staffId': typeof VerifyStaffIdRoute
   '/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
 }
 export interface FileRoutesById {
@@ -401,6 +409,7 @@ export interface FileRoutesById {
   '/_authenticated/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
+  '/verify/$staffId': typeof VerifyStaffIdRoute
   '/_authenticated/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
 }
 export interface FileRouteTypes {
@@ -446,6 +455,7 @@ export interface FileRouteTypes {
     | '/signature-approvals'
     | '/team'
     | '/biometric-attendance/$city'
+    | '/verify/$staffId'
     | '/staff/$staffId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -489,6 +499,7 @@ export interface FileRouteTypes {
     | '/signature-approvals'
     | '/team'
     | '/biometric-attendance/$city'
+    | '/verify/$staffId'
     | '/staff/$staffId'
   id:
     | '__root__'
@@ -533,6 +544,7 @@ export interface FileRouteTypes {
     | '/_authenticated/signature-approvals'
     | '/_authenticated/team'
     | '/biometric-attendance/$city'
+    | '/verify/$staffId'
     | '/_authenticated/staff/$staffId'
   fileRoutesById: FileRoutesById
 }
@@ -545,6 +557,7 @@ export interface RootRouteChildren {
   SupportRoute: typeof SupportRoute
   TermsRoute: typeof TermsRoute
   BiometricAttendanceCityRoute: typeof BiometricAttendanceCityRoute
+  VerifyStaffIdRoute: typeof VerifyStaffIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -836,6 +849,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BiometricAttendanceCityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verify/$staffId': {
+      id: '/verify/$staffId'
+      path: '/verify/$staffId'
+      fullPath: '/verify/$staffId'
+      preLoaderRoute: typeof VerifyStaffIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/staff/$staffId': {
       id: '/_authenticated/staff/$staffId'
       path: '/staff/$staffId'
@@ -932,6 +952,7 @@ const rootRouteChildren: RootRouteChildren = {
   SupportRoute: SupportRoute,
   TermsRoute: TermsRoute,
   BiometricAttendanceCityRoute: BiometricAttendanceCityRoute,
+  VerifyStaffIdRoute: VerifyStaffIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
