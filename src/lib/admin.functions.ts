@@ -316,6 +316,7 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     id_card_template?: "corporate" | "modern" | "compact" | "minimal" | "bold" | "formal" | "badge" | null;
     id_card_accent?: string | null;
     partial_day_policy?: string | null;
+    default_monthly_working_days?: number | null;
   }) => data)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -345,6 +346,13 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
         throw new Error("Invalid ID card template");
       }
       update.id_card_template = data.id_card_template || "corporate";
+    }
+    if (data.default_monthly_working_days !== undefined) {
+      const v = data.default_monthly_working_days;
+      if (v !== null && (!Number.isInteger(v) || v < 1 || v > 31)) {
+        throw new Error("Expected working days must be between 1 and 31");
+      }
+      update.default_monthly_working_days = v;
     }
     if (data.partial_day_policy !== undefined && data.partial_day_policy) {
       const allowed = ["proportional", "half_day", "full_day", "absent"];

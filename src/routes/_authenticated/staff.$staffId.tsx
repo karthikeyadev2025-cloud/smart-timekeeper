@@ -173,6 +173,7 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
     phone: staff.phone ?? "",
     designation: staff.designation ?? "",
     monthly_salary: staff.monthly_salary?.toString() ?? "",
+    monthly_working_days: staff.monthly_working_days?.toString() ?? "",
     date_of_birth: staff.date_of_birth ?? "",
     gender: staff.gender ?? "",
     blood_group: staff.blood_group ?? "",
@@ -197,6 +198,7 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
           phone: form.phone.trim() !== staff.phone ? form.phone.trim() : undefined,
           designation: form.designation,
           monthly_salary: Number(form.monthly_salary) || 0,
+          monthly_working_days: form.monthly_working_days.trim() ? Number(form.monthly_working_days) : null,
           date_of_birth: form.date_of_birth || null,
           gender: (form.gender || null) as any,
           blood_group: (form.blood_group || null) as any,
@@ -233,6 +235,7 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
           <div className="space-y-1 col-span-2"><Label>Full name</Label><Input value={form.full_name} onChange={(e) => set("full_name")(e.target.value)} /></div>
           <div className="space-y-1"><Label>Designation</Label><Input value={form.designation} onChange={(e) => set("designation")(e.target.value)} /></div>
           <div className="space-y-1"><Label>Monthly salary (₹)</Label><Input type="number" min={0} value={form.monthly_salary} onChange={(e) => set("monthly_salary")(e.target.value)} /></div>
+          <div className="space-y-1 col-span-2"><Label>Expected working days / month</Label><Input type="number" min={1} max={31} placeholder="Leave blank to use shift or company default" value={form.monthly_working_days} onChange={(e) => set("monthly_working_days")(e.target.value)} /><p className="text-[11px] text-muted-foreground">For rotating weekly offs. Payroll measures attendance against this number instead of guessing which dates were offs.</p></div>
           <div className="space-y-1 col-span-2">
             <Label>Phone (login number)</Label>
             <Input

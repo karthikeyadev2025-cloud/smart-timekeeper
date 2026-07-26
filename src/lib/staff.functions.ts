@@ -103,6 +103,7 @@ const updateInput = z.object({
   phone: phoneSchema.optional(),
   designation: z.string().trim().max(100).optional(),
   monthly_salary: z.number().min(0).optional(),
+  monthly_working_days: z.number().int().min(1).max(31).nullable().optional(),
   shift_id: z.string().uuid().nullable().optional(),
   // Multi-branch split duty: a staff member can hold SEVERAL shifts at once
   // (Branch A 9-1, Branch B 2-4, Branch C 4-6). shift_id stays for the
@@ -185,6 +186,7 @@ export const updateStaff = createServerFn({ method: "POST" })
     if (data.date_of_joining !== undefined) profileUpdate.date_of_joining = data.date_of_joining || null;
     if (data.address !== undefined) profileUpdate.address = data.address || null;
     if (data.emergency_contact_name !== undefined) profileUpdate.emergency_contact_name = data.emergency_contact_name || null;
+    if (data.monthly_working_days !== undefined) profileUpdate.monthly_working_days = data.monthly_working_days;
     if (data.emergency_contact_phone !== undefined) profileUpdate.emergency_contact_phone = data.emergency_contact_phone || null;
     if (data.id_proof_type !== undefined) profileUpdate.id_proof_type = data.id_proof_type;
     if (data.id_proof_number !== undefined) profileUpdate.id_proof_number = data.id_proof_number || null;

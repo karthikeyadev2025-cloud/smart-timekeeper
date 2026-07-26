@@ -62,15 +62,16 @@ function Payroll() {
     try {
       // Partial-day pay policy: branch override, else company default.
       const [{ data: tenantRow }, { data: branchRows }] = await Promise.all([
-        (supabase as any).from("tenants").select("partial_day_policy").eq("id", tenantId).maybeSingle(),
+        (supabase as any).from("tenants").select("partial_day_policy, default_monthly_working_days").eq("id", tenantId).maybeSingle(),
         (supabase as any).from("branches").select("id, partial_day_policy").eq("tenant_id", tenantId),
       ]);
       const tenantPolicy: string = tenantRow?.partial_day_policy ?? "full_day";
+      const tenantExpectedDays: number | null = tenantRow?.default_monthly_working_days ?? null;
       const branchPolicy = new Map<string, string | null>(
         (branchRows ?? []).map((b: any) => [b.id, b.partial_day_policy ?? null]),
       );
 
-      let sq = supabase.from("profiles").select("id, full_name, monthly_salary, branch_id").eq("tenant_id", tenantId).eq("is_active", true);
+      let sq = supabase.from("profiles").select("id, full_name, monthly_salary, branch_id, monthly_working_days").eq("tenant_id", tenantId).eq("is_active", true);
       if (branchId !== "all") sq = sq.eq("branch_id", branchId);
       const { data: staff } = await sq;
       if (!staff?.length) throw new Error("No active staff");
@@ -83,8 +84,13 @@ function Payroll() {
       // mid-month previously treated every remaining day of the month as an
       // absence and deducted for it — running July payroll on the 7th
       // deducted ~24 days of salary from staff with perfect attendance.
-      const todayLocal = localDateStr();
-      const effectiveEnd = monthEnd <= todayLocal ? monthEnd : todayLocal;
+      // Judge only days that are OVER. Today is still in progress — counting
+      // it would mark every staff member absent for today if payroll is run
+      // before they punch in (e.g. a 10 AM preview). If the month is already
+      // complete, the full month is used.
+      const y = new Date(); y.setDate(y.getDate() - 1);
+      const yesterday = localDateStr(y);
+      const effectiveEnd = monthEnd <= yesterday ? monthEnd : yesterday;
       if (effectiveEnd < monthStart) throw new Error("That month hasn't started yet");
       const lastCountedDay = Number(effectiveEnd.slice(8, 10));
 
@@ -126,12 +132,26 @@ function Payroll() {
           return shiftDows.includes(js === 0 ? 7 : js);
         };
 
+        // Expected-days override, for ROTATING rosters where no fixed weekly
+        // pattern applies (7-day operations with a rotating weekly off).
+        // Without this, every non-attended day counts as unpaid absence and
+        // legitimate rest days get deducted.
+        const expectedDays: number | null =
+          (s as any).monthly_working_days ?? tenantExpectedDays ?? null;
+
         let workingDays = 0;
-        for (let d = 1; d <= lastCountedDay; d++) if (isWorkingDay(d)) workingDays++;
-        // Per-day rate uses the month's FULL working-day count so a
-        // mid-month run doesn't inflate the daily rate.
         let fullMonthWorkingDays = 0;
-        for (let d = 1; d <= lastDay; d++) if (isWorkingDay(d)) fullMonthWorkingDays++;
+        if (expectedDays && expectedDays > 0) {
+          fullMonthWorkingDays = Math.min(expectedDays, lastDay);
+          // Pro-rate the expected days across the part of the month judged so
+          // far, so a mid-month run doesn't demand a full month of attendance.
+          workingDays = Math.round((fullMonthWorkingDays * lastCountedDay) / lastDay);
+        } else {
+          for (let d = 1; d <= lastCountedDay; d++) if (isWorkingDay(d)) workingDays++;
+          // Per-day rate uses the month's FULL working-day count so a
+          // mid-month run doesn't inflate the daily rate.
+          for (let d = 1; d <= lastDay; d++) if (isWorkingDay(d)) fullMonthWorkingDays++;
+        }
         if (fullMonthWorkingDays === 0) continue;
 
         const { data: recs } = await supabase
@@ -170,11 +190,18 @@ function Payroll() {
           insByDate.set(ci.attendance_date, arr);
         }
 
+        // When an expected-days count is in force we are deliberately NOT
+        // trying to identify WHICH dates were rostered offs — only how many
+        // days were worked against the expected number. So every calendar day
+        // is eligible, and the shift's fixed weekday pattern is bypassed
+        // (otherwise the two definitions would disagree with each other).
+        const countsAsWorkDay = (d: number) => (expectedDays ? true : isWorkingDay(d));
+
         let presentCredit = 0;   // fractional days actually earned
         let presentDays = 0;     // whole days with any attendance (for display)
         let partialDays = 0;
         for (let d = 1; d <= lastCountedDay; d++) {
-          if (!isWorkingDay(d)) continue;
+          if (!countsAsWorkDay(d)) continue;
           const ds = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
           const dayIns = insByDate.get(ds) ?? [];
           if (dayIns.length === 0) continue;
@@ -222,7 +249,7 @@ function Payroll() {
         let paidLeave = 0;
         let unpaidLeave = 0;
         for (let d = 1; d <= lastCountedDay; d++) {
-          if (!isWorkingDay(d)) continue;
+          if (!countsAsWorkDay(d)) continue;
           const ds = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
           const hit = (approvedLeaves ?? []).find((l: any) => l.start_date <= ds && l.end_date >= ds);
           if (!hit) continue;

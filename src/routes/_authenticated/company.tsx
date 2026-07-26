@@ -32,7 +32,7 @@ function CompanyProfilePage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("tenants")
-        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent, partial_day_policy")
+        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent, partial_day_policy, default_monthly_working_days")
         .eq("id", tenantId!)
         .maybeSingle();
       return data;
@@ -48,6 +48,7 @@ function CompanyProfilePage() {
   const [saving, setSaving] = useState(false);
   const [cardTemplate, setCardTemplate] = useState<"corporate" | "modern" | "compact" | "minimal" | "bold" | "formal" | "badge">("corporate");
   const [partialPolicy, setPartialPolicy] = useState<string>("full_day");
+  const [expectedDays, setExpectedDays] = useState<string>("");
   const [cardAccent, setCardAccent] = useState<string>("#4F46E5");
 
   // Sync state when tenant loads
@@ -61,6 +62,7 @@ function CompanyProfilePage() {
     setCardTemplate(((tenant as any).id_card_template ?? "corporate") as any);
     setCardAccent((tenant as any).id_card_accent ?? "#4F46E5");
     setPartialPolicy((tenant as any).partial_day_policy ?? "full_day");
+    setExpectedDays(((tenant as any).default_monthly_working_days ?? "").toString());
   }, [tenant]);
 
   if (!tenantId) {
@@ -105,6 +107,7 @@ function CompanyProfilePage() {
           id_card_template: cardTemplate,
           id_card_accent: cardAccent || null,
           partial_day_policy: partialPolicy,
+          default_monthly_working_days: expectedDays.trim() ? Number(expectedDays) : null,
         },
       });
       toast.success("Company profile updated");
@@ -202,6 +205,18 @@ function CompanyProfilePage() {
           <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
             <p><span className="font-medium text-foreground">Slug:</span> <span className="font-mono">{tenant?.slug ?? "—"}</span></p>
             <p><span className="font-medium text-foreground">Type:</span> {tenant?.tenant_type === "school" ? "School / college / coaching" : "Business"}</p>
+          </div>
+
+          {/* ─── Expected working days ─── */}
+          <div className="space-y-2 border-t pt-5">
+            <Label className="text-sm">Expected working days per month</Label>
+            <p className="text-xs text-muted-foreground">
+              For rotating weekly offs (7-day operations). Payroll measures attendance against this
+              number instead of treating every non-attended day as absence. Leave blank to derive
+              working days from each staff member's shift. Individual staff can override this.
+            </p>
+            <Input type="number" min={1} max={31} placeholder="e.g. 26" value={expectedDays}
+              onChange={(e) => setExpectedDays(e.target.value)} className="sm:max-w-[12rem]" />
           </div>
 
           {/* ─── Partial day pay policy ─── */}
