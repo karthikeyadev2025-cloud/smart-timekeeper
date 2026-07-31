@@ -277,6 +277,15 @@ function Payroll() {
         for (let d = firstDay; d <= lastCountedDay; d++) {
           if (!countsAsWorkDay(d)) continue;
           const ds = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          // A day the staff member actually attended is PRESENT, full stop —
+          // never also charge (or credit) it as leave, even if an approved
+          // leave request happens to cover that date (e.g. leave was
+          // approved but they came in anyway). Double-crediting it as BOTH
+          // present and paid-leave silently forgives an absence elsewhere in
+          // the month (management loses money); double-crediting it as
+          // unpaid leave deducts pay for a day they actually worked
+          // (the staff member loses money). Either way it must count once.
+          if ((insByDate.get(ds) ?? []).length > 0) continue;
           const hit = (approvedLeaves ?? []).find((l: any) => l.start_date <= ds && l.end_date >= ds);
           if (!hit) continue;
           // Missing leave type → treat as paid (matches previous behaviour).
@@ -300,7 +309,24 @@ function Payroll() {
           return h * 60 + m;
         };
         if (legs.length > 0) {
+          // Resolve each punch's leg FIRST, then collapse to one judged punch
+          // per (day, leg). Two things could otherwise double- (or triple-)
+          // charge the same lateness: a double-tap / flaky-network retry /
+          // kiosk-and-app both firing produces more than one check_in row for
+          // the same leg on the same day, and the old code fined EVERY row
+          // instead of the one real arrival. The EARLIEST punch for that leg
+          // is what's judged, since that's when they actually showed up.
+          const judged = new Map<string, { leg: any; minutesIn: number; occurredAt: string }>();
           for (const ci of checkIns as any[]) {
+            const d = Number(String(ci.attendance_date).slice(8, 10));
+            // Never fine a punch on a day that isn't even a scheduled work
+            // day (or falls outside the employed/elapsed window) — that day
+            // earns zero attendance credit already, so it must not cost a
+            // fine too. Without this, an off-day check-in (e.g. a Mon-Fri
+            // staffer coming in on a Saturday) could get charged "late"
+            // against a shift start time that day was never scheduled for.
+            if (d < firstDay || d > lastCountedDay || !countsAsWorkDay(d)) continue;
+
             // Explicit IST. shift start_time is IST wall-clock; reading the
             // timestamp with the ADMIN's browser timezone happened to work
             // only because admins are in India — it silently produced wrong
@@ -319,8 +345,17 @@ function Payroll() {
             const leg = pool.reduce((best, l) =>
               Math.abs(minutesIn - toMin(l.start_time)) < Math.abs(minutesIn - toMin(best.start_time)) ? l : best
             );
+            if (!leg) continue;
 
-            if (!leg || leg.late_fine_type === "none" || !leg.start_time) continue;
+            const key = `${ci.attendance_date}|${leg.id}`;
+            const existing = judged.get(key);
+            if (!existing || ci.occurred_at < existing.occurredAt) {
+              judged.set(key, { leg, minutesIn, occurredAt: ci.occurred_at });
+            }
+          }
+
+          for (const { leg, minutesIn } of judged.values()) {
+            if (leg.late_fine_type === "none" || !leg.start_time) continue;
             const grace = leg.grace_minutes ?? 10;
             const lateBy = minutesIn - (toMin(leg.start_time) + grace);
             if (lateBy > 0) {
