@@ -18,6 +18,15 @@ const ICON_BY_KIND: Record<string, string> = {
   bank_change_rejected: "⚠️",
   subscription_expiring: "⏰",
   irregular_attendance: "📊",
+  // Attendance events (20260901000200_notification_kinds)
+  check_in: "✅",
+  check_out: "👋",
+  break_in: "☕",
+  break_out: "🔙",
+  check_out_missed: "🌙",
+  attendance_flagged: "⚠️",
+  announcement: "📢",
+  birthday: "🎂",
 };
 
 export function NotificationBell() {

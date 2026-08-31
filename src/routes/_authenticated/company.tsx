@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { updateOwnCompanyProfile } from "@/lib/admin.functions";
 import { IdCardTemplateChooser } from "@/components/IdCardTemplateChooser";
+import { NotificationSettingsCard } from "@/components/NotificationSettingsCard";
 import { SignaturePad } from "@/components/SignaturePad";
 import { Building2, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -295,6 +296,10 @@ function CompanyProfilePage() {
             </Button>
           </div>
         </Card>
+
+        {(tenant as any)?.id && (
+          <NotificationSettingsCard tenantId={(tenant as any).id} />
+        )}
       </div>
     </AppShell>
   );
