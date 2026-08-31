@@ -141,13 +141,11 @@ export const getAuditLog = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
-export const PERMISSION_KEYS = [
-  "manage_staff",
-  "manage_branches",
-  "manage_payroll",
-  "manage_approvals",
-] as const;
-export type PermissionKey = (typeof PERMISSION_KEYS)[number];
+// Single source of truth lives in @/lib/permissions, next to the enforcement
+// that actually reads these keys. Re-exported here so existing importers
+// (TenantPermissionsDialog) keep working.
+export { PERMISSION_KEYS, type PermissionKey } from "@/lib/permissions";
+import { PERMISSION_KEYS } from "@/lib/permissions";
 
 export const listTenantAdmins = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

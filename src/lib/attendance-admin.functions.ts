@@ -10,6 +10,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireTenantPermission } from "@/lib/permissions";
 
 const schema = z.object({
   record_id: z.string().uuid(),
@@ -36,6 +37,7 @@ export const correctAttendanceKind = createServerFn({ method: "POST" })
       supabaseAdmin.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: rec.tenant_id }),
     ]);
     if (!isSuper && !isAdmin) throw new Error("Not authorized to correct records for this tenant");
+    if (!isSuper) await requireTenantPermission(supabaseAdmin as any, userId, rec.tenant_id, "manage_approvals");
 
     // When turning a mislabeled punch INTO a closing punch (check_out /
     // break_in), re-home its attendance_date onto the open session it

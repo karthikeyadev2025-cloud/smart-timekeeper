@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireTenantPermission } from "@/lib/permissions";
 
 /* ─────────────── STAFF: REQUEST BANK CHANGE ───────────────
    Staff submits a request to change their bank details. Until an admin
@@ -79,6 +80,7 @@ export const approveBankChange = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_approvals");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -131,6 +133,7 @@ export const rejectBankChange = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_approvals");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

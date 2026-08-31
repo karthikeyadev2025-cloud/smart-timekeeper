@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireTenantPermission } from "@/lib/permissions";
 
 /* ─────────────── RECORD SALARY PAYMENT ───────────────
    Inserts a row into salary_payments. A DB trigger recomputes the parent
@@ -28,6 +29,7 @@ export const recordSalaryPayment = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized to record payments for this company");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_payroll");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -79,6 +81,7 @@ export const deleteSalaryPayment = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_payroll");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

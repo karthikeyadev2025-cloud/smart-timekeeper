@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireTenantPermission } from "@/lib/permissions";
 import { requireActiveSubscription } from "@/lib/subscription-gate";
 
 import { canonicalPhone } from "@/lib/phone-auth";
@@ -40,6 +41,7 @@ export const createStaff = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized to add staff for this company");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_staff");
 
     // Block writes when the tenant's subscription is expired (super_admin bypasses).
     if (!isSuper) await requireActiveSubscription(supabase, data.tenant_id);
@@ -140,6 +142,7 @@ export const updateStaff = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_staff");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -271,6 +274,7 @@ export const deleteStaff = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_staff");
     if (data.user_id === userId) throw new Error("You can't delete your own account here");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -373,6 +377,7 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_staff");
     if (!isSuper) await requireActiveSubscription(supabase, data.tenant_id);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
