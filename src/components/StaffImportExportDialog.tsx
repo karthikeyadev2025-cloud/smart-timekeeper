@@ -3,8 +3,9 @@ import { useServerFn } from "@tanstack/react-start";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Download, Upload, FileSpreadsheet, CheckCircle2, XCircle } from "lucide-react";
+import { Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, KeyRound } from "lucide-react";
 import { bulkImportStaff } from "@/lib/staff.functions";
+import { downloadCsv } from "@/lib/csv";
 import { toast } from "sonner";
 
 const SAMPLE_ROWS = [
@@ -118,7 +119,8 @@ export function StaffImportExportDialog({
             <p className="text-sm font-semibold">2. Upload your filled file</p>
             <p className="text-xs text-muted-foreground">
               Branch Name / Shift Name must match existing names exactly (case-insensitive). Leave blank to skip.
-              If PIN is left blank, a random 4-digit PIN is generated.
+              If PIN is left blank, a random 4-digit PIN is generated and shown once after the
+              import — save it then, as it can only be reset afterwards, not looked up.
             </p>
             <label className="inline-block">
               <input type="file" accept=".xlsx,.xls" className="hidden" onChange={onFile} disabled={importing} />
@@ -142,6 +144,42 @@ export function StaffImportExportDialog({
               {result.results.filter((r: any) => r.status === "created").length > 0 && (
                 <div className="flex items-center gap-1.5 text-xs text-success">
                   <CheckCircle2 className="h-3.5 w-3.5" /> {result.results.filter((r: any) => r.status === "created").length} added successfully
+                </div>
+              )}
+
+              {/* Generated PINs are shown exactly once — they are not stored
+                  anywhere readable and cannot be recovered later, only reset.
+                  Previously they were generated and silently discarded, so
+                  those staff could never log in. */}
+              {result.results.some((r: any) => r.generated_pin) && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 space-y-2">
+                  <p className="text-xs font-semibold flex items-center gap-1.5">
+                    <KeyRound className="h-3.5 w-3.5" /> Generated PINs — save these now
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Shown once. They can't be looked up later, only reset from the staff member's profile.
+                  </p>
+                  <div className="space-y-0.5">
+                    {result.results.filter((r: any) => r.generated_pin).map((r: any) => (
+                      <div key={r.row} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="truncate">{r.name} · {r.phone}</span>
+                        <span className="font-mono font-semibold tabular-nums">{r.generated_pin}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 w-full"
+                    onClick={() => {
+                      const rows = result.results
+                        .filter((r: any) => r.generated_pin)
+                        .map((r: any) => ({ name: r.name, phone: r.phone, pin: r.generated_pin }));
+                      downloadCsv(`staff_pins_${new Date().toISOString().slice(0, 10)}.csv`, rows);
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download PIN list (CSV)
+                  </Button>
                 </div>
               )}
             </div>

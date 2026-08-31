@@ -391,13 +391,29 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
     const branchByName = new Map((branches ?? []).map((b) => [b.name.trim().toLowerCase(), b.id]));
     const shiftByName = new Map((shifts ?? []).map((s) => [s.name.trim().toLowerCase(), s.id]));
 
-    const results: { row: number; name: string; status: "created" | "failed"; error?: string }[] = [];
+    // A generated PIN is the staff member's ONLY way to log in, so it has to
+    // come back to the admin. It previously came from Math.random() and was
+    // never returned anywhere, which left those accounts permanently
+    // unreachable — nobody, including the admin, knew the password.
+    const { randomInt } = await import("crypto");
+    const generatePin = () => String(randomInt(1000, 10000));
+
+    const results: {
+      row: number;
+      name: string;
+      phone: string;
+      status: "created" | "failed";
+      /** Set only when WE generated it — never echoes a PIN the admin supplied. */
+      generated_pin?: string;
+      error?: string;
+    }[] = [];
 
     for (let i = 0; i < data.rows.length; i++) {
       const row = data.rows[i];
       try {
         const email = `${row.phone}@${STAFF_EMAIL_DOMAIN}`;
-        const password = row.pin ?? String(Math.floor(1000 + Math.random() * 9000));
+        const generatedPin = row.pin ? undefined : generatePin();
+        const password = row.pin ?? generatedPin!;
 
         const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
           email,
@@ -436,9 +452,21 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
           });
         }
 
-        results.push({ row: i + 1, name: row.full_name, status: "created" });
+        results.push({
+          row: i + 1,
+          name: row.full_name,
+          phone: row.phone,
+          status: "created",
+          generated_pin: generatedPin,
+        });
       } catch (e: any) {
-        results.push({ row: i + 1, name: row.full_name, status: "failed", error: e?.message ?? "Unknown error" });
+        results.push({
+          row: i + 1,
+          name: row.full_name,
+          phone: row.phone,
+          status: "failed",
+          error: e?.message ?? "Unknown error",
+        });
       }
     }
 
