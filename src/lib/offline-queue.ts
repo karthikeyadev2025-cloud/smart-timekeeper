@@ -21,6 +21,13 @@ export type PendingAttendance = {
   tenant_id: string;
   user_id: string;
   office_location_id: string | null;
+  // Carried through the queue so a synced punch is attributed exactly like an
+  // online one. Without these, every offline punch landed with branch_id and
+  // shift_id NULL, which broke multi-branch payroll attribution and left
+  // punctuality stats with no shift to compare against.
+  // Optional: items queued by an older build of the app will not have them.
+  branch_id?: string | null;
+  shift_id?: string | null;
   kind: "check_in" | "check_out" | "break_in" | "break_out";
   latitude: number;
   longitude: number;
@@ -34,6 +41,14 @@ export type PendingAttendance = {
   selfie_blob: Blob;
   attempt_count: number;
   last_error?: string;
+  /**
+   * Set when the server rejected this punch for a reason retrying cannot fix
+   * (RLS denial, a failed constraint, a punch too old to accept). Dead items
+   * leave the sync queue so they cannot block the punches behind them, and
+   * are surfaced to the user instead of being retried forever.
+   */
+  dead?: boolean;
+  dead_reason?: string;
 };
 
 function openDb(): Promise<IDBDatabase> {
@@ -73,7 +88,51 @@ export async function listPending(): Promise<PendingAttendance[]> {
     req.onerror = () => reject(req.error);
   });
   db.close();
-  return items.sort((a, b) => a.occurred_at_local.localeCompare(b.occurred_at_local));
+  return items
+    .filter((i) => !i.dead)
+    .sort((a, b) => a.occurred_at_local.localeCompare(b.occurred_at_local));
+}
+
+/** Items the server permanently rejected. Never retried; shown to the user. */
+export async function listDead(): Promise<PendingAttendance[]> {
+  const db = await openDb();
+  const items = await new Promise<PendingAttendance[]>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => resolve(req.result as PendingAttendance[]);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return items
+    .filter((i) => i.dead)
+    .sort((a, b) => a.occurred_at_local.localeCompare(b.occurred_at_local));
+}
+
+/** Drop a rejected punch once the user has acknowledged it. */
+export async function discardDead(id: string): Promise<void> {
+  return removePending(id);
+}
+
+/** Mark a punch as permanently rejected so the queue stops retrying it. */
+export async function markDead(id: string, reason: string): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    const getReq = store.get(id);
+    getReq.onsuccess = () => {
+      const item = getReq.result as PendingAttendance | undefined;
+      if (item) {
+        item.dead = true;
+        item.dead_reason = reason;
+        item.last_error = reason;
+        store.put(item);
+      }
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
 }
 
 export async function removePending(id: string): Promise<void> {

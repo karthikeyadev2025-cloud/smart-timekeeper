@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { MapPin, Camera, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, ShieldAlert, Clock, WifiOff } from "lucide-react";
 import { formatTime12h } from "@/components/ui/time-input";
 import { queueAttendance } from "@/lib/offline-queue";
-import { syncOfflineQueue } from "@/lib/offline-sync";
+import { syncOfflineQueue, isPermanentSyncFailure } from "@/lib/offline-sync";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
@@ -459,6 +459,16 @@ function CheckInFlow() {
       queryClient.invalidateQueries({ queryKey: ["recent-records"] });
       navigate({ to: "/app" });
     } catch (e: any) {
+      // Only queue what a retry could actually fix. A punch the SERVER
+      // refused (RLS denial, a failed constraint, a punch outside the
+      // accepted time window) will be refused identically every time, so
+      // queueing it used to park a permanent failure at the head of the
+      // device's queue and block every later punch behind it.
+      if (isPermanentSyncFailure(e)) {
+        toast.error(e?.message ?? "Your punch was rejected. Please tell your admin.");
+        setSubmitting(false);
+        return;
+      }
       // Network/upload failed even though navigator.onLine said we're connected
       // (flaky signal, captive portal, server hiccup) — queue it instead of
       // just showing an error and losing the punch.
@@ -473,6 +483,11 @@ function CheckInFlow() {
           tenant_id: user!.tenant!.id,
           user_id: user!.userId,
           office_location_id: matchedLocation?.id ?? null,
+          // Same attribution the online path writes — without these an
+          // offline punch synced with branch_id/shift_id NULL, breaking
+          // multi-branch payroll and punctuality stats.
+          branch_id: activeBranchId,
+          shift_id: (myShift as any)?.id ?? null,
           kind: nextKind,
           latitude: coords!.latitude,
           longitude: coords!.longitude,
