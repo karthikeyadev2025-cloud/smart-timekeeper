@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
-import { planExpiresAt } from "@/lib/billing-period";
+import { planExpiresAt, maintenanceDueAt } from "@/lib/billing-period";
 
 /**
  * Razorpay server-to-server webhook.
@@ -100,6 +100,60 @@ export const Route = createFileRoute("/webhook/razorpay")({
 
         if (!plan || !tenantId) {
           console.error(`[Razorpay webhook] Order ${orderId} has no plan/tenant; nothing to grant`);
+          return new Response("OK", { status: 200 });
+        }
+
+        // ── Maintenance fee: a renewal, NOT a new subscription ────────────
+        // createMaintenanceOrder tags these orders purpose='maintenance', and
+        // verifyRazorpayPayment has always branched on it. This handler did
+        // not — which was harmless only while the route 404'd. Now that the
+        // webhook actually receives events, falling through here would grant
+        // a fresh subscription for a maintenance payment: resetting
+        // expires_at, overwriting employee_limit from the plan, and never
+        // advancing maintenance_due_at, so the fee would fall due again
+        // immediately despite having been paid.
+        if (order.purpose === "maintenance") {
+          const periodMonths = plan.maintenance_period_months ?? 12;
+
+          const { data: mSub } = await supabaseAdmin
+            .from("subscriptions" as any)
+            .select("id, maintenance_due_at")
+            .eq("tenant_id", tenantId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (!mSub) {
+            console.error(`[Razorpay webhook] Maintenance order ${orderId} has no subscription to extend`);
+            return new Response("OK", { status: 200 });
+          }
+
+          // Paying early must not lose the time already bought.
+          const currentDue = (mSub as any).maintenance_due_at
+            ? new Date((mSub as any).maintenance_due_at)
+            : null;
+          const base = currentDue && currentDue.getTime() > Date.now() ? currentDue : new Date();
+
+          await supabaseAdmin
+            .from("subscriptions" as any)
+            .update({ maintenance_due_at: maintenanceDueAt(base, periodMonths) })
+            .eq("id", (mSub as any).id);
+
+          const { error: mntPayErr } = await supabaseAdmin.from("payments").insert({
+            tenant_id: tenantId,
+            plan_id: plan.id,
+            amount_inr: Number(payment.amount ?? 0) / 100,
+            status: "success",
+            razorpay_payment_id: paymentId,
+            razorpay_order_id: orderId,
+            payer_name: payment.contact ?? null,
+            payer_email: payment.email ?? null,
+          });
+          if (mntPayErr) {
+            console.error("[Razorpay webhook] maintenance extended but payment NOT logged:", mntPayErr);
+          }
+
+          console.log(`[Razorpay webhook] Maintenance payment ${paymentId} applied for tenant ${tenantId}`);
           return new Response("OK", { status: 200 });
         }
 
