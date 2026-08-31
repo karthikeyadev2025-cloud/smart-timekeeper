@@ -13,11 +13,42 @@
 -- HOW TO READ THE RESULTS: every row should say '✅ OK'. Any '❌ MISSING' row
 -- names the exact piece that did not apply — re-run that one migration.
 --
+-- NOTE: the Supabase SQL editor displays only the LAST result set, so the
+-- one-line summary runs FIRST and the per-check table runs LAST. The table is
+-- what you want to read; the summary is there for a quick glance if you run
+-- the statements separately.
+--
 -- The last four rows are the ones that matter most: they check the SEMANTICS,
 -- not just that an object exists. A trigger that exists but was replaced by an
 -- older definition would still pass an existence check and fail these.
 -- ============================================================================
 
+-- ============================================================================
+-- SUMMARY — one row. Expect passed = total and '🎉 ALL FOUR MIGRATIONS APPLIED'.
+-- ============================================================================
+WITH checks AS (
+  SELECT EXISTS (SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+                 WHERE c.relname='profiles' AND t.tgname='trg_profiles_self_update_guard') AS ok
+  UNION ALL SELECT EXISTS (SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+                 WHERE c.relname='attendance_records' AND t.tgname='trg_attendance_records_integrity')
+  UNION ALL SELECT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='branches'
+                 AND policyname='admins with manage_branches insert branches')
+  UNION ALL SELECT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='plans'
+                   AND column_name='employee_limit' AND is_nullable='YES')
+)
+SELECT
+  count(*) FILTER (WHERE ok) AS passed,
+  count(*)                   AS total,
+  CASE WHEN count(*) FILTER (WHERE ok) = count(*)
+       THEN '🎉 ALL FOUR MIGRATIONS APPLIED'
+       ELSE '⚠️  SOMETHING IS MISSING — see the rows above'
+  END AS verdict
+FROM checks;
+
+-- ============================================================================
+-- PER-CHECK DETAIL — this is the result set the editor will show you.
+-- ============================================================================
 WITH checks AS (
 
   -- ─────────── 20260831000000 · profiles self-update guard ───────────
@@ -136,26 +167,3 @@ SELECT
   check_name
 FROM checks
 ORDER BY ok ASC, check_name;
-
--- ============================================================================
--- SUMMARY — one row. Expect passed = total and '🎉 ALL FOUR MIGRATIONS APPLIED'.
--- ============================================================================
-WITH checks AS (
-  SELECT EXISTS (SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
-                 WHERE c.relname='profiles' AND t.tgname='trg_profiles_self_update_guard') AS ok
-  UNION ALL SELECT EXISTS (SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
-                 WHERE c.relname='attendance_records' AND t.tgname='trg_attendance_records_integrity')
-  UNION ALL SELECT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='branches'
-                 AND policyname='admins with manage_branches insert branches')
-  UNION ALL SELECT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_schema='public' AND table_name='plans'
-                   AND column_name='employee_limit' AND is_nullable='YES')
-)
-SELECT
-  count(*) FILTER (WHERE ok) AS passed,
-  count(*)                   AS total,
-  CASE WHEN count(*) FILTER (WHERE ok) = count(*)
-       THEN '🎉 ALL FOUR MIGRATIONS APPLIED'
-       ELSE '⚠️  SOMETHING IS MISSING — see the rows above'
-  END AS verdict
-FROM checks;
