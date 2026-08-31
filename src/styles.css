@@ -129,6 +129,15 @@
   --sidebar-accent-foreground: oklch(0.98 0.005 250);
   --sidebar-border: oklch(1 0 0 / 0.10);
   --sidebar-ring: oklch(0.72 0.18 280);
+
+  /* These three were defined only in :root, so in dark mode both hero
+     sections that paint with them (the landing page and the /biometric-
+     attendance/:city SEO pages) kept a near-white gradient behind
+     near-white foreground text — the headline was effectively invisible.
+     Redefined here so the token, not each caller, carries the theme. */
+  --gradient-hero: linear-gradient(135deg, oklch(0.72 0.18 280), oklch(0.78 0.16 285));
+  --gradient-soft: linear-gradient(180deg, oklch(0.16 0.03 265), oklch(0.20 0.04 272));
+  --shadow-glow: 0 20px 60px -20px oklch(0.72 0.18 280 / 0.28);
 }
 
 @layer base {
@@ -148,4 +157,35 @@
 }
 .leaflet-popup-pane {
   z-index: 15 !important;
+}
+
+/* ── Landing page typography ────────────────────────────────────────────────
+   The app shipped with no typeface of its own, so every page fell back to the
+   system stack. These three roles are scoped as opt-in utilities rather than a
+   global body override, so only the marketing page picks them up and the
+   authenticated app keeps rendering exactly as before.
+
+   Faces load from Google Fonts via <link> in the landing route's head; the
+   CSP in vercel.json already allows fonts.googleapis.com + fonts.gstatic.com. */
+.font-display {
+  font-family: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-optical-sizing: auto;
+}
+.font-body {
+  font-family: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+/* Timestamps, staff IDs, counts and prices. Tabular figures so digits line up
+   in a column the way they do on a real register. */
+.font-data {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Hairline rule used to separate register rows. Uses the theme's border token
+   so it inverts correctly in dark mode. */
+.rule-row + .rule-row { border-top: 1px solid var(--color-border); }
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe-only { animation: none !important; transition: none !important; }
 }
