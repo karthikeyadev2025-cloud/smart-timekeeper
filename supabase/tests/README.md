@@ -54,3 +54,27 @@ SET LOCAL request.jwt.claim.sub = '';              -- service_role / server fn
 `CREATE EXTENSION pg_cron`, which is not available in a stock Postgres. That is
 expected; the notification-digest cron jobs are the only thing it defines and
 nothing else in the schema depends on them.
+
+---
+
+# Note: bun.lock is stale
+
+`bun.lock` is missing 19 dependencies that `package.json` declares — all of
+`@capacitor/*`, `leaflet`, `react-leaflet`, `@types/leaflet`, `xlsx`,
+`qrcode.react` and `html-to-image`. It predates the mobile, maps, export and
+ID-card work, so `bun install --frozen-lockfile` fails:
+
+    error: lockfile had changes, but lockfile is frozen
+
+Deploys were unaffected only because `vercel.json` installs with npm and
+ignored `bun.lock` entirely — while `package-lock.json` was gitignored, so
+production resolved every transitive version from scratch on each build. That
+is now fixed: `package-lock.json` is committed and Vercel runs `npm ci`.
+
+`bun.lock` is left in place rather than deleted, because choosing the team's
+package manager is not a decision to make silently. To carry on using bun
+locally, regenerate it once with network access to the registry:
+
+    bun install && git add bun.lock
+
+Until then, prefer `npm ci` locally too, so you get the same tree as production.

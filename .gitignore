@@ -33,7 +33,8 @@ dist-ssr
 -e 
 # Vercel build output
 .vercel/output
-package-lock.json
+# package-lock.json is COMMITTED on purpose: vercel.json installs with npm,
+# so without it every deploy re-resolves transitive versions from scratch.
 .lovable/
 .env
 .env.local

@@ -29,9 +29,12 @@ function ReportsPage() {
   const [branchId, setBranchId] = useState<string>("all");
   const [generating, setGenerating] = useState<"attendance" | "payroll" | null>(null);
 
-  if (!isLoading && role !== "client_admin" && role !== "branch_manager") {
-    return <AppShell><Card className="p-6"><p className="text-sm text-muted-foreground">Only admins can generate reports.</p></Card></AppShell>;
-  }
+  // Computed here but ACTED ON below, after every hook has run.
+  // Returning from this point skipped the useQuery calls underneath, so a
+  // non-admin rendered a different number of hooks once isLoading flipped
+  // false — React then throws "Rendered more hooks than during the previous
+  // render" and the page crashes instead of showing the notice.
+  const notAuthorized = !isLoading && role !== "client_admin" && role !== "branch_manager";
 
   const { data: branches } = useQuery({
     queryKey: ["report-branches", tenantId],
@@ -190,6 +193,10 @@ function ReportsPage() {
       setGenerating(null);
     }
   };
+
+  if (notAuthorized) {
+    return <AppShell><Card className="p-6"><p className="text-sm text-muted-foreground">Only admins can generate reports.</p></Card></AppShell>;
+  }
 
   return (
     <AppShell>

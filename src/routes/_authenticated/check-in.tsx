@@ -338,7 +338,6 @@ function CheckInFlow() {
     if (step !== 2) {
       stopCamera();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   const captureSelfie = () => {

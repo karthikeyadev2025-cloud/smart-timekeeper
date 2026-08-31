@@ -20,16 +20,12 @@ function ShiftSwapApprovalsPage() {
   const role = primaryRole(user?.roles ?? []);
   const tenantId = user?.tenant?.id;
 
-  if (!isLoading && role !== "client_admin" && role !== "branch_manager") {
-    return (
-      <AppShell>
-        <Card className="p-6">
-          <p className="text-sm text-muted-foreground">Only company admins can approve shift swaps.</p>
-          <Link to="/app"><Button variant="outline" size="sm" className="mt-3">Back to dashboard</Button></Link>
-        </Card>
-      </AppShell>
-    );
-  }
+  // Computed here but ACTED ON below, after every hook has run.
+  // Returning from this point skipped the useQuery calls underneath, so a
+  // non-admin rendered a different number of hooks once isLoading flipped
+  // false — React then throws "Rendered more hooks than during the previous
+  // render" and the page crashes instead of showing the notice.
+  const notAuthorized = !isLoading && role !== "client_admin" && role !== "branch_manager";
 
   const { data: rows = [], isFetching } = useQuery({
     queryKey: ["shift-swap-approvals", tenantId],
@@ -54,6 +50,17 @@ function ShiftSwapApprovalsPage() {
       }));
     },
   });
+
+  if (notAuthorized) {
+    return (
+      <AppShell>
+        <Card className="p-6">
+          <p className="text-sm text-muted-foreground">Only company admins can approve shift swaps.</p>
+          <Link to="/app"><Button variant="outline" size="sm" className="mt-3">Back to dashboard</Button></Link>
+        </Card>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>

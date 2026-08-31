@@ -128,7 +128,6 @@ function KioskFlow() {
   useEffect(() => {
     if (stage === "selfie" && !streamRef.current) startCamera();
     if (stage !== "selfie") stopCamera();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
   useEffect(() => () => stopCamera(), []);
 
