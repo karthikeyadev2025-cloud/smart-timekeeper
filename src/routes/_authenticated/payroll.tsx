@@ -108,13 +108,16 @@ function Payroll() {
         // with a per-minute fine that silently ate his salary.
         const { data: shiftLinks } = await supabase
           .from("staff_shifts")
-          .select("shifts(id, branch_id, start_time, grace_minutes, late_fine_type, late_fine_amount, half_day_after_minutes, working_days)")
+          // end_time is required by legMinutes() below. Without it every leg
+          // measured 0 minutes long, so the "proportional" partial-day policy
+          // divided by zero, fell through to its 1.0 fallback, and silently
+          // paid a full day for a half-attended one.
+          .select("shifts(id, branch_id, start_time, end_time, grace_minutes, late_fine_type, late_fine_amount, half_day_after_minutes, working_days)")
           .eq("user_id", s.id);
         const legs: any[] = (shiftLinks ?? [])
           .map((r: any) => r.shifts)
           .filter(Boolean)
           .sort((a: any, b: any) => String(a.start_time).localeCompare(String(b.start_time)));
-        const shiftRule = legs[0] ?? null;
 
         // shifts.working_days is an ISO-dow array (1=Mon … 7=Sun), default
         // Mon-Fri. Payroll previously used the raw calendar-day count, so
@@ -194,10 +197,22 @@ function Payroll() {
         // others. How much of the day that earns is a business decision the
         // branch admin sets; payroll must not assume it.
         const policy = (branchPolicy.get(s.branch_id ?? "") ?? null) || tenantPolicy;
+        // Length of one shift leg in minutes. Returns 0 only when the shift
+        // genuinely has no usable times — the caller treats that as "cannot
+        // apportion" rather than "zero-length day".
         const legMinutes = (l: any) => {
-          const [h1, m1] = String(l.start_time).slice(0, 5).split(":").map(Number);
-          const [h2, m2] = String(l.end_time ?? l.start_time).slice(0, 5).split(":").map(Number);
-          return Math.max(0, (h2 * 60 + m2) - (h1 * 60 + m1));
+          const start = String(l?.start_time ?? "").slice(0, 5);
+          const end = String(l?.end_time ?? "").slice(0, 5);
+          if (!start || !end) return 0;
+          const [h1, m1] = start.split(":").map(Number);
+          const [h2, m2] = end.split(":").map(Number);
+          if (![h1, m1, h2, m2].every(Number.isFinite)) return 0;
+          const mins = h2 * 60 + m2 - (h1 * 60 + m1);
+          if (mins === 0) return 0;
+          // A night leg (22:00 -> 06:00) wraps past midnight and would
+          // otherwise measure negative, clamp to 0, and take the same
+          // full-day fallback that the missing end_time did.
+          return mins > 0 ? mins : mins + 24 * 60;
         };
         const dowOf = (d: number) => {
           const js = new Date(year, month - 1, d).getDay();
@@ -250,7 +265,12 @@ function Payroll() {
           } else if (policy === "proportional") {
             const total = todaysLegs.reduce((a: number, l: any) => a + legMinutes(l), 0);
             const done = attended.reduce((a: number, l: any) => a + legMinutes(l), 0);
-            presentCredit += total > 0 ? done / total : 1;
+            // total === 0 now means the shifts carry no usable times at all,
+            // so there is nothing to apportion by. Fall back to counting legs
+            // rather than paying a silent full day.
+            presentCredit += total > 0
+              ? done / total
+              : attended.length / todaysLegs.length;
           } else {
             presentCredit += 1; // full_day — paid in full, flagged on /branch-schedule
           }
