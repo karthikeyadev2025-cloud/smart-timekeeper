@@ -12,6 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+
+// The plans.billing column is an enum, not free text.
+type PlanBilling = Database["public"]["Enums"]["plan_billing"];
 import { useCurrentUser, primaryRole } from "@/hooks/useCurrentUser";
 import { CheckCircle2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,7 +29,7 @@ type Plan = {
   name: string;
   description: string | null;
   price_inr: number;
-  billing: string;
+  billing: PlanBilling;
   employee_limit: number | null;
   features: string[];
   is_active: boolean;
@@ -162,7 +166,7 @@ function PlanForm({ initial, onDone }: { initial: Plan | null; onDone: () => voi
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [price, setPrice] = useState(String(initial?.price_inr ?? ""));
-  const [billing, setBilling] = useState(initial?.billing ?? "monthly");
+  const [billing, setBilling] = useState<PlanBilling>((initial?.billing as PlanBilling) ?? "monthly");
   const [billingMonths, setBillingMonths] = useState(String((initial as any)?.billing_period_months ?? ""));
   const [limit, setLimit] = useState(String(initial?.employee_limit ?? ""));
   const [featuresText, setFeaturesText] = useState((initial?.features ?? []).join("\n"));

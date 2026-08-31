@@ -1299,7 +1299,9 @@ function IrregularStaffWidget({
   tenantId?: string; branchManagerMode?: boolean; userBranchId?: string | null; tenantName?: string;
 }) {
   const [windowDays, setWindowDays] = useState<7 | 14 | 30>(7);
-  const branchFilter = branchManagerMode && userBranchId ? userBranchId : null;
+  // undefined, not null: the generated RPC arg type is `string | undefined`,
+  // and an omitted arg is what makes the function fall back to all branches.
+  const branchFilter = branchManagerMode && userBranchId ? userBranchId : undefined;
 
   const { data: summary, isLoading, error, refetch } = useQuery({
     queryKey: ["attendance-summary", tenantId, branchFilter, windowDays],

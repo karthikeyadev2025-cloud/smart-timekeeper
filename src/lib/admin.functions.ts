@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { planExpiresAt } from "@/lib/billing-period";
 
@@ -328,7 +329,7 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     const tenantId = roles?.find((r: any) => r.role === "client_admin" && r.tenant_id)?.tenant_id;
     if (!tenantId) throw new Error("You must be a client admin to edit company profile");
 
-    const update: Record<string, unknown> = {};
+    const update: Database["public"]["Tables"]["tenants"]["Update"] = {};
     if (data.name !== undefined) {
       const n = data.name.trim();
       if (!n) throw new Error("Company name cannot be empty");
@@ -354,11 +355,15 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
       update.default_monthly_working_days = v;
     }
     if (data.partial_day_policy !== undefined && data.partial_day_policy) {
-      const allowed = ["proportional", "half_day", "full_day", "absent"];
-      if (!allowed.includes(data.partial_day_policy)) {
+      // Narrow to the enum instead of listing the values twice. The generated
+      // type is now the single source of truth, so adding a policy in SQL
+      // surfaces here rather than silently accepting a value the DB rejects.
+      const allowed = ["proportional", "half_day", "full_day", "absent"] as const;
+      type Policy = (typeof allowed)[number];
+      if (!(allowed as readonly string[]).includes(data.partial_day_policy)) {
         throw new Error("Invalid partial day policy");
       }
-      update.partial_day_policy = data.partial_day_policy;
+      update.partial_day_policy = data.partial_day_policy as Policy;
     }
     if (data.id_card_accent !== undefined) {
       // Basic hex validation. NULL clears it (falls back to the app's indigo).

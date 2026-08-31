@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireTenantPermission } from "@/lib/permissions";
 import { requireActiveSubscription } from "@/lib/subscription-gate";
@@ -185,7 +186,7 @@ export const updateStaff = createServerFn({ method: "POST" })
     }
 
     // Profile updates (only set fields that were passed)
-    const profileUpdate: Record<string, unknown> = {};
+    const profileUpdate: Database["public"]["Tables"]["profiles"]["Update"] = {};
     if (data.full_name !== undefined) profileUpdate.full_name = data.full_name;
     if (data.designation !== undefined) profileUpdate.designation = data.designation || null;
     if (data.monthly_salary !== undefined) profileUpdate.monthly_salary = data.monthly_salary;
@@ -340,7 +341,7 @@ export const updateMyProfile = createServerFn({ method: "POST" })
     const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const update: Record<string, unknown> = {};
+    const update: Database["public"]["Tables"]["profiles"]["Update"] = {};
     if (data.date_of_birth !== undefined) update.date_of_birth = data.date_of_birth || null;
     if (data.gender !== undefined) update.gender = data.gender;
     if (data.blood_group !== undefined) update.blood_group = data.blood_group || null;

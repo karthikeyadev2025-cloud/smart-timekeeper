@@ -124,7 +124,7 @@ function ClientsPage() {
                         <div className="text-xs text-destructive">Expired</div>
                       )}
                     </TableCell>
-                    <TableCell>{t.employee_limit}</TableCell>
+                    <TableCell>{t.employee_limit ?? "Unlimited"}</TableCell>
                     <TableCell><Badge variant={t.is_active ? "default" : "secondary"}>{t.is_active ? "Active" : "Suspended"}</Badge></TableCell>
                     <TableCell className="text-right">
                       <RowActions tenant={t} onChange={refresh} />

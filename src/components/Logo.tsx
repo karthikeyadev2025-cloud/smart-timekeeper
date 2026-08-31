@@ -1,13 +1,13 @@
 import { BRAND } from "@/lib/brand";
 import { useId } from "react";
 
-export function Logo({ size = 28, showName = true }: { size?: number; showName?: boolean }) {
+export function Logo({ size = 28, showName = true, className }: { size?: number; showName?: boolean; className?: string }) {
   // Unique gradient id per instance so multiple <Logo />s on the same page each render correctly.
   const gid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const gradientId = `punchly-g-${gid}`;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={className ? `flex items-center gap-2 ${className}` : "flex items-center gap-2"}>
       <svg
         width={size}
         height={size}

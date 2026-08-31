@@ -48,7 +48,11 @@ function MyProfile() {
   const [saving, setSaving] = useState(false);
 
   const get = (k: string) => (touched ? form[k] ?? "" : (profile as any)?.[k] ?? "");
-  const set = (k: string) => (v: string) => { setTouched(true); setForm((f) => ({ ...(touched ? f : profile ?? {}), [k]: v })); };
+  // Seeding from the profile row drags in nullable columns, so coerce to the
+  // Record<string, string> the form actually holds.
+  const profileAsForm = (): Record<string, string> =>
+    Object.fromEntries(Object.entries((profile ?? {}) as Record<string, unknown>).map(([k, v]) => [k, v == null ? "" : String(v)]));
+  const set = (k: string) => (v: string) => { setTouched(true); setForm((f) => ({ ...(touched ? f : profileAsForm()), [k]: v })); };
 
   const completion = profile
     ? Math.round((FIELDS.filter((f) => !!(touched ? form[f] : (profile as any)[f])).length / FIELDS.length) * 100)
@@ -258,7 +262,7 @@ function MyBankCard({ tenantId, profile }: { tenantId: string | undefined; profi
   };
 
   const isPending = pending?.status === "pending";
-  const wasRejected = pending?.status === "rejected" && new Date(pending.reviewed_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const wasRejected = pending?.status === "rejected" && new Date(pending.reviewed_at ?? 0).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000;
   const hasBank = !!profile?.bank_account_number;
 
   return (
