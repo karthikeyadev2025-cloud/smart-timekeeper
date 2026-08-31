@@ -35,19 +35,68 @@ function NotFoundComponent() {
   );
 }
 
+/**
+ * Distinguishes a dropped connection from a genuine application fault.
+ *
+ * Telling a user on a flaky connection that "something went wrong on our end"
+ * sends them to support for a problem support cannot fix. ERR_CONNECTION_CLOSED
+ * and friends surface as a bare TypeError: Failed to fetch.
+ */
+function classifyError(error: Error): "offline" | "network" | "config" | "app" {
+  const msg = String(error?.message ?? "");
+
+  if (typeof navigator !== "undefined" && !navigator.onLine) return "offline";
+
+  if (
+    /Failed to fetch|NetworkError|Load failed|ERR_CONNECTION|ERR_NETWORK|ERR_INTERNET/i.test(msg)
+  ) {
+    return "network";
+  }
+
+  // Thrown by integrations/supabase/client.ts when env vars are absent —
+  // a deploy problem, not a user problem.
+  if (/Missing Supabase environment variable|Invalid Supabase URL/i.test(msg)) {
+    return "config";
+  }
+
+  return "app";
+}
+
+const ERROR_COPY: Record<
+  ReturnType<typeof classifyError>,
+  { title: string; body: string }
+> = {
+  offline: {
+    title: "You're offline",
+    body: "Punchly can't reach the server. Any attendance you record is saved on this device and will sync automatically once you're back online.",
+  },
+  network: {
+    title: "Couldn't reach the server",
+    body: "The connection was interrupted. This is usually your network rather than Punchly — try switching between Wi-Fi and mobile data, then retry.",
+  },
+  config: {
+    title: "App isn't configured",
+    body: "This deployment is missing its server settings. Nothing you did caused this — please let your administrator know.",
+  },
+  app: {
+    title: "This page didn't load",
+    body: "Something went wrong on our end. You can try refreshing or head back home.",
+  },
+};
+
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-
+  const copy = ERROR_COPY[classifyError(error)];
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          {copy.title}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          {copy.body}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button

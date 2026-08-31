@@ -2,8 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 import { CITIES } from "@/lib/cities";
 
-// TODO: replace with your project URL once a project name or custom domain is set.
-const BASE_URL = "https://punchly.online";
+// Canonical public origin. Must match the domain configured in Vercel and the
+// one submitted to Search Console, or the sitemap will be rejected as
+// cross-domain. Override per-environment with VITE_PUBLIC_ORIGIN.
+const BASE_URL =
+  (import.meta.env.VITE_PUBLIC_ORIGIN as string | undefined)?.replace(/\/$/, "") ||
+  "https://punchly.online";
 
 interface SitemapEntry {
   path: string;

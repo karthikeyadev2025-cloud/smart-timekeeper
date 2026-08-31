@@ -1,9 +1,21 @@
 import { createServerFileRoute } from "@tanstack/react-start/server";
 
+/**
+ * Razorpay server-to-server webhook.
+ *
+ * This is the FALLBACK path — it exists so a payment still completes when the
+ * customer closes the browser before the checkout callback fires. It must not
+ * contain any fulfilment logic of its own; both this and
+ * verifyRazorpayPayment call the same fulfilPaidOrder().
+ *
+ * Always returns 200 for anything we've decided not to act on, so Razorpay
+ * stops retrying. Genuine server faults return 500 so Razorpay DOES retry.
+ */
 export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
   GET: async () => {
     return new Response("Razorpay webhook endpoint active", { status: 200 });
   },
+
   POST: async ({ request }) => {
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
     if (!webhookSecret) {
@@ -18,12 +30,13 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
       return new Response("Missing signature", { status: 400 });
     }
 
-    const { createHmac } = await import("crypto");
-    const expected = createHmac("sha256", webhookSecret)
-      .update(rawBody)
-      .digest("hex");
+    const { verifyWebhookSignature, fulfilPaidOrder } = await import(
+      "@/lib/payment-fulfilment.server"
+    );
 
-    if (expected !== signature) {
+    // Constant-time comparison — the previous `expected !== signature` leaked
+    // timing information about the correct signature.
+    if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
       console.warn("[Razorpay webhook] Invalid signature");
       return new Response("Invalid signature", { status: 400 });
     }
@@ -33,6 +46,20 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
       event = JSON.parse(rawBody);
     } catch {
       return new Response("Invalid JSON", { status: 400 });
+    }
+
+    // ── payment.failed: mark the order so it stops showing as pending ───────
+    if (event.event === "payment.failed") {
+      const failedOrderId = event.payload?.payment?.entity?.order_id;
+      if (failedOrderId) {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        await supabaseAdmin
+          .from("payment_orders" as any)
+          .update({ status: "failed" })
+          .eq("razorpay_order_id", failedOrderId)
+          .eq("status", "pending");   // never clobber an already-completed order
+      }
+      return new Response("OK", { status: 200 });
     }
 
     if (event.event !== "payment.captured") {
@@ -47,68 +74,31 @@ export const ServerRoute = createServerFileRoute("/webhook/razorpay").methods({
       return new Response("Missing order/payment id", { status: 400 });
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const { data: order, error: orderErr } = await supabaseAdmin
-      .from("payment_orders" as any)
-      .select("*, plans(*)")
-      .eq("razorpay_order_id", orderId)
-      .maybeSingle();
-
-    if (orderErr || !order) {
-      return new Response("Order not found", { status: 200 });
-    }
-
-    if ((order as any).status === "completed") {
-      return new Response("Already processed", { status: 200 });
-    }
-
-    const plan = (order as any).plans;
-    const tenantId = (order as any).tenant_id;
-
-    const expiresAt =
-      plan?.billing === "lifetime"
-        ? null
-        : plan?.billing === "monthly"
-        ? new Date(Date.now() + 30 * 86400000).toISOString()
-        : new Date(Date.now() + 365 * 86400000).toISOString();
-
-    const { data: existingSub } = await supabaseAdmin
-      .from("subscriptions" as any)
-      .select("id")
-      .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existingSub) {
-      await supabaseAdmin
-        .from("subscriptions" as any)
-        .update({ plan_id: plan.id, status: "active", expires_at: expiresAt, razorpay_payment_id: paymentId })
-        .eq("id", (existingSub as any).id);
-    } else {
-      await supabaseAdmin.from("subscriptions" as any).insert({
-        tenant_id: tenantId, plan_id: plan.id, status: "active",
-        expires_at: expiresAt, razorpay_payment_id: paymentId,
+    try {
+      const result = await fulfilPaidOrder({
+        razorpayOrderId: orderId,
+        razorpayPaymentId: paymentId,
       });
+
+      if (result.already_completed) {
+        console.log(`[Razorpay webhook] ${paymentId} already fulfilled by the checkout callback`);
+      } else {
+        console.log(`[Razorpay webhook] ${paymentId} fulfilled (plan: ${result.plan_name})`);
+      }
+      return new Response("OK", { status: 200 });
+    } catch (e: any) {
+      const msg = e?.message ?? "Unknown error";
+
+      // An order we don't recognise is never going to appear — tell Razorpay
+      // to stop retrying rather than accumulating failed deliveries forever.
+      if (msg === "Order not found") {
+        console.warn(`[Razorpay webhook] Unknown order ${orderId}, ignoring`);
+        return new Response("Order not found", { status: 200 });
+      }
+
+      // Anything else is our fault. 500 makes Razorpay retry with backoff.
+      console.error(`[Razorpay webhook] Fulfilment failed for ${paymentId}: ${msg}`);
+      return new Response("Fulfilment failed", { status: 500 });
     }
-
-    await supabaseAdmin.from("payments").insert({
-      tenant_id: tenantId,
-      amount_inr: Number(payment.amount) / 100,
-      status: "success",
-      razorpay_payment_id: paymentId,
-      razorpay_order_id: orderId,
-      payer_name: payment.contact ?? null,
-      payer_email: payment.email ?? null,
-    });
-
-    await supabaseAdmin
-      .from("payment_orders" as any)
-      .update({ status: "completed", razorpay_payment_id: paymentId })
-      .eq("razorpay_order_id", orderId);
-
-    console.log(`[Razorpay webhook] Payment ${paymentId} processed for tenant ${tenantId}`);
-    return new Response("OK", { status: 200 });
   },
 });

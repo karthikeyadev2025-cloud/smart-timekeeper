@@ -147,8 +147,12 @@ export const createMaintenanceOrder = createServerFn({ method: "POST" })
   });
 
 // ─── Verify Payment After Checkout ──────────────────────────────────────────
+// Thin wrapper. ALL fulfilment logic lives in payment-fulfilment.server.ts and
+// is shared with routes/webhook/razorpay.ts — the two used to be separate
+// implementations that disagreed about maintenance fees, custom billing
+// periods and tenants.employee_limit.
 export const verifyRazorpayPayment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])     // ← was unauthenticated; now requires login
+  .middleware([requireSupabaseAuth])
   .inputValidator(
     (data: {
       razorpay_order_id: string;
@@ -161,177 +165,46 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keySecret) throw new Error("Razorpay not configured");
 
-    // Verify HMAC signature to prevent fake payments
-    const { createHmac } = await import("crypto");
-    const body = `${data.razorpay_order_id}|${data.razorpay_payment_id}`;
-    const expectedSig = createHmac("sha256", keySecret).update(body).digest("hex");
-    if (expectedSig !== data.razorpay_signature) {
+    const { verifyCheckoutSignature, fulfilPaidOrder } = await import(
+      "@/lib/payment-fulfilment.server"
+    );
+
+    // Constant-time HMAC check (was a plain !== comparison).
+    const signatureValid = verifyCheckoutSignature(
+      data.razorpay_order_id,
+      data.razorpay_payment_id,
+      data.razorpay_signature,
+      keySecret
+    );
+    if (!signatureValid) {
       throw new Error("Invalid payment signature — possible fraud attempt");
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Get the pending order — with FULL plan + tenant info
+    // AUTHZ before fulfilment: the payer must be an admin of the tenant that
+    // placed the order (or a super admin). Stops a stranger replaying somebody
+    // else's order_id even with a valid HMAC.
     const { data: order, error: orderErr } = await supabaseAdmin
       .from("payment_orders" as any)
-      .select("*, plans(*), tenants(*)")
+      .select("tenant_id")
       .eq("razorpay_order_id", data.razorpay_order_id)
-      .single();
+      .maybeSingle();
 
     if (orderErr || !order) throw new Error("Order not found");
-    const ord = order as any;
 
-    // AUTHZ: the user who paid must be an admin of the tenant that placed the
-    // order (or a super admin). Stops a stranger from re-using somebody
-    // else's order_id even if the HMAC happens to be valid.
     const [{ data: isAdmin }, { data: isSuper }] = await Promise.all([
-      supabaseAdmin.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: ord.tenant_id }),
+      supabaseAdmin.rpc("is_tenant_admin", {
+        _user_id: userId,
+        _tenant_id: (order as any).tenant_id,
+      }),
       supabaseAdmin.rpc("is_super_admin", { _user_id: userId }),
     ]);
     if (!isAdmin && !isSuper) throw new Error("Forbidden: not an admin of this tenant");
 
-    // IDEMPOTENCY: if already completed, just return success — the user may
-    // have refreshed mid-flow or Razorpay called the handler twice.
-    if (ord.status === "completed") {
-      return {
-        ok: true,
-        already_completed: true,
-        plan_name: ord.plans?.name ?? "",
-        expires_at: null,
-      };
-    }
-
-    const plan = ord.plans;
-    if (!plan) throw new Error("Plan not found on order");
-
-    // ========================================================================
-    // MAINTENANCE FEE PAYMENT — different side effects than a normal
-    // subscription purchase. The plan itself doesn't change; we just push
-    // the next due date forward and log the payment.
-    // ========================================================================
-    if (ord.purpose === "maintenance") {
-      const periodMonths = plan.maintenance_period_months ?? 12;
-
-      const { data: sub } = await supabaseAdmin
-        .from("subscriptions" as any)
-        .select("id, maintenance_due_at")
-        .eq("tenant_id", ord.tenant_id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!sub) throw new Error("No subscription found to apply maintenance payment to");
-
-      // Extend from the current due date if still in the future (paying
-      // early shouldn't lose time), otherwise extend from now.
-      const currentDue = (sub as any).maintenance_due_at ? new Date((sub as any).maintenance_due_at) : null;
-      const base = currentDue && currentDue.getTime() > Date.now() ? currentDue : new Date();
-      const nextDue = new Date(base.getTime() + periodMonths * 30 * 86400000).toISOString();
-
-      await supabaseAdmin
-        .from("subscriptions" as any)
-        .update({ maintenance_due_at: nextDue })
-        .eq("id", (sub as any).id);
-
-      await supabaseAdmin.from("payments" as any).insert({
-        tenant_id: ord.tenant_id,
-        plan_id: plan.id,
-        amount_inr: Number(plan.maintenance_fee_inr ?? 0),
-        currency: "INR",
-        status: "success",
-        method: "razorpay",
-        razorpay_order_id: data.razorpay_order_id,
-        razorpay_payment_id: data.razorpay_payment_id,
-        payer_name: ord.tenants?.name ?? null,
-        payer_email: ord.tenants?.contact_email ?? null,
-      });
-
-      await supabaseAdmin
-        .from("payment_orders" as any)
-        .update({ status: "completed", razorpay_payment_id: data.razorpay_payment_id })
-        .eq("razorpay_order_id", data.razorpay_order_id);
-
-      return { ok: true, plan_name: plan.name, expires_at: null, maintenance_due_at: nextDue };
-    }
-
-    // Calculate expiry from billing_period_months if set (custom plan duration),
-    // else fall back to the legacy enum. Lifetime plans pass NULL months and
-    // therefore get NULL expiry.
-    const months = plan.billing_period_months;
-    const expiresAt =
-      months == null
-        ? plan.billing === "lifetime"
-          ? null
-          : plan.billing === "monthly"
-          ? new Date(Date.now() + 30 * 86400000).toISOString()
-          : new Date(Date.now() + 365 * 86400000).toISOString()
-        : new Date(Date.now() + months * 30 * 86400000).toISOString();
-
-    // If this plan carries a maintenance fee, set the first due date now
-    // (grace period from today). Plans with no maintenance_fee_inr get NULL,
-    // meaning tenant_maintenance_overdue() never fires for them.
-    const maintenanceDueAt =
-      plan.maintenance_fee_inr && Number(plan.maintenance_fee_inr) > 0
-        ? new Date(Date.now() + (plan.maintenance_grace_months ?? 24) * 30 * 86400000).toISOString()
-        : null;
-
-    // Upsert subscription (one per tenant — we update if it exists)
-    const { data: existingSub } = await supabaseAdmin
-      .from("subscriptions" as any)
-      .select("id")
-      .eq("tenant_id", ord.tenant_id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existingSub) {
-      await supabaseAdmin
-        .from("subscriptions" as any)
-        .update({
-          plan_id: plan.id,
-          status: "active",
-          expires_at: expiresAt,
-          maintenance_due_at: maintenanceDueAt,
-          razorpay_payment_id: data.razorpay_payment_id,
-        })
-        .eq("id", (existingSub as any).id);
-    } else {
-      await supabaseAdmin.from("subscriptions" as any).insert({
-        tenant_id: ord.tenant_id,
-        plan_id: plan.id,
-        status: "active",
-        expires_at: expiresAt,
-        maintenance_due_at: maintenanceDueAt,
-        razorpay_payment_id: data.razorpay_payment_id,
-      });
-    }
-
-    // CRITICAL: update tenants.employee_limit so the new plan's cap takes
-    // effect. Without this, paying for a bigger plan does nothing.
-    await supabaseAdmin
-      .from("tenants")
-      .update({ employee_limit: plan.employee_limit })
-      .eq("id", ord.tenant_id);
-
-    // RECORD THE PAYMENT in payments table — this is what /billing's history
-    // shows and what super-admin revenue dashboard sums.
-    await supabaseAdmin.from("payments" as any).insert({
-      tenant_id: ord.tenant_id,
-      plan_id: plan.id,
-      amount_inr: Number(plan.price_inr),
-      currency: "INR",
-      status: "success",
-      method: "razorpay",
-      razorpay_order_id: data.razorpay_order_id,
-      razorpay_payment_id: data.razorpay_payment_id,
-      payer_name: ord.tenants?.name ?? null,
-      payer_email: ord.tenants?.contact_email ?? null,
+    return await fulfilPaidOrder({
+      razorpayOrderId: data.razorpay_order_id,
+      razorpayPaymentId: data.razorpay_payment_id,
+      razorpaySignature: data.razorpay_signature,
     });
-
-    // Mark order complete (last, so a re-entry doesn't double-insert)
-    await supabaseAdmin
-      .from("payment_orders" as any)
-      .update({ status: "completed", razorpay_payment_id: data.razorpay_payment_id })
-      .eq("razorpay_order_id", data.razorpay_order_id);
-
-    return { ok: true, plan_name: plan.name, expires_at: expiresAt };
   });
