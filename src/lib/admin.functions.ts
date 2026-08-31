@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { planExpiresAt } from "@/lib/billing-period";
 
 async function assertSuper(supabase: any, userId: string) {
   const { data: isSuper } = await supabase.rpc("has_role", { _user_id: userId, _role: "super_admin" as any });
@@ -89,9 +90,9 @@ export const changeTenantPlan = createServerFn({ method: "POST" })
       .from("subscriptions").select("id").eq("tenant_id", data.tenant_id)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
 
-    const expiresAt = plan.billing === "lifetime" ? null
-      : plan.billing === "monthly" ? new Date(Date.now() + 30 * 86400000).toISOString()
-      : new Date(Date.now() + 365 * 86400000).toISOString();
+    // Calendar months via the shared helper — the old inline math ignored
+    // billing_period_months entirely and treated a year as 365 fixed days.
+    const expiresAt = planExpiresAt(plan);
 
     if (sub) {
       await supabaseAdmin.from("subscriptions").update({

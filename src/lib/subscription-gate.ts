@@ -14,8 +14,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export async function requireActiveSubscription(supabase: SupabaseClient, tenantId: string): Promise<void> {
   const { data: state, error } = await supabase.rpc("tenant_subscription_state", { _tenant_id: tenantId });
   if (error) {
-    // Don't block on an RPC failure — fall open to avoid breaking core
-    // workflows if the function temporarily errors. Still logged.
+    // Since 20260624090000_security_hardening, this RPC RAISEs "Not authorized
+    // for this tenant" for a caller who isn't a member. That is an
+    // authorization answer, not an outage, and must never be treated as
+    // "allowed" — so it fails closed.
+    if (/not authorized/i.test(error.message ?? "")) {
+      throw new Error("You are not authorized to make changes for this company.");
+    }
+    // Any other error is treated as an outage. Falling open here is
+    // deliberate: a transient failure of the billing check should not block
+    // core workflows like recording attendance or paying staff.
     console.warn("[requireActiveSubscription] RPC failed, allowing:", error);
     return;
   }
