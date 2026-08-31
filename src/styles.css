@@ -189,3 +189,7 @@
 @media (prefers-reduced-motion: reduce) {
   .motion-safe-only { animation: none !important; transition: none !important; }
 }
+
+/* Drives the FeatureStory scene-progress bar. Paused/off-screen scenes simply
+   don't run it, so the bar only advances while the story is actually playing. */
+@keyframes story-fill { from { width: 0%; } to { width: 100%; } }

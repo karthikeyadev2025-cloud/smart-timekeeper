@@ -12,6 +12,7 @@ import { BRAND } from "@/lib/brand";
 import { PromotionBanner, PromotionPlanBadge } from "@/lib/promotion";
 import { LogoScene3D } from "@/components/LogoScene3D";
 import { RazorpayCheckoutModal } from "@/components/RazorpayCheckoutModal";
+import { FeatureStory } from "@/components/FeatureStory";
 import { toast } from "sonner";
 
 const fadeUp: Variants = {
@@ -591,6 +592,8 @@ function Landing() {
           ))}
         </div>
       </section>
+
+      <FeatureStory />
 
       {/* ── How it works: a real clock sequence, so the times carry meaning ── */}
       <section id="how" className="border-b border-border py-20">
