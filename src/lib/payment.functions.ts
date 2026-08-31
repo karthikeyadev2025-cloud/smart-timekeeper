@@ -260,7 +260,8 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
         tenant_id: ord.tenant_id,
         plan_id: plan.id,
         amount_inr: Number(plan.maintenance_fee_inr ?? 0),
-        currency: "INR",
+        // No `currency` column on payments either — the same PGRST204 trap as
+        // `method`. Amounts are INR by definition (the column is amount_inr).
         status: "success",
         razorpay_order_id: data.razorpay_order_id,
         razorpay_payment_id: data.razorpay_payment_id,
@@ -340,7 +341,6 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       tenant_id: ord.tenant_id,
       plan_id: plan.id,
       amount_inr: Number(plan.price_inr),
-      currency: "INR",
       status: "success",
       razorpay_order_id: data.razorpay_order_id,
       razorpay_payment_id: data.razorpay_payment_id,
