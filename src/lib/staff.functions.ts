@@ -156,14 +156,22 @@ export const updateStaff = createServerFn({ method: "POST" })
       const newPhone = canonicalPhone(data.phone);
 
       // Same tenant can't have two staff sharing a login phone.
-      const { data: clash } = await supabaseAdmin
+      //
+      // This used .maybeSingle(), which ERRORS rather than returning a row
+      // once two or more match. The error was discarded, `clash` came back
+      // null, and the guard passed — so the check stopped working precisely
+      // when duplicates already existed, letting a third be added on top.
+      const { data: clash, error: clashErr } = await supabaseAdmin
         .from("profiles")
         .select("id")
         .eq("tenant_id", data.tenant_id)
         .eq("phone", newPhone)
         .neq("id", data.user_id)
-        .maybeSingle();
-      if (clash) throw new Error(`Another staff member already uses phone ${newPhone}`);
+        .limit(1);
+      if (clashErr) throw new Error(`Could not verify phone uniqueness: ${clashErr.message}`);
+      if (clash && clash.length > 0) {
+        throw new Error(`Another staff member already uses phone ${newPhone}`);
+      }
 
       const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
         email: `${newPhone}@${STAFF_EMAIL_DOMAIN}`,
