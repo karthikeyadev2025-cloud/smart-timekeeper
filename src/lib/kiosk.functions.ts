@@ -142,6 +142,23 @@ export const kioskPunch = createServerFn({ method: "POST" })
     const { staffProfile, tenantId } = await verifyStaffCredentials(context.userId, data.phone, data.pin);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // occurred_at is the KIOSK DEVICE's clock, and this path writes through
+    // the service role, which bypasses the attendance_records integrity
+    // trigger that bounds it for ordinary punches. A tablet with a wrong (or
+    // deliberately altered) clock could therefore backdate or post-date
+    // attendance at will, so the same bounds are enforced here.
+    const occurredAt = new Date(data.occurred_at);
+    if (Number.isNaN(occurredAt.getTime())) {
+      throw new Error("Invalid punch time from this device");
+    }
+    const skewMs = occurredAt.getTime() - Date.now();
+    if (skewMs > 5 * 60 * 1000) {
+      throw new Error("This device's clock is ahead — fix the date & time settings, then punch again");
+    }
+    if (skewMs < -48 * 60 * 60 * 1000) {
+      throw new Error("This punch is more than 48 hours old — ask your admin to add it as a correction");
+    }
+
     // Server-side state machine + dedupe: the requested kind must be allowed
     // RIGHT NOW according to the server's records.
     const { allowed, sessionDate } = await computeAllowedKinds(staffProfile.id, data.local_date);
