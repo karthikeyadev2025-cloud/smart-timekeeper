@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Building2, Trash2, GraduationCap, Settings, Clock, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { TimeInput12h } from "@/components/ui/time-input";
 import { toast } from "sonner";
@@ -224,7 +225,7 @@ function BranchSettingsForm({ branch, noun, onDone }: { branch: Branch; noun: st
       checkin_window_end: ciEnd || null,
       checkout_window_start: coStart || null,
       checkout_window_end: coEnd || null,
-      partial_day_policy: partialPolicy || null,
+      partial_day_policy: (partialPolicy || null) as Database["public"]["Enums"]["partial_day_policy"] | null,
     }).eq("id", branch.id);
     if (error) { setLoading(false); toast.error(error.message); return; }
 

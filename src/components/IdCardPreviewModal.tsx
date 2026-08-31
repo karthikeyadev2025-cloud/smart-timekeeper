@@ -57,7 +57,6 @@ export function IdCardPreviewModal({
       .then((url) => { if (!cancelled) setPreparedUrl(url); })
       .catch((e) => console.warn("[id-card] pre-generation failed:", e));
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, staffWithFreshPhoto.avatar_url, staffWithFreshPhoto.signature_url, tenantWithSignature.authority_signature_url, tenantWithSignature.id_card_template]);
 
   const handleDownload = () => {

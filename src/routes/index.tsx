@@ -719,7 +719,7 @@ type Plan = {
   name: string;
   description?: string | null;
   billing: string;
-  employee_limit: number;
+  employee_limit: number | null; // null = unlimited
   price_inr: number | string;
   features: unknown;
 };
@@ -757,7 +757,7 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
 
   const core = plans
     .filter((p) => (billing === "monthly" ? isMonthlyPlan(p) : !isMonthlyPlan(p)))
-    .filter((p) => p.employee_limit <= 50)
+    .filter((p) => p.employee_limit != null && p.employee_limit <= 50)
     .filter((p) => !/school|enterprise/i.test(p.name))
     .sort((a, b) => Number(a.price_inr) - Number(b.price_inr));
   const school = plans.find((p) => /school/i.test(p.name));
@@ -825,7 +825,7 @@ function PricingSection({ plans, tenantId, isLoggedIn, onCheckout }: { plans: Pl
                     <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 shadow">Most popular</Badge>
                   )}
                   <h3 className="text-xl font-semibold">{p.name.replace(/\s*(Lifetime|Monthly|Yearly|\d+[- ]?(Year|Month)s?)$/i, "")}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">Up to {p.employee_limit} employees</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{p.employee_limit == null ? "Unlimited employees" : `Up to ${p.employee_limit} employees`}</p>
                   <div className="mt-4 flex items-baseline gap-1">
                     <span className="text-4xl font-bold tracking-tight">₹{Number(p.price_inr).toLocaleString("en-IN")}</span>
                     <span className="text-sm text-muted-foreground">{billingLabel(p)}</span>

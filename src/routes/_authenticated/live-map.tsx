@@ -131,7 +131,10 @@ function LiveMapPage() {
                 </Marker>
                 <Circle
                   center={[Number(o.latitude), Number(o.longitude)]}
-                  radius={Number(o.radius_meters) ?? 100}
+                  // Number() returns NaN, never null, so the previous `?? 100`
+                  // could never fire — a missing radius drew a NaN-radius
+                  // circle instead of falling back to the default.
+                  radius={Number(o.radius_meters) || 100}
                   pathOptions={{ color: "#4f46e5", fillColor: "#4f46e5", fillOpacity: 0.08, weight: 1 }}
                 />
               </div>

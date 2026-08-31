@@ -51,6 +51,7 @@ import { Route as AuthenticatedSignatureApprovalsRouteImport } from './routes/_a
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
 import { Route as BiometricAttendanceCityRouteImport } from './routes/biometric-attendance.$city'
 import { Route as VerifyStaffIdRouteImport } from './routes/verify.$staffId'
+import { Route as WebhookRazorpayRouteImport } from './routes/webhook/razorpay'
 import { Route as AuthenticatedStaffStaffIdRouteImport } from './routes/_authenticated/staff.$staffId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -271,6 +272,11 @@ const VerifyStaffIdRoute = VerifyStaffIdRouteImport.update({
   path: '/verify/$staffId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WebhookRazorpayRoute = WebhookRazorpayRouteImport.update({
+  id: '/webhook/razorpay',
+  path: '/webhook/razorpay',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedStaffStaffIdRoute =
   AuthenticatedStaffStaffIdRouteImport.update({
     id: '/staff/$staffId',
@@ -320,6 +326,7 @@ export interface FileRoutesByFullPath {
   '/team': typeof AuthenticatedTeamRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
   '/verify/$staffId': typeof VerifyStaffIdRoute
+  '/webhook/razorpay': typeof WebhookRazorpayRoute
   '/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
 }
 export interface FileRoutesByTo {
@@ -364,6 +371,7 @@ export interface FileRoutesByTo {
   '/team': typeof AuthenticatedTeamRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
   '/verify/$staffId': typeof VerifyStaffIdRoute
+  '/webhook/razorpay': typeof WebhookRazorpayRoute
   '/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
 }
 export interface FileRoutesById {
@@ -410,6 +418,7 @@ export interface FileRoutesById {
   '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
   '/verify/$staffId': typeof VerifyStaffIdRoute
+  '/webhook/razorpay': typeof WebhookRazorpayRoute
   '/_authenticated/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
 }
 export interface FileRouteTypes {
@@ -456,6 +465,7 @@ export interface FileRouteTypes {
     | '/team'
     | '/biometric-attendance/$city'
     | '/verify/$staffId'
+    | '/webhook/razorpay'
     | '/staff/$staffId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -500,6 +510,7 @@ export interface FileRouteTypes {
     | '/team'
     | '/biometric-attendance/$city'
     | '/verify/$staffId'
+    | '/webhook/razorpay'
     | '/staff/$staffId'
   id:
     | '__root__'
@@ -545,6 +556,7 @@ export interface FileRouteTypes {
     | '/_authenticated/team'
     | '/biometric-attendance/$city'
     | '/verify/$staffId'
+    | '/webhook/razorpay'
     | '/_authenticated/staff/$staffId'
   fileRoutesById: FileRoutesById
 }
@@ -558,6 +570,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   BiometricAttendanceCityRoute: typeof BiometricAttendanceCityRoute
   VerifyStaffIdRoute: typeof VerifyStaffIdRoute
+  WebhookRazorpayRoute: typeof WebhookRazorpayRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -856,6 +869,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyStaffIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/webhook/razorpay': {
+      id: '/webhook/razorpay'
+      path: '/webhook/razorpay'
+      fullPath: '/webhook/razorpay'
+      preLoaderRoute: typeof WebhookRazorpayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/staff/$staffId': {
       id: '/_authenticated/staff/$staffId'
       path: '/staff/$staffId'
@@ -953,6 +973,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   BiometricAttendanceCityRoute: BiometricAttendanceCityRoute,
   VerifyStaffIdRoute: VerifyStaffIdRoute,
+  WebhookRazorpayRoute: WebhookRazorpayRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

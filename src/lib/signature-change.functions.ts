@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireTenantPermission } from "@/lib/permissions";
 
 const requestSchema = z.object({
   signature_path: z.string().trim().min(1).max(200),
@@ -73,6 +74,7 @@ export const approveSignatureChange = createServerFn({ method: "POST" })
       supabaseAdmin.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: req.tenant_id }),
     ]);
     if (!isSuper && !isAdmin) throw new Error("Not authorized to approve for this tenant");
+    if (!isSuper) await requireTenantPermission(supabaseAdmin as any, userId, req.tenant_id, "manage_approvals");
 
     const canonicalPath = `${req.user_id}/signature.png`;
     const { data: blob, error: dlErr } = await supabaseAdmin.storage
@@ -130,6 +132,7 @@ export const rejectSignatureChange = createServerFn({ method: "POST" })
       supabaseAdmin.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: req.tenant_id }),
     ]);
     if (!isSuper && !isAdmin) throw new Error("Not authorized to reject for this tenant");
+    if (!isSuper) await requireTenantPermission(supabaseAdmin as any, userId, req.tenant_id, "manage_approvals");
 
     await supabaseAdmin.storage.from("signatures").remove([req.signature_path]);
 

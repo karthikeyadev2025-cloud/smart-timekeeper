@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireTenantPermission } from "@/lib/permissions";
 import { requireActiveSubscription } from "@/lib/subscription-gate";
 
 import { canonicalPhone } from "@/lib/phone-auth";
@@ -40,6 +42,7 @@ export const createStaff = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized to add staff for this company");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_staff");
 
     // Block writes when the tenant's subscription is expired (super_admin bypasses).
     if (!isSuper) await requireActiveSubscription(supabase, data.tenant_id);
@@ -140,6 +143,7 @@ export const updateStaff = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_staff");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -153,14 +157,22 @@ export const updateStaff = createServerFn({ method: "POST" })
       const newPhone = canonicalPhone(data.phone);
 
       // Same tenant can't have two staff sharing a login phone.
-      const { data: clash } = await supabaseAdmin
+      //
+      // This used .maybeSingle(), which ERRORS rather than returning a row
+      // once two or more match. The error was discarded, `clash` came back
+      // null, and the guard passed — so the check stopped working precisely
+      // when duplicates already existed, letting a third be added on top.
+      const { data: clash, error: clashErr } = await supabaseAdmin
         .from("profiles")
         .select("id")
         .eq("tenant_id", data.tenant_id)
         .eq("phone", newPhone)
         .neq("id", data.user_id)
-        .maybeSingle();
-      if (clash) throw new Error(`Another staff member already uses phone ${newPhone}`);
+        .limit(1);
+      if (clashErr) throw new Error(`Could not verify phone uniqueness: ${clashErr.message}`);
+      if (clash && clash.length > 0) {
+        throw new Error(`Another staff member already uses phone ${newPhone}`);
+      }
 
       const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
         email: `${newPhone}@${STAFF_EMAIL_DOMAIN}`,
@@ -174,7 +186,7 @@ export const updateStaff = createServerFn({ method: "POST" })
     }
 
     // Profile updates (only set fields that were passed)
-    const profileUpdate: Record<string, unknown> = {};
+    const profileUpdate: Database["public"]["Tables"]["profiles"]["Update"] = {};
     if (data.full_name !== undefined) profileUpdate.full_name = data.full_name;
     if (data.designation !== undefined) profileUpdate.designation = data.designation || null;
     if (data.monthly_salary !== undefined) profileUpdate.monthly_salary = data.monthly_salary;
@@ -271,6 +283,7 @@ export const deleteStaff = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_staff");
     if (data.user_id === userId) throw new Error("You can't delete your own account here");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -328,7 +341,7 @@ export const updateMyProfile = createServerFn({ method: "POST" })
     const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const update: Record<string, unknown> = {};
+    const update: Database["public"]["Tables"]["profiles"]["Update"] = {};
     if (data.date_of_birth !== undefined) update.date_of_birth = data.date_of_birth || null;
     if (data.gender !== undefined) update.gender = data.gender;
     if (data.blood_group !== undefined) update.blood_group = data.blood_group || null;
@@ -373,6 +386,7 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
       supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
     ]);
     if (!isSuper && !isTenantAdmin) throw new Error("Not authorized");
+    if (!isSuper) await requireTenantPermission(supabase as any, userId, data.tenant_id, "manage_staff");
     if (!isSuper) await requireActiveSubscription(supabase, data.tenant_id);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -386,13 +400,29 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
     const branchByName = new Map((branches ?? []).map((b) => [b.name.trim().toLowerCase(), b.id]));
     const shiftByName = new Map((shifts ?? []).map((s) => [s.name.trim().toLowerCase(), s.id]));
 
-    const results: { row: number; name: string; status: "created" | "failed"; error?: string }[] = [];
+    // A generated PIN is the staff member's ONLY way to log in, so it has to
+    // come back to the admin. It previously came from Math.random() and was
+    // never returned anywhere, which left those accounts permanently
+    // unreachable — nobody, including the admin, knew the password.
+    const { randomInt } = await import("crypto");
+    const generatePin = () => String(randomInt(1000, 10000));
+
+    const results: {
+      row: number;
+      name: string;
+      phone: string;
+      status: "created" | "failed";
+      /** Set only when WE generated it — never echoes a PIN the admin supplied. */
+      generated_pin?: string;
+      error?: string;
+    }[] = [];
 
     for (let i = 0; i < data.rows.length; i++) {
       const row = data.rows[i];
       try {
         const email = `${row.phone}@${STAFF_EMAIL_DOMAIN}`;
-        const password = row.pin ?? String(Math.floor(1000 + Math.random() * 9000));
+        const generatedPin = row.pin ? undefined : generatePin();
+        const password = row.pin ?? generatedPin!;
 
         const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
           email,
@@ -431,9 +461,21 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
           });
         }
 
-        results.push({ row: i + 1, name: row.full_name, status: "created" });
+        results.push({
+          row: i + 1,
+          name: row.full_name,
+          phone: row.phone,
+          status: "created",
+          generated_pin: generatedPin,
+        });
       } catch (e: any) {
-        results.push({ row: i + 1, name: row.full_name, status: "failed", error: e?.message ?? "Unknown error" });
+        results.push({
+          row: i + 1,
+          name: row.full_name,
+          phone: row.phone,
+          status: "failed",
+          error: e?.message ?? "Unknown error",
+        });
       }
     }
 

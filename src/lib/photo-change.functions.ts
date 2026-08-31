@@ -18,6 +18,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireTenantPermission } from "@/lib/permissions";
 
 const requestSchema = z.object({
   photo_path: z.string().trim().min(1).max(200),
@@ -93,6 +94,7 @@ export const approvePhotoChange = createServerFn({ method: "POST" })
       supabaseAdmin.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: req.tenant_id }),
     ]);
     if (!isSuper && !isAdmin) throw new Error("Not authorized to approve for this tenant");
+    if (!isSuper) await requireTenantPermission(supabaseAdmin as any, userId, req.tenant_id, "manage_approvals");
 
     // Copy the pending photo bytes to the canonical profile.jpg path.
     // Approved photo becomes the new source of truth; the pending copy is
@@ -158,6 +160,7 @@ export const rejectPhotoChange = createServerFn({ method: "POST" })
       supabaseAdmin.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: req.tenant_id }),
     ]);
     if (!isSuper && !isAdmin) throw new Error("Not authorized to reject for this tenant");
+    if (!isSuper) await requireTenantPermission(supabaseAdmin as any, userId, req.tenant_id, "manage_approvals");
 
     // Delete the rejected photo so it doesn't linger
     await supabaseAdmin.storage.from("staff-photos").remove([req.photo_path]);

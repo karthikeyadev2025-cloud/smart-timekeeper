@@ -21,6 +21,7 @@ import * as XLSX from "xlsx";
 import { BroadcastForm } from "@/components/BroadcastForm";
 import { DeleteTenantDialog } from "@/components/DeleteTenantDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { planExpiresAt } from "@/lib/billing-period";
 import { toast } from "sonner";
 import {
   impersonateUser, setTenantActive, extendSubscription, changeTenantPlan, getTenantDetails,
@@ -123,7 +124,7 @@ function ClientsPage() {
                         <div className="text-xs text-destructive">Expired</div>
                       )}
                     </TableCell>
-                    <TableCell>{t.employee_limit}</TableCell>
+                    <TableCell>{t.employee_limit ?? "Unlimited"}</TableCell>
                     <TableCell><Badge variant={t.is_active ? "default" : "secondary"}>{t.is_active ? "Active" : "Suspended"}</Badge></TableCell>
                     <TableCell className="text-right">
                       <RowActions tenant={t} onChange={refresh} />
@@ -400,9 +401,10 @@ function TenantForm({ onDone }: { onDone: () => void }) {
       } as any).select().single();
       if (tErr) throw tErr;
 
-      const expiresAt = plan.billing === "lifetime" ? null
-        : plan.billing === "monthly" ? new Date(Date.now() + 30 * 86400000).toISOString()
-        : new Date(Date.now() + 365 * 86400000).toISOString();
+      // Shared calendar-month helper. The inline version here ignored
+      // billing_period_months, so a custom-duration plan silently got a
+      // 365-day expiry no matter what it was sold as.
+      const expiresAt = planExpiresAt(plan);
       await supabase.from("subscriptions").insert({
         tenant_id: tenant.id, plan_id: plan.id, status: "active", expires_at: expiresAt,
       });

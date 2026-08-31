@@ -26,35 +26,72 @@ export const requestPinReset = createServerFn({ method: "POST" })
 
     // Cheap rate limit: don't accept more than 1 reset request per phone per hour.
     // Stops abusers spamming the admin's queue and slows phone-enumeration.
+    //
+    // This used .maybeSingle(), which makes PostgREST ERROR once two or more
+    // rows match rather than returning one. The error was discarded and `data`
+    // came back null, so `recent` was falsy and the limit stopped applying at
+    // exactly the point it was needed — the limiter failed open under the
+    // abuse it existed to stop. .limit(1) returns at most one row, and the
+    // error is now checked and treated as "already requested" (fail closed).
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data: recent } = await supabaseAdmin
+    const { data: recent, error: recentErr } = await supabaseAdmin
       .from("pin_reset_requests")
       .select("id")
       .eq("phone", phone)
       .gte("created_at", oneHourAgo)
-      .maybeSingle();
-    if (recent) {
+      .limit(1);
+    if (recentErr) {
+      console.error("[pin-reset] rate-limit lookup failed, refusing:", recentErr);
+      // Fail closed. A rate limiter that opens on error is not a rate limiter.
+      return { ok: true };
+    }
+    if (recent && recent.length > 0) {
       // Still return success — don't reveal whether the phone is registered
       // or whether a request already exists.
       return { ok: true };
     }
 
-    // Look up the staff profile by phone (may not exist; we still record request)
-    const { data: profile } = await supabaseAdmin
+    // Look up the staff profile by phone (may not exist; we still record request).
+    //
+    // profiles.phone is NOT unique across tenants — two companies can each
+    // employ the same number. .maybeSingle() errored in exactly that case, so
+    // `profile` came back null and the request was filed with tenant_id and
+    // user_id NULL: invisible to every tenant admin, reachable only through
+    // the super-admin fallback view with no company attached. That is the
+    // symptom this function's own comments describe.
+    //
+    // Fetch up to two instead. Exactly one match attributes the request;
+    // more than one is genuinely ambiguous, so it is left unattributed for a
+    // super admin to resolve rather than guessing a company.
+    const { data: matches, error: profileErr } = await supabaseAdmin
       .from("profiles")
       .select("id, tenant_id")
       .eq("phone", phone)
-      .maybeSingle();
+      .limit(2);
+    if (profileErr) {
+      console.error("[pin-reset] profile lookup failed:", profileErr);
+    }
+    if ((matches?.length ?? 0) > 1) {
+      console.warn(`[pin-reset] phone ${phone} matches multiple tenants — filing unattributed`);
+    }
+    const profile = matches?.length === 1 ? matches[0] : null;
 
-    // Avoid duplicate pending requests for same phone
-    const { data: existing } = await supabaseAdmin
+    // Avoid duplicate pending requests for same phone. Same .maybeSingle()
+    // trap as above: with two pending rows already present it errored, `data`
+    // was null, and this inserted yet another duplicate.
+    const { data: existing, error: existingErr } = await supabaseAdmin
       .from("pin_reset_requests")
       .select("id")
       .eq("phone", phone)
       .eq("status", "pending")
-      .maybeSingle();
+      .limit(1);
 
-    if (!existing) {
+    if (existingErr) {
+      console.error("[pin-reset] pending lookup failed, not inserting:", existingErr);
+      return { ok: true };
+    }
+
+    if (!existing || existing.length === 0) {
       const { error } = await supabaseAdmin.from("pin_reset_requests").insert({
         phone,
         tenant_id: profile?.tenant_id ?? null,

@@ -204,6 +204,7 @@ export type Database = {
           is_active: boolean
           manager_id: string | null
           name: string
+          partial_day_policy: Database["public"]["Enums"]["partial_day_policy"] | null
           state: string | null
           tenant_id: string
           timezone: string | null
@@ -224,6 +225,7 @@ export type Database = {
           is_active?: boolean
           manager_id?: string | null
           name: string
+          partial_day_policy?: Database["public"]["Enums"]["partial_day_policy"] | null
           state?: string | null
           tenant_id: string
           timezone?: string | null
@@ -244,6 +246,7 @@ export type Database = {
           is_active?: boolean
           manager_id?: string | null
           name?: string
+          partial_day_policy?: Database["public"]["Enums"]["partial_day_policy"] | null
           state?: string | null
           tenant_id?: string
           timezone?: string | null
@@ -1139,7 +1142,7 @@ export type Database = {
           created_at: string
           description: string | null
           display_order: number | null
-          employee_limit: number
+          employee_limit: number | null
           features: Json | null
           id: string
           is_active: boolean
@@ -1156,7 +1159,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_order?: number | null
-          employee_limit: number
+          employee_limit: number | null
           features?: Json | null
           id?: string
           is_active?: boolean
@@ -1173,7 +1176,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_order?: number | null
-          employee_limit?: number
+          employee_limit?: number | null
           features?: Json | null
           id?: string
           is_active?: boolean
@@ -1213,6 +1216,7 @@ export type Database = {
           is_active: boolean
           is_field_staff: boolean
           monthly_salary: number | null
+          monthly_working_days: number | null
           phone: string | null
           photo_locked: boolean
           profile_completion: number | null
@@ -1248,6 +1252,7 @@ export type Database = {
           is_active?: boolean
           is_field_staff?: boolean
           monthly_salary?: number | null
+          monthly_working_days?: number | null
           phone?: string | null
           photo_locked?: boolean
           profile_completion?: number | null
@@ -1283,6 +1288,7 @@ export type Database = {
           is_active?: boolean
           is_field_staff?: boolean
           monthly_salary?: number | null
+          monthly_working_days?: number | null
           phone?: string | null
           photo_locked?: boolean
           profile_completion?: number | null
@@ -1921,7 +1927,7 @@ export type Database = {
           contact_email: string | null
           contact_phone: string | null
           created_at: string
-          employee_limit: number
+          employee_limit: number | null
           id: string
           id_card_accent: string | null
           id_card_template: string
@@ -1931,13 +1937,15 @@ export type Database = {
           primary_color: string | null
           slug: string
           tenant_type: Database["public"]["Enums"]["tenant_type"]
+          partial_day_policy: Database["public"]["Enums"]["partial_day_policy"]
+          default_monthly_working_days: number | null
           updated_at: string
         }
         Insert: {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
-          employee_limit?: number
+          employee_limit?: number | null
           id?: string
           id_card_accent?: string | null
           id_card_template?: string
@@ -1947,13 +1955,15 @@ export type Database = {
           primary_color?: string | null
           slug: string
           tenant_type?: Database["public"]["Enums"]["tenant_type"]
+          partial_day_policy?: Database["public"]["Enums"]["partial_day_policy"]
+          default_monthly_working_days?: number | null
           updated_at?: string
         }
         Update: {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
-          employee_limit?: number
+          employee_limit?: number | null
           id?: string
           id_card_accent?: string | null
           id_card_template?: string
@@ -1963,6 +1973,8 @@ export type Database = {
           primary_color?: string | null
           slug?: string
           tenant_type?: Database["public"]["Enums"]["tenant_type"]
+          partial_day_policy?: Database["public"]["Enums"]["partial_day_policy"]
+          default_monthly_working_days?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -2202,6 +2214,38 @@ export type Database = {
         Args: { _tenant_id: string }
         Returns: string
       }
+      public_verify_staff: {
+        Args: { _staff_id: string }
+        Returns: {
+          full_name: string
+          staff_id: string
+          designation: string
+          branch_name: string
+          company_name: string
+          company_logo_url: string
+          is_active: boolean
+          has_photo: boolean
+        }[]
+      }
+      staff_day_segments: {
+        Args: { _tenant_id: string; _date: string; _user_id: string }
+        Returns: {
+          user_id: string
+          full_name: string
+          staff_id: string
+          seq: number
+          shift_id: string
+          shift_name: string
+          branch_id: string
+          branch_name: string
+          start_time: string
+          end_time: string
+          first_check_in: string
+          last_check_out: string
+          minutes_late: number
+          status: string
+        }[]
+      }
     }
     Enums: {
       app_role: "super_admin" | "client_admin" | "staff" | "branch_manager"
@@ -2226,6 +2270,7 @@ export type Database = {
         | "shift_swap_requested"
         | "shift_swap_approved"
         | "shift_swap_rejected"
+      partial_day_policy: "proportional" | "half_day" | "full_day" | "absent"
       payment_status: "pending" | "success" | "failed" | "refunded"
       plan_billing: "monthly" | "yearly" | "lifetime"
       student_attendance_status: "present" | "absent" | "late"

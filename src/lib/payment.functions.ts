@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { planExpiresAt, addMonths } from "@/lib/billing-period";
 
 // ─── Create Razorpay Order ───────────────────────────────────────────────────
 export const createRazorpayOrder = createServerFn({ method: "POST" })
@@ -8,12 +9,17 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    // Verify user is admin of this tenant
-    const { data: isAdmin } = await supabase.rpc("has_role", {
-      _user_id: userId,
-      _role: "client_admin" as any,
-    });
-    if (!isAdmin) throw new Error("Forbidden: not a client admin");
+    // Verify the user is an admin OF THIS TENANT.
+    //
+    // This used has_role(userId, 'client_admin') with no tenant argument, so
+    // it only asked "is this person a client admin somewhere?" while
+    // data.tenant_id came straight from the request body. Any client admin
+    // could therefore open payment_orders rows against any other company.
+    const [{ data: isSuper }, { data: isTenantAdmin }] = await Promise.all([
+      supabase.rpc("is_super_admin", { _user_id: userId }),
+      supabase.rpc("is_tenant_admin", { _user_id: userId, _tenant_id: data.tenant_id }),
+    ]);
+    if (!isSuper && !isTenantAdmin) throw new Error("Forbidden: not an admin of this company");
 
     // Get plan
     const { data: plan, error: planErr } = await supabase
@@ -162,10 +168,14 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     if (!keySecret) throw new Error("Razorpay not configured");
 
     // Verify HMAC signature to prevent fake payments
-    const { createHmac } = await import("crypto");
+    const { createHmac, timingSafeEqual } = await import("crypto");
     const body = `${data.razorpay_order_id}|${data.razorpay_payment_id}`;
     const expectedSig = createHmac("sha256", keySecret).update(body).digest("hex");
-    if (expectedSig !== data.razorpay_signature) {
+    // Constant-time. timingSafeEqual throws on a length mismatch and the
+    // signature is caller-supplied, so compare lengths first.
+    const sigBuf = Buffer.from(String(data.razorpay_signature ?? ""), "utf8");
+    const expBuf = Buffer.from(expectedSig, "utf8");
+    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
       throw new Error("Invalid payment signature — possible fraud attempt");
     }
 
@@ -190,9 +200,21 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     ]);
     if (!isAdmin && !isSuper) throw new Error("Forbidden: not an admin of this tenant");
 
-    // IDEMPOTENCY: if already completed, just return success — the user may
-    // have refreshed mid-flow or Razorpay called the handler twice.
-    if (ord.status === "completed") {
+    // IDEMPOTENCY: claim the order atomically before doing anything with side
+    // effects. This races the /webhook/razorpay handler by design — whichever
+    // arrives first should win — and a read-then-write could let BOTH pass the
+    // check and then grant two subscriptions and log two payments for a single
+    // order. Only one caller can flip pending -> completed; the loser gets
+    // zero rows back and returns the already-completed result.
+    const { data: claimed, error: claimErr } = await supabaseAdmin
+      .from("payment_orders" as any)
+      .update({ status: "completed", razorpay_payment_id: data.razorpay_payment_id })
+      .eq("razorpay_order_id", data.razorpay_order_id)
+      .neq("status", "completed")
+      .select("id")
+      .maybeSingle();
+    if (claimErr) throw new Error(`Could not claim order: ${claimErr.message}`);
+    if (!claimed) {
       return {
         ok: true,
         already_completed: true,
@@ -225,53 +247,53 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       // early shouldn't lose time), otherwise extend from now.
       const currentDue = (sub as any).maintenance_due_at ? new Date((sub as any).maintenance_due_at) : null;
       const base = currentDue && currentDue.getTime() > Date.now() ? currentDue : new Date();
-      const nextDue = new Date(base.getTime() + periodMonths * 30 * 86400000).toISOString();
+      // Real calendar months. periodMonths * 30 days made a 12-month cycle
+      // fall due after 360 days, drifting 5 days earlier every renewal.
+      const nextDue = addMonths(base, periodMonths).toISOString();
 
       await supabaseAdmin
         .from("subscriptions" as any)
         .update({ maintenance_due_at: nextDue })
         .eq("id", (sub as any).id);
 
-      await supabaseAdmin.from("payments" as any).insert({
+      const { error: mntPayErr } = await supabaseAdmin.from("payments" as any).insert({
         tenant_id: ord.tenant_id,
         plan_id: plan.id,
         amount_inr: Number(plan.maintenance_fee_inr ?? 0),
         currency: "INR",
         status: "success",
-        method: "razorpay",
         razorpay_order_id: data.razorpay_order_id,
         razorpay_payment_id: data.razorpay_payment_id,
         payer_name: ord.tenants?.name ?? null,
         payer_email: ord.tenants?.contact_email ?? null,
       });
 
-      await supabaseAdmin
-        .from("payment_orders" as any)
-        .update({ status: "completed", razorpay_payment_id: data.razorpay_payment_id })
-        .eq("razorpay_order_id", data.razorpay_order_id);
+      // The subscription was already extended, so a failure to log the
+      // payment must not fail the request — but it must be loud. Silently
+      // swallowing this error is how the bad `method` column lost every
+      // payment record from billing history and the revenue dashboard.
+      if (mntPayErr) {
+        console.error("[payments] maintenance payment recorded in Razorpay but NOT logged:", mntPayErr);
+      }
 
+      // The order was already marked completed by the claim above.
       return { ok: true, plan_name: plan.name, expires_at: null, maintenance_due_at: nextDue };
     }
 
     // Calculate expiry from billing_period_months if set (custom plan duration),
     // else fall back to the legacy enum. Lifetime plans pass NULL months and
     // therefore get NULL expiry.
-    const months = plan.billing_period_months;
-    const expiresAt =
-      months == null
-        ? plan.billing === "lifetime"
-          ? null
-          : plan.billing === "monthly"
-          ? new Date(Date.now() + 30 * 86400000).toISOString()
-          : new Date(Date.now() + 365 * 86400000).toISOString()
-        : new Date(Date.now() + months * 30 * 86400000).toISOString();
+    // Calendar months, and one definition shared with the webhook and
+    // changeTenantPlan. The old inline math expired a 12-month plan after
+    // 360 days, short-changing every yearly subscriber by 5 days a year.
+    const expiresAt = planExpiresAt(plan);
 
     // If this plan carries a maintenance fee, set the first due date now
     // (grace period from today). Plans with no maintenance_fee_inr get NULL,
     // meaning tenant_maintenance_overdue() never fires for them.
     const maintenanceDueAt =
       plan.maintenance_fee_inr && Number(plan.maintenance_fee_inr) > 0
-        ? new Date(Date.now() + (plan.maintenance_grace_months ?? 24) * 30 * 86400000).toISOString()
+        ? addMonths(new Date(), plan.maintenance_grace_months ?? 24).toISOString()
         : null;
 
     // Upsert subscription (one per tenant — we update if it exists)
@@ -314,24 +336,22 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
 
     // RECORD THE PAYMENT in payments table — this is what /billing's history
     // shows and what super-admin revenue dashboard sums.
-    await supabaseAdmin.from("payments" as any).insert({
+    const { error: payErr } = await supabaseAdmin.from("payments" as any).insert({
       tenant_id: ord.tenant_id,
       plan_id: plan.id,
       amount_inr: Number(plan.price_inr),
       currency: "INR",
       status: "success",
-      method: "razorpay",
       razorpay_order_id: data.razorpay_order_id,
       razorpay_payment_id: data.razorpay_payment_id,
       payer_name: ord.tenants?.name ?? null,
       payer_email: ord.tenants?.contact_email ?? null,
     });
 
-    // Mark order complete (last, so a re-entry doesn't double-insert)
-    await supabaseAdmin
-      .from("payment_orders" as any)
-      .update({ status: "completed", razorpay_payment_id: data.razorpay_payment_id })
-      .eq("razorpay_order_id", data.razorpay_order_id);
+    if (payErr) {
+      console.error("[payments] subscription granted but payment NOT logged:", payErr);
+    }
 
+    // The order was already marked completed by the claim above.
     return { ok: true, plan_name: plan.name, expires_at: expiresAt };
   });

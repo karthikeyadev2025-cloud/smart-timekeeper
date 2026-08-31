@@ -11,14 +11,12 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
       throw error;
     }
     console.error(error);
-    // Report to Sentry if configured
-    try {
-      const dsn = process.env.SENTRY_DSN;
-      if (dsn) {
-        const Sentry = await import("@sentry/react");
-        Sentry.captureException(error);
-      }
-    } catch { /* Sentry not installed yet */ }
+    // Error reporting is not wired up. There was a `await import("@sentry/react")`
+    // here guarded by SENTRY_DSN, but @sentry/react is not a dependency and
+    // Sentry.init() is never called anywhere, so the import could only ever
+    // throw into its own catch — and it broke `tsc` for everyone. To enable
+    // reporting for real: add the dependency, call Sentry.init({ dsn }) once at
+    // startup, then capture here.
     return new Response(renderErrorPage(), {
       status: 500,
       headers: { "content-type": "text/html; charset=utf-8" },

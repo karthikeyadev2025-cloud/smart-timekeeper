@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { planExpiresAt } from "@/lib/billing-period";
 
 async function assertSuper(supabase: any, userId: string) {
   const { data: isSuper } = await supabase.rpc("has_role", { _user_id: userId, _role: "super_admin" as any });
@@ -89,9 +91,9 @@ export const changeTenantPlan = createServerFn({ method: "POST" })
       .from("subscriptions").select("id").eq("tenant_id", data.tenant_id)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
 
-    const expiresAt = plan.billing === "lifetime" ? null
-      : plan.billing === "monthly" ? new Date(Date.now() + 30 * 86400000).toISOString()
-      : new Date(Date.now() + 365 * 86400000).toISOString();
+    // Calendar months via the shared helper — the old inline math ignored
+    // billing_period_months entirely and treated a year as 365 fixed days.
+    const expiresAt = planExpiresAt(plan);
 
     if (sub) {
       await supabaseAdmin.from("subscriptions").update({
@@ -141,13 +143,11 @@ export const getAuditLog = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
-export const PERMISSION_KEYS = [
-  "manage_staff",
-  "manage_branches",
-  "manage_payroll",
-  "manage_approvals",
-] as const;
-export type PermissionKey = (typeof PERMISSION_KEYS)[number];
+// Single source of truth lives in @/lib/permissions, next to the enforcement
+// that actually reads these keys. Re-exported here so existing importers
+// (TenantPermissionsDialog) keep working.
+export { PERMISSION_KEYS, type PermissionKey } from "@/lib/permissions";
+import { PERMISSION_KEYS } from "@/lib/permissions";
 
 export const listTenantAdmins = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -329,7 +329,7 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     const tenantId = roles?.find((r: any) => r.role === "client_admin" && r.tenant_id)?.tenant_id;
     if (!tenantId) throw new Error("You must be a client admin to edit company profile");
 
-    const update: Record<string, unknown> = {};
+    const update: Database["public"]["Tables"]["tenants"]["Update"] = {};
     if (data.name !== undefined) {
       const n = data.name.trim();
       if (!n) throw new Error("Company name cannot be empty");
@@ -355,11 +355,15 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
       update.default_monthly_working_days = v;
     }
     if (data.partial_day_policy !== undefined && data.partial_day_policy) {
-      const allowed = ["proportional", "half_day", "full_day", "absent"];
-      if (!allowed.includes(data.partial_day_policy)) {
+      // Narrow to the enum instead of listing the values twice. The generated
+      // type is now the single source of truth, so adding a policy in SQL
+      // surfaces here rather than silently accepting a value the DB rejects.
+      const allowed = ["proportional", "half_day", "full_day", "absent"] as const;
+      type Policy = (typeof allowed)[number];
+      if (!(allowed as readonly string[]).includes(data.partial_day_policy)) {
         throw new Error("Invalid partial day policy");
       }
-      update.partial_day_policy = data.partial_day_policy;
+      update.partial_day_policy = data.partial_day_policy as Policy;
     }
     if (data.id_card_accent !== undefined) {
       // Basic hex validation. NULL clears it (falls back to the app's indigo).

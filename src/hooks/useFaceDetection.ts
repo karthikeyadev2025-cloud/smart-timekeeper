@@ -11,7 +11,8 @@ import { useEffect, useRef, useState } from "react";
  * Returns whether a face is currently visible, and how long it's been
  * continuously visible (used to trigger auto-capture after a short hold).
  */
-export function useFaceDetection(videoRef: React.RefObject<HTMLVideoElement>, active: boolean) {
+// RefObject<T | null> is what useRef<T>(null) produces under React 19 types.
+export function useFaceDetection(videoRef: React.RefObject<HTMLVideoElement | null>, active: boolean) {
   const [supported, setSupported] = useState<boolean | null>(null);
   const [faceDetected, setFaceDetected] = useState(false);
   const [steadyMs, setSteadyMs] = useState(0);

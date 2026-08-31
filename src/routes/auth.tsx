@@ -26,7 +26,20 @@ export const Route = createFileRoute("/auth")({
 });
 
 const emailSchema = z.string().trim().email("Enter a valid email").max(255);
-const passwordSchema = z.string().min(4, "At least 4 characters").max(72);
+// Sign-IN only checks the field isn't empty. Raising the minimum here would
+// lock out every existing admin whose password is shorter than the new
+// minimum — they could no longer authenticate to change it.
+const signinPasswordSchema = z.string().min(1, "Enter your password").max(72);
+
+// Sign-UP is where a stronger rule can be applied without stranding anyone.
+// 4 characters is reasonable for a staff numeric PIN typed on a shared kiosk
+// keypad; it is not reasonable for a company-admin account that can read
+// every employee's salary and bank details.
+const signupPasswordSchema = z
+  .string()
+  .min(8, "Use at least 8 characters")
+  .max(72)
+  .refine((v) => !/^\d+$/.test(v), "Use more than just numbers");
 
 function AuthPage() {
   const navigate = useNavigate();
@@ -83,7 +96,10 @@ function AuthPage() {
     companyName?: string,
     tenantType?: "business" | "school",
   ) => {
-    try { emailSchema.parse(email); passwordSchema.parse(password); }
+    try {
+      emailSchema.parse(email);
+      (mode === "signup" ? signupPasswordSchema : signinPasswordSchema).parse(password);
+    }
     catch (e) { if (e instanceof z.ZodError) { toast.error(e.errors[0].message); return; } }
     if (mode === "signup" && !companyName?.trim()) {
       toast.error("Please enter your company name");
@@ -313,7 +329,11 @@ function SignUpForm({ loading, onSubmit }: { loading: boolean; onSubmit: (name: 
         </div>
       </div>
       <div className="space-y-1"><Label htmlFor="su-email">Email</Label><Input id="su-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></div>
-      <div className="space-y-1"><Label htmlFor="su-pass">Password</Label><Input id="su-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={4} /></div>
+      <div className="space-y-1">
+        <Label htmlFor="su-pass">Password</Label>
+        <Input id="su-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={8} />
+        <p className="text-xs text-muted-foreground">At least 8 characters, not all digits.</p>
+      </div>
       <Button type="submit" className="w-full" disabled={loading}>{loading ? "Creating…" : "Create account"}</Button>
     </form>
   );

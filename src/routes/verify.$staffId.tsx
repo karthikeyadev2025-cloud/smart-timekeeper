@@ -23,10 +23,24 @@ const getVerifyPhoto = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ staff_id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: files } = await supabaseAdmin.storage
-      .from("staff-photos")
-      .list(data.staff_id, { limit: 1, search: "profile.jpg" });
-    if (!files || files.length === 0) return { url: null };
+
+    // Gate on the SAME visibility rule the page itself uses. This endpoint is
+    // unauthenticated by design, but it previously minted a signed URL for any
+    // UUID handed to it, with no check that the id corresponds to a staff
+    // member whose card is verifiable at all. It was a bare
+    // uuid -> private-photo oracle for any user id that leaked anywhere else
+    // in the system; now it can only return a photo that public_verify_staff
+    // would already show on the card.
+    const { data: visible, error: visErr } = await supabaseAdmin.rpc("public_verify_staff", {
+      _staff_id: data.staff_id,
+    });
+    if (visErr) {
+      console.error("[verify] visibility check failed:", visErr);
+      return { url: null };
+    }
+    const row = (visible as any[])?.[0];
+    if (!row || !row.has_photo) return { url: null };
+
     const { data: signed } = await supabaseAdmin.storage
       .from("staff-photos")
       .createSignedUrl(`${data.staff_id}/profile.jpg`, 300);

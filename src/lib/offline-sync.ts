@@ -1,23 +1,76 @@
 import { supabase } from "@/integrations/supabase/client";
-import { listPending, removePending, updatePendingError, type PendingAttendance } from "./offline-queue";
+import {
+  listPending,
+  removePending,
+  updatePendingError,
+  markDead,
+  type PendingAttendance,
+} from "./offline-queue";
 import { localDateStr } from "./local-date";
 
 let syncing = false;
 
 /**
- * Attempts to upload every queued offline attendance record, in order.
- * Safe to call repeatedly (e.g. on 'online' event, on page load, every 30s) —
- * it no-ops if a sync is already in progress or the queue is empty.
- *
- * Returns { synced, failed, remaining } so the UI can show a toast/badge.
+ * After this many transient failures we stop assuming "transient". Something
+ * we failed to classify is still blocking the queue, so it gets retired
+ * rather than retried forever.
  */
-export async function syncOfflineQueue(): Promise<{ synced: number; failed: number; remaining: number }> {
-  if (syncing) return { synced: 0, failed: 0, remaining: (await listPending()).length };
-  if (!navigator.onLine) return { synced: 0, failed: 0, remaining: (await listPending()).length };
+const MAX_ATTEMPTS = 10;
+
+/**
+ * True when retrying cannot possibly help: the server understood the request
+ * and refused it.
+ *
+ * This matters because the queue used to `break` on the first failure of any
+ * kind and retry the whole queue next pass. A punch the server will never
+ * accept — an RLS denial, a failed constraint, a punch older than the backdate
+ * window — therefore blocked every punch queued behind it, on that device,
+ * forever. Permanent failures now leave the queue so the rest can drain.
+ */
+export function isPermanentSyncFailure(e: any): boolean {
+  const code = e?.code ?? e?.error?.code;
+  if (typeof code === "string") {
+    // 42501 insufficient_privilege (RLS and the attendance integrity trigger),
+    // class 23 integrity constraint violations, class 22 data exceptions.
+    // Postgres SQLSTATEs are alphanumeric, not just digits — 22P02
+    // (invalid_text_representation) would slip through a \d-only pattern.
+    if (code === "42501" || /^2[23][0-9A-Z]{3}$/.test(code)) return true;
+    // PostgREST schema/shape errors — e.g. PGRST204, an unknown column.
+    if (code.startsWith("PGRST")) return true;
+  }
+
+  const status = e?.status ?? e?.statusCode ?? e?.originalError?.status;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    // 408 and 429 are worth retrying; the rest of 4xx is our own bad request.
+    return status !== 408 && status !== 429;
+  }
+
+  // Network failures (offline, captive portal, DNS) arrive as a bare
+  // TypeError with no code or status — retry those.
+  return false;
+}
+
+/**
+ * Uploads queued offline punches in order. Safe to call repeatedly (on
+ * 'online', on page load, every 30s) — it no-ops if a sync is already running.
+ *
+ * Returns { synced, failed, dead, remaining } so the UI can report progress
+ * and surface punches that will never go through.
+ */
+export async function syncOfflineQueue(): Promise<{
+  synced: number;
+  failed: number;
+  dead: number;
+  remaining: number;
+}> {
+  if (syncing || !navigator.onLine) {
+    return { synced: 0, failed: 0, dead: 0, remaining: (await listPending()).length };
+  }
 
   syncing = true;
   let synced = 0;
   let failed = 0;
+  let dead = 0;
 
   try {
     const pending = await listPending();
@@ -27,11 +80,26 @@ export async function syncOfflineQueue(): Promise<{ synced: number; failed: numb
         await removePending(item.id);
         synced++;
       } catch (e: any) {
+        const reason = e?.message ?? "Unknown error";
+        const attempts = (item.attempt_count ?? 0) + 1;
+
+        if (isPermanentSyncFailure(e)) {
+          // Retiring it lets the rest of the queue drain.
+          await markDead(item.id, reason);
+          dead++;
+          continue;
+        }
+
+        if (attempts >= MAX_ATTEMPTS) {
+          await markDead(item.id, `Gave up after ${attempts} attempts: ${reason}`);
+          dead++;
+          continue;
+        }
+
+        await updatePendingError(item.id, reason);
         failed++;
-        await updatePendingError(item.id, e?.message ?? "Unknown error");
-        // Stop after first failure in this pass — likely still offline or a
-        // systemic issue (e.g. expired session). Retrying the rest would just
-        // burn through attempts pointlessly. Next sync pass will retry all.
+        // A transient failure almost certainly means we are offline again, so
+        // stop this pass rather than burning attempts on every queued item.
         break;
       }
     }
@@ -39,8 +107,7 @@ export async function syncOfflineQueue(): Promise<{ synced: number; failed: numb
     syncing = false;
   }
 
-  const remaining = (await listPending()).length;
-  return { synced, failed, remaining };
+  return { synced, failed, dead, remaining: (await listPending()).length };
 }
 
 async function uploadOne(item: PendingAttendance): Promise<void> {
@@ -54,6 +121,10 @@ async function uploadOne(item: PendingAttendance): Promise<void> {
     tenant_id: item.tenant_id,
     user_id: item.user_id,
     office_location_id: item.office_location_id,
+    // Attribute the punch exactly like an online one. Older queued items
+    // predate these fields, hence the ?? null.
+    branch_id: item.branch_id ?? null,
+    shift_id: item.shift_id ?? null,
     kind: item.kind,
     latitude: item.latitude,
     longitude: item.longitude,
@@ -77,8 +148,13 @@ async function uploadOne(item: PendingAttendance): Promise<void> {
 }
 
 /** Sets up automatic background syncing: on load, on reconnect, and every 30s while online. */
-export function startAutoSync(onResult?: (r: { synced: number; failed: number; remaining: number }) => void) {
-  const run = () => syncOfflineQueue().then((r) => { if (r.synced > 0 || r.failed > 0) onResult?.(r); });
+export function startAutoSync(
+  onResult?: (r: { synced: number; failed: number; dead: number; remaining: number }) => void,
+) {
+  const run = () =>
+    syncOfflineQueue().then((r) => {
+      if (r.synced > 0 || r.failed > 0 || r.dead > 0) onResult?.(r);
+    });
 
   run(); // try immediately on mount
   window.addEventListener("online", run);

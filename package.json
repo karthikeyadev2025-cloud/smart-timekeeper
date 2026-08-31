@@ -8,13 +8,16 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
-    "lint": "echo \"lint skipped\" && exit 0",
+    "lint": "eslint .",
     "format": "prettier --write .",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
     "cap:ios": "cap open ios",
     "android:debug": "cd android && ./gradlew assembleDebug",
-    "android:release": "cd android && ./gradlew assembleRelease"
+    "android:release": "cd android && ./gradlew assembleRelease",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "esbuild src/lib/__tests__/offline-sync.classifier.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/t1.mjs --alias:@=./src --external:@supabase/supabase-js && node node_modules/.cache/t1.mjs && esbuild src/lib/__tests__/billing-period.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/t2.mjs --alias:@=./src && node node_modules/.cache/t2.mjs",
+    "check": "npm run typecheck && npm run lint && npm run test:unit"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
@@ -102,6 +105,7 @@
     "@types/react-dom": "^19.2.0",
     "@types/three": "^0.184.1",
     "@vitejs/plugin-react": "^5.2.0",
+    "esbuild": "0.28.2",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
