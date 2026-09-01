@@ -1937,8 +1937,75 @@ export type Database = {
           },
         ]
       }
+      location_pings: {
+        Row: {
+          id: number
+          tenant_id: string
+          user_id: string
+          latitude: number
+          longitude: number
+          accuracy_meters: number | null
+          is_mock_location: boolean
+          battery_level: number | null
+          recorded_at: string
+        }
+        Insert: {
+          id?: number
+          tenant_id: string
+          user_id: string
+          latitude: number
+          longitude: number
+          accuracy_meters?: number | null
+          is_mock_location?: boolean
+          battery_level?: number | null
+          recorded_at?: string
+        }
+        Update: {
+          id?: number
+          tenant_id?: string
+          user_id?: string
+          latitude?: number
+          longitude?: number
+          accuracy_meters?: number | null
+          is_mock_location?: boolean
+          battery_level?: number | null
+          recorded_at?: string
+        }
+        Relationships: []
+      }
+      late_alerts: {
+        Row: {
+          tenant_id: string
+          user_id: string
+          shift_id: string | null
+          attendance_date: string
+          minutes_late: number
+          created_at: string
+        }
+        Insert: {
+          tenant_id: string
+          user_id: string
+          shift_id?: string | null
+          attendance_date: string
+          minutes_late: number
+          created_at?: string
+        }
+        Update: {
+          tenant_id?: string
+          user_id?: string
+          shift_id?: string | null
+          attendance_date?: string
+          minutes_late?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       tenants: {
         Row: {
+          live_tracking_enabled: boolean
+          live_tracking_interval_seconds: number
+          live_tracking_stale_minutes: number
+          live_tracking_retention_days: number
           late_alerts_enabled: boolean
           late_alert_after_minutes: number
           late_alert_window_hours: number
@@ -1966,6 +2033,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          live_tracking_enabled?: boolean
+          live_tracking_interval_seconds?: number
+          live_tracking_stale_minutes?: number
+          live_tracking_retention_days?: number
           late_alerts_enabled?: boolean
           late_alert_after_minutes?: number
           late_alert_window_hours?: number
@@ -1993,6 +2064,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          live_tracking_enabled?: boolean
+          live_tracking_interval_seconds?: number
+          live_tracking_stale_minutes?: number
+          live_tracking_retention_days?: number
           late_alerts_enabled?: boolean
           late_alert_after_minutes?: number
           late_alert_window_hours?: number
@@ -2165,6 +2240,28 @@ export type Database = {
       has_tenant_permission: {
         Args: { _perm: string; _tenant_id: string; _user_id: string }
         Returns: boolean
+      }
+      live_staff_positions: {
+        Args: { _tenant_id: string }
+        Returns: {
+          user_id: string
+          full_name: string | null
+          phone: string | null
+          is_field_staff: boolean
+          checked_in_at: string
+          latitude: number | null
+          longitude: number | null
+          accuracy_meters: number | null
+          recorded_at: string | null
+          age_seconds: number | null
+          is_sharing: boolean
+          is_stale: boolean
+          position_source: string
+        }[]
+      }
+      statutory_deductions: {
+        Args: { _tenant_id: string; _gross: number }
+        Returns: { pf: number; esi: number }[]
       }
       is_branch_manager: {
         Args: { _branch_id: string; _user_id: string }

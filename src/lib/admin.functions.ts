@@ -319,6 +319,10 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     default_monthly_working_days?: number | null;
     late_alerts_enabled?: boolean;
     late_alert_after_minutes?: number;
+    live_tracking_enabled?: boolean;
+    live_tracking_interval_seconds?: number;
+    live_tracking_stale_minutes?: number;
+    live_tracking_retention_days?: number;
     pf_enabled?: boolean;
     pf_employee_percent?: number;
     pf_wage_ceiling?: number | null;
@@ -382,6 +386,28 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
         throw new Error("Late alert delay must be between 0 and 240 minutes");
       }
       update.late_alert_after_minutes = v;
+    }
+
+    // ── Live location tracking ─────────────────────────────────────────────
+    if (data.live_tracking_enabled !== undefined) update.live_tracking_enabled = data.live_tracking_enabled;
+    // Each bound mirrors the column's CHECK constraint.
+    const intRange = (v: number, lo: number, hi: number, label: string) => {
+      if (!Number.isInteger(v) || v < lo || v > hi) {
+        throw new Error(`${label} must be between ${lo} and ${hi}`);
+      }
+      return v;
+    };
+    if (data.live_tracking_interval_seconds !== undefined) {
+      update.live_tracking_interval_seconds =
+        intRange(data.live_tracking_interval_seconds, 30, 600, "Reporting interval (seconds)");
+    }
+    if (data.live_tracking_stale_minutes !== undefined) {
+      update.live_tracking_stale_minutes =
+        intRange(data.live_tracking_stale_minutes, 2, 120, "Stale-after (minutes)");
+    }
+    if (data.live_tracking_retention_days !== undefined) {
+      update.live_tracking_retention_days =
+        intRange(data.live_tracking_retention_days, 1, 90, "Location history retention (days)");
     }
 
     // ── Statutory (PF / ESI) ───────────────────────────────────────────────

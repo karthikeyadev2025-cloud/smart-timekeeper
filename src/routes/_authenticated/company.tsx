@@ -32,7 +32,7 @@ function CompanyProfilePage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("tenants")
-        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent, partial_day_policy, default_monthly_working_days, late_alerts_enabled, late_alert_after_minutes, pf_enabled, pf_employee_percent, pf_wage_ceiling, esi_enabled, esi_employee_percent, esi_wage_threshold")
+        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent, partial_day_policy, default_monthly_working_days, late_alerts_enabled, late_alert_after_minutes, pf_enabled, pf_employee_percent, pf_wage_ceiling, esi_enabled, esi_employee_percent, esi_wage_threshold, live_tracking_enabled, live_tracking_interval_seconds, live_tracking_stale_minutes, live_tracking_retention_days")
         .eq("id", tenantId!)
         .maybeSingle();
       return data;
@@ -49,6 +49,10 @@ function CompanyProfilePage() {
   const [cardTemplate, setCardTemplate] = useState<"corporate" | "modern" | "compact" | "minimal" | "bold" | "formal" | "badge">("corporate");
   const [partialPolicy, setPartialPolicy] = useState<string>("full_day");
   const [lateAlerts, setLateAlerts] = useState(true);
+  const [trackOn, setTrackOn] = useState(false);
+  const [trackInterval, setTrackInterval] = useState("120");
+  const [trackStale, setTrackStale] = useState("10");
+  const [trackRetention, setTrackRetention] = useState("7");
   const [lateAfter, setLateAfter] = useState("2");
   const [pfOn, setPfOn] = useState(false);
   const [pfPct, setPfPct] = useState("12");
@@ -73,6 +77,10 @@ function CompanyProfilePage() {
     setExpectedDays(((tenant as any).default_monthly_working_days ?? "").toString());
     const t = tenant as any;
     setLateAlerts(t.late_alerts_enabled ?? true);
+    setTrackOn(t.live_tracking_enabled ?? false);
+    setTrackInterval(String(t.live_tracking_interval_seconds ?? 120));
+    setTrackStale(String(t.live_tracking_stale_minutes ?? 10));
+    setTrackRetention(String(t.live_tracking_retention_days ?? 7));
     setLateAfter(String(t.late_alert_after_minutes ?? 2));
     setPfOn(t.pf_enabled ?? false);
     setPfPct(String(t.pf_employee_percent ?? 12));
@@ -127,6 +135,10 @@ function CompanyProfilePage() {
           partial_day_policy: partialPolicy,
           default_monthly_working_days: expectedDays.trim() ? Number(expectedDays) : null,
           late_alerts_enabled: lateAlerts,
+          live_tracking_enabled: trackOn,
+          live_tracking_interval_seconds: Number(trackInterval) || 120,
+          live_tracking_stale_minutes: Number(trackStale) || 10,
+          live_tracking_retention_days: Number(trackRetention) || 7,
           late_alert_after_minutes: Number(lateAfter) || 0,
           pf_enabled: pfOn,
           pf_employee_percent: Number(pfPct) || 0,
@@ -281,6 +293,42 @@ function CompanyProfilePage() {
                 <Input type="number" min={0} max={240} value={lateAfter}
                   onChange={(e) => setLateAfter(e.target.value)} className="w-24" />
                 <span className="text-sm text-muted-foreground">minutes after grace period</span>
+              </div>
+            )}
+          </div>
+
+          {/* ─── Live location tracking ─── */}
+          <div className="space-y-2 border-t pt-5">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" checked={trackOn} onChange={(e) => setTrackOn(e.target.checked)}
+                className="h-4 w-4 rounded border-input" />
+              Track staff location while they are on duty
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Shows where on-duty staff are now on the live map, and lists anyone who has stopped
+              sharing. Positions are only reported between check-in and check-out, and only while
+              the app is open — closing the app stops it. Tell your staff you have turned this on.
+            </p>
+            {trackOn && (
+              <div className="grid gap-3 sm:grid-cols-3 pl-6 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-xs">Report every (seconds)</Label>
+                  <Input type="number" min={30} max={600} value={trackInterval}
+                    onChange={(e) => setTrackInterval(e.target.value)} />
+                  <p className="text-[11px] text-muted-foreground">Lower drains battery faster.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Stale after (minutes)</Label>
+                  <Input type="number" min={2} max={120} value={trackStale}
+                    onChange={(e) => setTrackStale(e.target.value)} />
+                  <p className="text-[11px] text-muted-foreground">Older than this counts as not sharing.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Keep history (days)</Label>
+                  <Input type="number" min={1} max={90} value={trackRetention}
+                    onChange={(e) => setTrackRetention(e.target.value)} />
+                  <p className="text-[11px] text-muted-foreground">Older positions are deleted nightly.</p>
+                </div>
               </div>
             )}
           </div>
