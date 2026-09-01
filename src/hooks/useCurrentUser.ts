@@ -18,6 +18,8 @@ export interface CurrentUserData {
     staff_id: string | null;
     branch_id: string | null;
     photo_locked: boolean | null;
+    pf_uan: string | null;
+    esi_number: string | null;
     signature_locked: boolean | null;
   } | null;
   roles: AppRole[];

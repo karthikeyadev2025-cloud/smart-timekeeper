@@ -183,6 +183,8 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
     emergency_contact_phone: staff.emergency_contact_phone ?? "",
     id_proof_type: staff.id_proof_type ?? "",
     id_proof_number: staff.id_proof_number ?? "",
+    pf_uan: staff.pf_uan ?? "",
+    esi_number: staff.esi_number ?? "",
   });
   const [saving, setSaving] = useState(false);
   const set = (k: string) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -208,6 +210,8 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
           emergency_contact_phone: form.emergency_contact_phone || null,
           id_proof_type: (form.id_proof_type || null) as any,
           id_proof_number: form.id_proof_number || null,
+          pf_uan: form.pf_uan.trim() || null,
+          esi_number: form.esi_number.trim() || null,
         },
       });
       toast.success("Profile updated");
@@ -236,6 +240,9 @@ function ProfileTab({ tenantId, staff, onSaved }: { tenantId: string; staff: any
           <div className="space-y-1"><Label>Designation</Label><Input value={form.designation} onChange={(e) => set("designation")(e.target.value)} /></div>
           <div className="space-y-1"><Label>Monthly salary (₹)</Label><Input type="number" min={0} value={form.monthly_salary} onChange={(e) => set("monthly_salary")(e.target.value)} /></div>
           <div className="space-y-1 col-span-2"><Label>Expected working days / month</Label><Input type="number" min={1} max={31} placeholder="Leave blank to use shift or company default" value={form.monthly_working_days} onChange={(e) => set("monthly_working_days")(e.target.value)} /><p className="text-[11px] text-muted-foreground">For rotating weekly offs. Payroll measures attendance against this number instead of guessing which dates were offs.</p></div>
+          {/* Printed on the payslip whenever a PF/ESI deduction is shown. */}
+          <div className="space-y-1"><Label>PF UAN</Label><Input value={form.pf_uan} onChange={(e) => set("pf_uan")(e.target.value)} placeholder="12-digit UAN" /></div>
+          <div className="space-y-1"><Label>ESI number</Label><Input value={form.esi_number} onChange={(e) => set("esi_number")(e.target.value)} placeholder="17-digit IP number" /></div>
           <div className="space-y-1 col-span-2">
             <Label>Phone (login number)</Label>
             <Input
@@ -451,7 +458,7 @@ function SalaryTab({ tenantId, staff, companyName }: { tenantId: string; staff: 
                   <TableCell>{statusBadge(p.payment_status)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => downloadPayslipPdf(p, { employeeName: staff.full_name ?? "Employee", companyName, staffId: staff.staff_id })}>
+                      <Button size="sm" variant="ghost" onClick={() => downloadPayslipPdf(p, { employeeName: staff.full_name ?? "Employee", companyName, staffId: staff.staff_id, pfUan: staff.pf_uan, esiNumber: staff.esi_number })}>
                         <Download className="h-4 w-4" />
                       </Button>
                       {balance > 0 && (

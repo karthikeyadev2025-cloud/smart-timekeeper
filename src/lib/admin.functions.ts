@@ -317,6 +317,14 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     id_card_accent?: string | null;
     partial_day_policy?: string | null;
     default_monthly_working_days?: number | null;
+    late_alerts_enabled?: boolean;
+    late_alert_after_minutes?: number;
+    pf_enabled?: boolean;
+    pf_employee_percent?: number;
+    pf_wage_ceiling?: number | null;
+    esi_enabled?: boolean;
+    esi_employee_percent?: number;
+    esi_wage_threshold?: number | null;
   }) => data)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -365,6 +373,46 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
       }
       update.partial_day_policy = data.partial_day_policy as Policy;
     }
+    if (data.late_alerts_enabled !== undefined) update.late_alerts_enabled = data.late_alerts_enabled;
+    if (data.late_alert_after_minutes !== undefined) {
+      const v = data.late_alert_after_minutes;
+      // Matches the CHECK constraint on the column; a clear message here beats
+      // a raw constraint violation.
+      if (!Number.isInteger(v) || v < 0 || v > 240) {
+        throw new Error("Late alert delay must be between 0 and 240 minutes");
+      }
+      update.late_alert_after_minutes = v;
+    }
+
+    // ── Statutory (PF / ESI) ───────────────────────────────────────────────
+    // These drive money coming out of an employee's pay, so every value is
+    // range-checked here rather than trusted from the client.
+    const pct = (v: number, label: string) => {
+      if (!Number.isFinite(v) || v < 0 || v > 100) {
+        throw new Error(`${label} must be between 0 and 100`);
+      }
+      return Math.round(v * 100) / 100;
+    };
+    const wage = (v: number | null, label: string) => {
+      if (v === null) return null;
+      if (!Number.isFinite(v) || v < 0) throw new Error(`${label} cannot be negative`);
+      return Math.round(v * 100) / 100;
+    };
+    if (data.pf_enabled !== undefined) update.pf_enabled = data.pf_enabled;
+    if (data.pf_employee_percent !== undefined) {
+      update.pf_employee_percent = pct(data.pf_employee_percent, "PF percentage");
+    }
+    if (data.pf_wage_ceiling !== undefined) {
+      update.pf_wage_ceiling = wage(data.pf_wage_ceiling, "PF wage ceiling");
+    }
+    if (data.esi_enabled !== undefined) update.esi_enabled = data.esi_enabled;
+    if (data.esi_employee_percent !== undefined) {
+      update.esi_employee_percent = pct(data.esi_employee_percent, "ESI percentage");
+    }
+    if (data.esi_wage_threshold !== undefined) {
+      update.esi_wage_threshold = wage(data.esi_wage_threshold, "ESI wage threshold");
+    }
+
     if (data.id_card_accent !== undefined) {
       // Basic hex validation. NULL clears it (falls back to the app's indigo).
       if (data.id_card_accent && !/^#[0-9a-fA-F]{6}$/.test(data.id_card_accent)) {

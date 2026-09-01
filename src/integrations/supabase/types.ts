@@ -816,6 +816,9 @@ export type Database = {
       }
       payslips: {
         Row: {
+          pf_deduction: number
+          esi_deduction: number
+          gross_earnings: number | null
           absent_days: number
           amount_paid: number
           base_salary: number
@@ -839,6 +842,9 @@ export type Database = {
           working_days: number
         }
         Insert: {
+          pf_deduction?: number
+          esi_deduction?: number
+          gross_earnings?: number | null
           absent_days?: number
           amount_paid?: number
           base_salary: number
@@ -862,6 +868,9 @@ export type Database = {
           working_days?: number
         }
         Update: {
+          pf_deduction?: number
+          esi_deduction?: number
+          gross_earnings?: number | null
           absent_days?: number
           amount_paid?: number
           base_salary?: number
@@ -1191,6 +1200,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          pf_uan: string | null
+          esi_number: string | null
           address: string | null
           avatar_url: string | null
           bank_account_holder: string | null
@@ -1227,6 +1238,8 @@ export type Database = {
           upi_id: string | null
         }
         Insert: {
+          pf_uan?: string | null
+          esi_number?: string | null
           address?: string | null
           avatar_url?: string | null
           bank_account_holder?: string | null
@@ -1263,6 +1276,8 @@ export type Database = {
           upi_id?: string | null
         }
         Update: {
+          pf_uan?: string | null
+          esi_number?: string | null
           address?: string | null
           avatar_url?: string | null
           bank_account_holder?: string | null
@@ -1924,6 +1939,15 @@ export type Database = {
       }
       tenants: {
         Row: {
+          late_alerts_enabled: boolean
+          late_alert_after_minutes: number
+          late_alert_window_hours: number
+          pf_enabled: boolean
+          pf_employee_percent: number
+          pf_wage_ceiling: number | null
+          esi_enabled: boolean
+          esi_employee_percent: number
+          esi_wage_threshold: number | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
@@ -1942,6 +1966,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          late_alerts_enabled?: boolean
+          late_alert_after_minutes?: number
+          late_alert_window_hours?: number
+          pf_enabled?: boolean
+          pf_employee_percent?: number
+          pf_wage_ceiling?: number | null
+          esi_enabled?: boolean
+          esi_employee_percent?: number
+          esi_wage_threshold?: number | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -1960,6 +1993,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          late_alerts_enabled?: boolean
+          late_alert_after_minutes?: number
+          late_alert_window_hours?: number
+          pf_enabled?: boolean
+          pf_employee_percent?: number
+          pf_wage_ceiling?: number | null
+          esi_enabled?: boolean
+          esi_employee_percent?: number
+          esi_wage_threshold?: number | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
