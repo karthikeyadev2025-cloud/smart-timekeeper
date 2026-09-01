@@ -1546,6 +1546,7 @@ export type Database = {
       }
       shifts: {
         Row: {
+          late_alerts_enabled: boolean
           branch_id: string | null
           break_minutes: number | null
           created_at: string
@@ -1563,6 +1564,7 @@ export type Database = {
           working_days: number[] | null
         }
         Insert: {
+          late_alerts_enabled?: boolean
           branch_id?: string | null
           break_minutes?: number | null
           created_at?: string
@@ -1580,6 +1582,7 @@ export type Database = {
           working_days?: number[] | null
         }
         Update: {
+          late_alerts_enabled?: boolean
           branch_id?: string | null
           break_minutes?: number | null
           created_at?: string

@@ -127,6 +127,14 @@ WITH checks(ord, feature, object, ok) AS (VALUES
   -- Location history is personal data; it must be opt-in.
   (43, 'Semantics', 'Live tracking defaults to OFF', pg_temp.chk(
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants WHERE live_tracking_enabled)$$)),
+  (26, 'Late alerts', 'shifts.late_alerts_enabled opt-out', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='shifts' AND column_name='late_alerts_enabled')$$)),
+  (27, 'Late alerts', 'job honours the per-shift opt-out', pg_temp.chk(
+     $$SELECT prosrc LIKE '%s.late_alerts_enabled%' FROM pg_proc p
+       JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='cron_notify_late_arrivals'$$)),
+
   (44, 'Semantics', 'Late-alert threshold within 0-240 min', pg_temp.chk(
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants
        WHERE late_alert_after_minutes < 0 OR late_alert_after_minutes > 240)$$))

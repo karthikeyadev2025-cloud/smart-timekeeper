@@ -26,6 +26,11 @@ const input = z.object({
   designation: z.string().trim().max(100).optional().default(""),
   monthly_salary: z.number().min(0).default(0),
   shift_id: z.string().uuid().optional().nullable(),
+  // Multi-branch split duty from the moment the person is created: several
+  // shifts, each carrying its own branch. updateStaff has accepted this for a
+  // while; not having it here forced a create-then-edit round trip, which is
+  // why the Add form looked like one-branch-per-person.
+  shift_ids: z.array(z.string().uuid()).optional(),
   branch_id: z.string().uuid().optional().nullable(),
   role: z.enum(["staff", "branch_manager"]).optional().default("staff"),
 });
@@ -84,12 +89,25 @@ export const createStaff = createServerFn({ method: "POST" })
       await supabaseAdmin.from("branches").update({ manager_id: newUserId }).eq("id", data.branch_id);
     }
 
-    if (data.shift_id) {
-      await supabaseAdmin.from("staff_shifts").insert({
-        tenant_id: data.tenant_id,
-        user_id: newUserId,
-        shift_id: data.shift_id,
-      });
+    // De-dupe for the same reason updateStaff does: the same shift twice
+    // double-counts the leg in /branch-schedule and in the missed-branch alert.
+    const shiftIds = Array.from(
+      new Set(
+        data.shift_ids?.length ? data.shift_ids : data.shift_id ? [data.shift_id] : [],
+      ),
+    );
+    if (shiftIds.length > 0) {
+      const { error: sErr } = await supabaseAdmin.from("staff_shifts").insert(
+        shiftIds.map((sid) => ({
+          tenant_id: data.tenant_id,
+          user_id: newUserId,
+          shift_id: sid,
+        })),
+      );
+      // The staff member already exists at this point, so a shift failure must
+      // be reported rather than swallowed — otherwise they are created with no
+      // schedule and nothing says so.
+      if (sErr) throw new Error(`Staff created, but shifts could not be assigned: ${sErr.message}`);
     }
 
     return { user_id: newUserId, phone: data.phone };
