@@ -39,7 +39,7 @@ function MySalary() {
                   <p className="text-sm opacity-90">Latest payslip · {latest.period_month}/{latest.period_year}</p>
                   <p className="mt-1 text-4xl font-bold">₹{Number(latest.net_pay).toLocaleString("en-IN")}</p>
                 </div>
-                <Button size="sm" variant="secondary" className="gap-2" onClick={() => downloadPayslipPdf(latest as any, { employeeName: user?.profile?.full_name ?? "Employee", employeeEmail: user?.profile?.email, companyName: user?.tenant?.name })}>
+                <Button size="sm" variant="secondary" className="gap-2" onClick={() => downloadPayslipPdf(latest as any, { employeeName: user?.profile?.full_name ?? "Employee", employeeEmail: user?.profile?.email, companyName: user?.tenant?.name, pfUan: user?.profile?.pf_uan, esiNumber: user?.profile?.esi_number })}>
                   <Download className="h-4 w-4" /> PDF
                 </Button>
               </div>
@@ -63,7 +63,7 @@ function MySalary() {
                   <TableCell className="text-destructive">-₹{Number(p.deductions).toFixed(0)}</TableCell>
                   <TableCell className="text-right font-bold">₹{Number(p.net_pay).toLocaleString("en-IN")}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadPayslipPdf(p as any, { employeeName: user?.profile?.full_name ?? "Employee", employeeEmail: user?.profile?.email, companyName: user?.tenant?.name })}>
+                    <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadPayslipPdf(p as any, { employeeName: user?.profile?.full_name ?? "Employee", employeeEmail: user?.profile?.email, companyName: user?.tenant?.name, pfUan: user?.profile?.pf_uan, esiNumber: user?.profile?.esi_number })}>
                       <Download className="h-4 w-4" /> PDF
                     </Button>
                   </TableCell>

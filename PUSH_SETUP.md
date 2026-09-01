@@ -4,6 +4,9 @@ The in-app bell + realtime updates work right now. To actually deliver
 notifications to phones that have the app closed, you need Firebase
 Cloud Messaging (FCM). This is a one-time setup.
 
+**The code is done.** What is missing is credentials — five environment
+variables. Nothing below requires a code change or an app re-install.
+
 ## What's already done in the app
 
 - ✅ Database tables: `notifications`, `push_subscriptions`
@@ -14,6 +17,10 @@ Cloud Messaging (FCM). This is a one-time setup.
 - ✅ Bell icon + dropdown in the AppShell header (realtime via Supabase)
 - ✅ `usePushSubscription` hook auto-registers tokens when users open the app
 - ✅ `@capacitor/push-notifications` plugin installed
+- ✅ Late-arrival alerts (every minute, per person, by name)
+- ✅ **The send path itself**: a delivery outbox on `notifications`, an FCM
+   HTTP v1 client, and `/api/push-dispatch` to drain the queue. It is deployed
+   and running; it just has no credentials yet, so it no-ops.
 
 ## What you need to do (for push to phones)
 
@@ -43,120 +50,129 @@ Cloud Messaging (FCM). This is a one-time setup.
    ```
 4. Commit + rebuild the APK (`gradlew assembleDebug`)
 
-### Part 3: Get the FCM server key (3 min)
+### Part 3: Create a service account (3 min)
 
-This is the secret your server uses to send pushes.
+The old "FCM server key" no longer exists — Google decommissioned the legacy
+API in 2024. The current API (HTTP v1) authenticates with a service account,
+which is what this app uses.
 
-1. Firebase Console → Project settings → **Cloud Messaging** tab
-2. Under "Cloud Messaging API (V1)" → click **Manage Service Accounts**
-3. In Google Cloud Console → IAM → Service Accounts →
-   find `firebase-adminsdk-...` → click it → Keys tab →
-   Add key → **Create new key** → JSON → download
-4. **DO NOT commit this JSON to git.** Store it in Vercel:
-   - Vercel → Settings → Environment Variables
-   - Add `FIREBASE_SERVICE_ACCOUNT` with the contents of the JSON file
-     pasted as a single line (or base64-encoded; either works)
+1. Firebase console → **Project settings → Service accounts**
+2. Click **Generate new private key** → confirm → a `.json` file downloads
+3. Open it. You need three values out of it:
 
-### Part 4: Create the Supabase Edge Function that sends pushes
+   | JSON field     | Environment variable    |
+   | -------------- | ----------------------- |
+   | `project_id`   | `FIREBASE_PROJECT_ID`   |
+   | `client_email` | `FIREBASE_CLIENT_EMAIL` |
+   | `private_key`  | `FIREBASE_PRIVATE_KEY`  |
 
-We send pushes from an Edge Function (not a server function) because we
-want fire-and-forget delivery that doesn't block trigger transactions.
+Keep that file out of the repository. It is a credential: anyone holding it
+can send notifications to every device that has your app installed.
 
-Create `supabase/functions/send-push/index.ts`:
+### Part 4: Set the environment variables (5 min)
 
-```typescript
-// supabase/functions/send-push/index.ts
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+In Vercel → your project → **Settings → Environment Variables**, add:
 
-// Trigger: invoked by a DB webhook on every INSERT to notifications.
-Deno.serve(async (req) => {
-  const { record } = await req.json();
-  if (!record?.user_id) return new Response("no user_id", { status: 400 });
+```
+FIREBASE_PROJECT_ID        = punchly-1234
+FIREBASE_CLIENT_EMAIL      = firebase-adminsdk-xxxxx@punchly-1234.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY       = -----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n
+PUSH_DISPATCH_SECRET       = <any long random string you invent>
+SUPABASE_SERVICE_ROLE_KEY  = <Supabase → Settings → API → service_role>
+```
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+Notes:
 
-  // Get this user's push tokens
-  const { data: subs } = await supabase
-    .from("push_subscriptions")
-    .select("endpoint, platform")
-    .eq("user_id", record.user_id);
+- Paste `FIREBASE_PRIVATE_KEY` exactly as it appears in the JSON, `\n`
+  escapes and all. The code un-escapes them, because most dashboards mangle
+  real newlines.
+- `PUSH_DISPATCH_SECRET` is yours to invent. It is the only thing stopping a
+  stranger from triggering your push dispatcher. Generate one with
+  `openssl rand -hex 32`.
+- The service role key bypasses every row-level security policy. It belongs in
+  server environment variables only — never in the app bundle, never in a
+  `VITE_`-prefixed variable.
 
-  if (!subs || subs.length === 0) return new Response("no subs", { status: 200 });
+**Check it worked** — visit `https://punchly.online/api/push-dispatch` in a
+browser. It reports what is still missing:
 
-  // Get a Google access token from the service account
-  const sa = JSON.parse(Deno.env.get("FIREBASE_SERVICE_ACCOUNT")!);
-  const accessToken = await getGoogleAccessToken(sa);
+```json
+{ "status": "ok", "fcm_configured": true, "missing": [] }
+```
 
-  // Send to each device
-  await Promise.all(subs.map(async (s) => {
-    if (s.platform === "android" || s.platform === "ios") {
-      await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: {
-            token: s.endpoint,
-            notification: { title: record.title, body: record.body },
-            data: { action_url: record.action_url ?? "/" },
-          },
-        }),
-      });
-    }
-  }));
+### Part 5: Schedule the dispatcher (2 min)
 
-  return new Response("ok", { status: 200 });
-});
+Something has to call the dispatcher on a schedule. Add to `vercel.json`:
 
-async function getGoogleAccessToken(sa: any): Promise<string> {
-  // JWT signing with sa.private_key — use jose or implement manually
-  // ... (standard Google service-account auth flow — there are many examples online)
-  throw new Error("TODO: implement Google service account JWT signing");
+```json
+{
+  "crons": [{ "path": "/api/push-dispatch", "schedule": "* * * * *" }]
 }
 ```
 
-Deploy:
-```bash
-npx supabase functions deploy send-push
-```
-
-### Part 5: Wire the trigger
-
-In Supabase SQL Editor:
+Vercel Cron sends a GET, which is the health check, so for the actual send you
+need the POST. If your plan's cron cannot set an Authorization header, call it
+from Supabase instead — SQL editor, once:
 
 ```sql
--- Tell Postgres to call the Edge Function every time a notification is inserted
-CREATE EXTENSION IF NOT EXISTS http;
-
-CREATE OR REPLACE FUNCTION public.tg_notification_send_push() RETURNS TRIGGER
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  PERFORM net.http_post(
-    'https://<your-project>.functions.supabase.co/send-push',
-    json_build_object('record', row_to_json(NEW))::text,
-    'application/json',
-    ARRAY[net.http_header('Authorization', 'Bearer ' || current_setting('app.service_role_key', true))]
+SELECT cron.schedule('dispatch_push', '* * * * *', $$
+  SELECT net.http_post(
+    url     := 'https://punchly.online/api/push-dispatch',
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer ' || current_setting('app.push_dispatch_secret', true)
+    ),
+    body    := '{}'::jsonb
   );
-  RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_notification_send_push
-AFTER INSERT ON public.notifications
-FOR EACH ROW EXECUTE FUNCTION public.tg_notification_send_push();
+$$);
 ```
 
-After this, every row inserted into `notifications` triggers a push send to
-all of that user's registered devices.
+...having first stored the secret so it is not written into the job body:
+
+```sql
+ALTER DATABASE postgres SET app.push_dispatch_secret = 'the-same-value-as-vercel';
+```
+
+## How delivery works
+
+`notify()` writes a row to `notifications` with `push_state = 'queued'`. The
+dispatcher claims a batch, sends to each of that user's registered devices,
+and records the result:
+
+| `push_state` | Meaning                                                        |
+| ------------ | -------------------------------------------------------------- |
+| `queued`     | Waiting for the dispatcher, or a transient failure to be retried |
+| `sent`       | FCM accepted it for at least one device                          |
+| `skipped`    | No registered device — nothing to send to, and no retry helps    |
+| `failed`     | Rejected 5 times; `push_last_error` says why                     |
+
+Properties worth knowing:
+
+- **Nothing is delivered twice.** Claiming uses `FOR UPDATE SKIP LOCKED`, so
+  two overlapping runs cannot pick up the same row.
+- **Retries are bounded.** Five attempts, then `failed`. A permanently broken
+  notification stops occupying the queue.
+- **Stale news is dropped.** A notification older than a day is never pushed —
+  nobody needs yesterday's "you are late" at midnight.
+- **Dead tokens retire themselves.** When FCM says a token is unregistered,
+  that device row is disabled rather than deleted, so you can still see why it
+  stopped receiving.
+- **Before the credentials are set**, the dispatcher no-ops and leaves rows
+  queued rather than burning their retries. When you finish the setup above,
+  the backlog delivers itself.
+
+To watch it:
+
+```sql
+SELECT push_state, count(*) FROM public.notifications GROUP BY 1;
+SELECT title, push_attempts, push_last_error FROM public.notifications
+ WHERE push_state = 'failed' ORDER BY created_at DESC LIMIT 20;
+```
 
 ## Timeline
 
-1. **Today / day 1**: in-app bell works. Push tokens being collected.
-2. **When you have a free hour**: complete the Firebase setup above.
-3. **As soon as Part 5 ships**: all existing users with the app installed
-   start getting real push notifications, no re-install needed.
-
-The order matters — start collecting tokens first so when you flip the
-delivery switch, everyone is enrolled retroactively.
+1. **Today**: in-app bell works, push tokens are being collected, and the
+   delivery path is deployed and idle.
+2. **When you have a free hour**: Parts 1-5 above.
+3. **The moment the variables are set**: every enrolled device starts
+   receiving. No app re-install, no code change, no redeploy of the app.

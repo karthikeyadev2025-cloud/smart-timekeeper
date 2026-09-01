@@ -39,12 +39,40 @@ const mockIcon = L.divIcon({
   iconSize: [26, 26],
   iconAnchor: [13, 13],
 });
+// A live position is a pulsing dot so it reads as "now" at a glance; a stale
+// one is flat grey so it never gets mistaken for a current location.
+const liveIcon = L.divIcon({
+  className: "punchly-pin",
+  html: '<div style="position:relative;width:22px;height:22px;">'
+    + '<div style="position:absolute;inset:0;border-radius:50%;background:#2563eb;opacity:.35;animation:punchly-ping 1.8s cubic-bezier(0,0,.2,1) infinite;"></div>'
+    + '<div style="position:absolute;left:5px;top:5px;width:12px;height:12px;border-radius:50%;background:#2563eb;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.35);"></div>'
+    + '</div>',
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+});
+const staleIcon = L.divIcon({
+  className: "punchly-pin",
+  html: '<div style="width:14px;height:14px;border-radius:50%;background:#94a3b8;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3);opacity:.85;"></div>',
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
 const officeIcon = L.divIcon({
   className: "punchly-pin",
   html: '<div style="background:#4f46e5;border:2px solid white;width:18px;height:18px;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.3);"></div>',
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 });
+
+/** "just now" / "4 min ago" / "2 hr ago" — short enough for a map popup. */
+function formatAge(seconds: number | null | undefined): string {
+  if (seconds == null) return "unknown";
+  if (seconds < 60) return "just now";
+  const mins = Math.floor(seconds / 60);
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr ${mins % 60} min ago`;
+  return `${Math.floor(hrs / 24)} day(s) ago`;
+}
 
 function LiveMapPage() {
   const { data: user } = useCurrentUser();
@@ -66,6 +94,41 @@ function LiveMapPage() {
       return data ?? [];
     },
   });
+
+  // Tracking config drives the refresh cadence: polling faster than devices
+  // report just re-renders the same positions.
+  const { data: trackingConfig } = useQuery({
+    queryKey: ["live-tracking-config", tenantId],
+    enabled: !!tenantId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("tenants")
+        .select("live_tracking_enabled, live_tracking_interval_seconds, live_tracking_stale_minutes")
+        .eq("id", tenantId!)
+        .single();
+      return data;
+    },
+  });
+
+  const trackingOn = !!trackingConfig?.live_tracking_enabled;
+  const pollMs = Math.max(15, Math.round((trackingConfig?.live_tracking_interval_seconds ?? 120) / 2)) * 1000;
+
+  const { data: livePositions, refetch: refetchLive, dataUpdatedAt } = useQuery({
+    queryKey: ["live-positions", tenantId],
+    enabled: !!tenantId && trackingOn,
+    // Half the device reporting interval, so a new ping shows up promptly
+    // without hammering the database between reports.
+    refetchInterval: pollMs,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("live_staff_positions", { _tenant_id: tenantId! });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const sharing = (livePositions ?? []).filter((r: any) => r.is_sharing);
+  const notSharing = (livePositions ?? []).filter((r: any) => !r.is_sharing);
 
   const { data: offices } = useQuery({
     queryKey: ["office-locations-map", tenantId],
@@ -103,9 +166,18 @@ function LiveMapPage() {
         <header className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Live staff map</h1>
-            <p className="text-muted-foreground">Today's attendance with GPS — auto-refreshes every 30s.</p>
+            <p className="text-muted-foreground">
+              {trackingOn
+                ? `Live positions for staff on duty, refreshed every ${Math.round(pollMs / 1000)}s, plus today's punches.`
+                : "Today's attendance with GPS. Turn on live tracking in Company profile to see where on-duty staff are now."}
+            </p>
+            {trackingOn && dataUpdatedAt > 0 && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Last updated {new Date(dataUpdatedAt).toLocaleTimeString()}
+              </p>
+            )}
           </div>
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => { refetch(); refetchLive(); }} disabled={isFetching} className="gap-2">
             <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} /> Refresh
           </Button>
         </header>
@@ -154,14 +226,104 @@ function LiveMapPage() {
                 </Marker>
               );
             })}
+            {/* Live positions, drawn last so a current dot sits above the
+                morning's punch pin for the same person. */}
+            {trackingOn && (livePositions ?? [])
+              .filter((r: any) => r.latitude != null && r.longitude != null)
+              .map((r: any) => (
+                <Marker
+                  key={`live-${r.user_id}`}
+                  position={[Number(r.latitude), Number(r.longitude)]}
+                  icon={r.is_sharing ? liveIcon : staleIcon}
+                >
+                  <Popup>
+                    <strong>{r.full_name ?? "Unknown"}</strong><br/>
+                    {r.is_sharing
+                      ? `Live · ${formatAge(r.age_seconds)}`
+                      : r.recorded_at
+                        ? `Last seen ${formatAge(r.age_seconds)} — not sharing now`
+                        : "Never shared today — showing check-in location"}
+                    <br/>
+                    {r.accuracy_meters != null && <>Accuracy ±{Math.round(Number(r.accuracy_meters))}m<br/></>}
+                    {r.phone ?? "—"}
+                  </Popup>
+                </Marker>
+              ))}
           </MapContainer>
           <div className="flex flex-wrap gap-3 border-t bg-muted/30 p-3 text-xs">
             <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-full bg-emerald-500" /> Check-in</span>
             <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-full bg-indigo-500" /> Check-out</span>
             <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-full bg-red-500" /> Mock GPS</span>
             <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 bg-indigo-600" /> Office (with geofence)</span>
+            {trackingOn && <>
+              <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-full bg-blue-600" /> Live position</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-full bg-slate-400" /> Last known (not sharing)</span>
+            </>}
           </div>
         </Card>
+
+        {/* ─── On duty right now ─── */}
+        {trackingOn && (livePositions ?? []).length > 0 && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="p-4">
+              <h2 className="mb-3 flex items-center gap-2 font-semibold">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600" />
+                Sharing location ({sharing.length})
+              </h2>
+              {sharing.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nobody is reporting a position right now.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {sharing.map((r: any) => (
+                    <li key={r.user_id} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-medium">{r.full_name ?? "Unknown"}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatAge(r.age_seconds)}
+                        {r.accuracy_meters != null && ` · ±${Math.round(Number(r.accuracy_meters))}m`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            {/* This is the panel that answers "can I see staff who turned
+                location off?" — they are on duty but nothing is coming in. */}
+            <Card className="p-4">
+              <h2 className="mb-1 flex items-center gap-2 font-semibold">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-400" />
+                On duty but not sharing ({notSharing.length})
+              </h2>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Checked in and not checked out, but no recent position. Usually location
+                permission is off, or the app is closed.
+              </p>
+              {notSharing.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Everyone on duty is sharing their location.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {notSharing.map((r: any) => (
+                    <li key={r.user_id} className="flex items-center justify-between gap-3 text-sm">
+                      <div>
+                        <span className="font-medium">{r.full_name ?? "Unknown"}</span>
+                        {r.phone && <span className="ml-2 text-xs text-muted-foreground">{r.phone}</span>}
+                      </div>
+                      <span className="text-right text-xs text-muted-foreground">
+                        {r.recorded_at
+                          ? `Last seen ${formatAge(r.age_seconds)}`
+                          : "Never shared today"}
+                        <br/>
+                        <span className="opacity-70">
+                          On duty since {new Date(r.checked_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+        )}
 
         {/* List */}
         <div className="grid gap-3">

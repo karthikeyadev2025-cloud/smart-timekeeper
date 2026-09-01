@@ -816,6 +816,9 @@ export type Database = {
       }
       payslips: {
         Row: {
+          pf_deduction: number
+          esi_deduction: number
+          gross_earnings: number | null
           absent_days: number
           amount_paid: number
           base_salary: number
@@ -839,6 +842,9 @@ export type Database = {
           working_days: number
         }
         Insert: {
+          pf_deduction?: number
+          esi_deduction?: number
+          gross_earnings?: number | null
           absent_days?: number
           amount_paid?: number
           base_salary: number
@@ -862,6 +868,9 @@ export type Database = {
           working_days?: number
         }
         Update: {
+          pf_deduction?: number
+          esi_deduction?: number
+          gross_earnings?: number | null
           absent_days?: number
           amount_paid?: number
           base_salary?: number
@@ -1191,6 +1200,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          pf_uan: string | null
+          esi_number: string | null
           address: string | null
           avatar_url: string | null
           bank_account_holder: string | null
@@ -1227,6 +1238,8 @@ export type Database = {
           upi_id: string | null
         }
         Insert: {
+          pf_uan?: string | null
+          esi_number?: string | null
           address?: string | null
           avatar_url?: string | null
           bank_account_holder?: string | null
@@ -1263,6 +1276,8 @@ export type Database = {
           upi_id?: string | null
         }
         Update: {
+          pf_uan?: string | null
+          esi_number?: string | null
           address?: string | null
           avatar_url?: string | null
           bank_account_holder?: string | null
@@ -1922,8 +1937,84 @@ export type Database = {
           },
         ]
       }
+      location_pings: {
+        Row: {
+          id: number
+          tenant_id: string
+          user_id: string
+          latitude: number
+          longitude: number
+          accuracy_meters: number | null
+          is_mock_location: boolean
+          battery_level: number | null
+          recorded_at: string
+        }
+        Insert: {
+          id?: number
+          tenant_id: string
+          user_id: string
+          latitude: number
+          longitude: number
+          accuracy_meters?: number | null
+          is_mock_location?: boolean
+          battery_level?: number | null
+          recorded_at?: string
+        }
+        Update: {
+          id?: number
+          tenant_id?: string
+          user_id?: string
+          latitude?: number
+          longitude?: number
+          accuracy_meters?: number | null
+          is_mock_location?: boolean
+          battery_level?: number | null
+          recorded_at?: string
+        }
+        Relationships: []
+      }
+      late_alerts: {
+        Row: {
+          tenant_id: string
+          user_id: string
+          shift_id: string | null
+          attendance_date: string
+          minutes_late: number
+          created_at: string
+        }
+        Insert: {
+          tenant_id: string
+          user_id: string
+          shift_id?: string | null
+          attendance_date: string
+          minutes_late: number
+          created_at?: string
+        }
+        Update: {
+          tenant_id?: string
+          user_id?: string
+          shift_id?: string | null
+          attendance_date?: string
+          minutes_late?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       tenants: {
         Row: {
+          live_tracking_enabled: boolean
+          live_tracking_interval_seconds: number
+          live_tracking_stale_minutes: number
+          live_tracking_retention_days: number
+          late_alerts_enabled: boolean
+          late_alert_after_minutes: number
+          late_alert_window_hours: number
+          pf_enabled: boolean
+          pf_employee_percent: number
+          pf_wage_ceiling: number | null
+          esi_enabled: boolean
+          esi_employee_percent: number
+          esi_wage_threshold: number | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
@@ -1942,6 +2033,19 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          live_tracking_enabled?: boolean
+          live_tracking_interval_seconds?: number
+          live_tracking_stale_minutes?: number
+          live_tracking_retention_days?: number
+          late_alerts_enabled?: boolean
+          late_alert_after_minutes?: number
+          late_alert_window_hours?: number
+          pf_enabled?: boolean
+          pf_employee_percent?: number
+          pf_wage_ceiling?: number | null
+          esi_enabled?: boolean
+          esi_employee_percent?: number
+          esi_wage_threshold?: number | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -1960,6 +2064,19 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          live_tracking_enabled?: boolean
+          live_tracking_interval_seconds?: number
+          live_tracking_stale_minutes?: number
+          live_tracking_retention_days?: number
+          late_alerts_enabled?: boolean
+          late_alert_after_minutes?: number
+          late_alert_window_hours?: number
+          pf_enabled?: boolean
+          pf_employee_percent?: number
+          pf_wage_ceiling?: number | null
+          esi_enabled?: boolean
+          esi_employee_percent?: number
+          esi_wage_threshold?: number | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -2123,6 +2240,51 @@ export type Database = {
       has_tenant_permission: {
         Args: { _perm: string; _tenant_id: string; _user_id: string }
         Returns: boolean
+      }
+      claim_push_batch: {
+        Args: { _limit?: number }
+        Returns: {
+          notification_id: string
+          user_id: string
+          title: string
+          body: string
+          action_url: string | null
+          kind: string | null
+          attempts: number
+          tokens: { id: string; token: string; platform: string }[]
+        }[]
+      }
+      settle_push: {
+        Args: {
+          _sent?: string[]
+          _skipped?: string[]
+          _failed?: { id: string; error: string }[]
+          _dead_tokens?: string[]
+          _max_attempts?: number
+        }
+        Returns: undefined
+      }
+      live_staff_positions: {
+        Args: { _tenant_id: string }
+        Returns: {
+          user_id: string
+          full_name: string | null
+          phone: string | null
+          is_field_staff: boolean
+          checked_in_at: string
+          latitude: number | null
+          longitude: number | null
+          accuracy_meters: number | null
+          recorded_at: string | null
+          age_seconds: number | null
+          is_sharing: boolean
+          is_stale: boolean
+          position_source: string
+        }[]
+      }
+      statutory_deductions: {
+        Args: { _tenant_id: string; _gross: number }
+        Returns: { pf: number; esi: number }[]
       }
       is_branch_manager: {
         Args: { _branch_id: string; _user_id: string }

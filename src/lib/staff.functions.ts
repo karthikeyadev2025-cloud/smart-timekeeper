@@ -125,6 +125,8 @@ const updateInput = z.object({
   emergency_contact_phone: z.string().trim().max(20).nullable().optional(),
   id_proof_type: z.enum(["aadhaar", "pan", "voter_id", "driving_license", "other"]).nullable().optional(),
   id_proof_number: z.string().trim().max(50).nullable().optional(),
+  pf_uan: z.string().trim().max(20).nullable().optional(),
+  esi_number: z.string().trim().max(20).nullable().optional(),
   // Bank / account details for salary payment
   bank_account_holder: z.string().trim().max(100).nullable().optional(),
   bank_account_number: z.string().trim().max(30).nullable().optional(),
@@ -202,6 +204,8 @@ export const updateStaff = createServerFn({ method: "POST" })
     if (data.emergency_contact_phone !== undefined) profileUpdate.emergency_contact_phone = data.emergency_contact_phone || null;
     if (data.id_proof_type !== undefined) profileUpdate.id_proof_type = data.id_proof_type;
     if (data.id_proof_number !== undefined) profileUpdate.id_proof_number = data.id_proof_number || null;
+    if (data.pf_uan !== undefined) profileUpdate.pf_uan = data.pf_uan || null;
+    if (data.esi_number !== undefined) profileUpdate.esi_number = data.esi_number || null;
     if (data.bank_account_holder !== undefined) profileUpdate.bank_account_holder = data.bank_account_holder || null;
     if (data.bank_account_number !== undefined) profileUpdate.bank_account_number = data.bank_account_number || null;
     if (data.bank_ifsc !== undefined) profileUpdate.bank_ifsc = data.bank_ifsc ? data.bank_ifsc.toUpperCase() : null;

@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { useLiveLocationBroadcast } from "@/hooks/useLiveLocationBroadcast";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -12,5 +13,16 @@ export const Route = createFileRoute("/_authenticated")({
     if (error || !data.user) throw redirect({ to: "/auth" });
     return { user: data.user };
   },
-  component: () => <Outlet />,
+  component: AuthenticatedShell,
 });
+
+/**
+ * Mounted once for the whole authenticated area rather than per page, so a
+ * staff member's position keeps reporting as they move between screens. The
+ * hook is inert unless the company has enabled tracking and the person is
+ * currently on duty.
+ */
+function AuthenticatedShell() {
+  useLiveLocationBroadcast();
+  return <Outlet />;
+}

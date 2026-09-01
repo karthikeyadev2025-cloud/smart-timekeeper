@@ -222,3 +222,18 @@
 @media (prefers-reduced-motion: reduce) {
   .plaque-sheen { animation: none; opacity: 0; }
 }
+
+/* Live-map "current position" dot. The ring expands and fades so a live
+   position is distinguishable from a static punch pin at a glance. */
+@keyframes punchly-ping {
+  0%   { transform: scale(0.6); opacity: 0.5; }
+  80%  { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Hold a steady ring instead of pulsing — the dot still reads as "live"
+     through colour and the age label, without motion. */
+  @keyframes punchly-ping {
+    0%, 100% { transform: scale(1.4); opacity: 0.35; }
+  }
+}

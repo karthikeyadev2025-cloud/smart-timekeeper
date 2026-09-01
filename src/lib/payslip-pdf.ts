@@ -15,6 +15,9 @@ export type PayslipPdfData = {
   deductions: number | string;
   late_days?: number | string;
   late_fine?: number | string;
+  pf_deduction?: number | string;
+  esi_deduction?: number | string;
+  gross_earnings?: number | string;
   net_pay: number | string;
   generated_at?: string;
 };
@@ -24,6 +27,8 @@ export type PayslipContext = {
   employeeEmail?: string | null;
   companyName?: string | null;
   staffId?: string | null;
+  pfUan?: string | null;
+  esiNumber?: string | null;
 };
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -52,6 +57,13 @@ export function downloadPayslipPdf(payslip: PayslipPdfData, ctx: PayslipContext)
   y += 24;
   doc.text(`Employee: ${ctx.employeeName}${ctx.staffId ? `  (${ctx.staffId})` : ""}`, 40, y);
   if (ctx.employeeEmail) { y += 14; doc.text(`Email: ${ctx.employeeEmail}`, 40, y); }
+  // A payslip carrying a PF deduction is expected to show the UAN it was paid
+  // against; same for the ESI insurance number.
+  const ids = [
+    ctx.pfUan ? `UAN: ${ctx.pfUan}` : null,
+    ctx.esiNumber ? `ESI No: ${ctx.esiNumber}` : null,
+  ].filter(Boolean);
+  if (ids.length) { y += 14; doc.text(ids.join("   "), 40, y); }
   y += 14;
   doc.text(`Generated: ${new Date(payslip.generated_at ?? Date.now()).toLocaleDateString("en-IN")}`, 40, y);
 
@@ -87,9 +99,27 @@ export function downloadPayslipPdf(payslip: PayslipPdfData, ctx: PayslipContext)
   };
   row("Base salary", inr(payslip.base_salary));
   row("Overtime hours", String(payslip.overtime_hours));
+
   const lateFine = Number(payslip.late_fine ?? 0);
-  const absenceOnly = Number(payslip.deductions) - lateFine;
+  const pf = Number(payslip.pf_deduction ?? 0);
+  const esi = Number(payslip.esi_deduction ?? 0);
+  // `deductions` is the total. Everything itemised below it has to come out to
+  // leave the absence figure — forgetting PF and ESI here would silently
+  // inflate the "unpaid leave / absences" line by the statutory amount.
+  const absenceOnly = Number(payslip.deductions) - lateFine - pf - esi;
   row("Deductions (unpaid leave / absences)", "- " + inr(absenceOnly));
+
+  // Gross is the wage PF and ESI were calculated on. Shown only when there is
+  // a statutory deduction, so payslips for employers not registered for either
+  // scheme look exactly as they did before.
+  if (pf > 0 || esi > 0) {
+    const gross = payslip.gross_earnings ?? Number(payslip.base_salary) - absenceOnly;
+    doc.setDrawColor(235); doc.line(56, y - 14, W - 56, y - 14);
+    row("Gross earnings", inr(gross), true);
+    if (pf > 0) row("Provident Fund (employee share)", "- " + inr(pf));
+    if (esi > 0) row("ESI (employee share)", "- " + inr(esi));
+  }
+
   if (lateFine > 0) {
     row(`Late check-in fine (${payslip.late_days ?? 0} day${Number(payslip.late_days ?? 0) === 1 ? "" : "s"})`, "- " + inr(lateFine));
   }

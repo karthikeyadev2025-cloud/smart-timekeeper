@@ -32,7 +32,7 @@ function CompanyProfilePage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("tenants")
-        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent, partial_day_policy, default_monthly_working_days")
+        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent, partial_day_policy, default_monthly_working_days, late_alerts_enabled, late_alert_after_minutes, pf_enabled, pf_employee_percent, pf_wage_ceiling, esi_enabled, esi_employee_percent, esi_wage_threshold, live_tracking_enabled, live_tracking_interval_seconds, live_tracking_stale_minutes, live_tracking_retention_days")
         .eq("id", tenantId!)
         .maybeSingle();
       return data;
@@ -48,6 +48,18 @@ function CompanyProfilePage() {
   const [saving, setSaving] = useState(false);
   const [cardTemplate, setCardTemplate] = useState<"corporate" | "modern" | "compact" | "minimal" | "bold" | "formal" | "badge">("corporate");
   const [partialPolicy, setPartialPolicy] = useState<string>("full_day");
+  const [lateAlerts, setLateAlerts] = useState(true);
+  const [trackOn, setTrackOn] = useState(false);
+  const [trackInterval, setTrackInterval] = useState("120");
+  const [trackStale, setTrackStale] = useState("10");
+  const [trackRetention, setTrackRetention] = useState("7");
+  const [lateAfter, setLateAfter] = useState("2");
+  const [pfOn, setPfOn] = useState(false);
+  const [pfPct, setPfPct] = useState("12");
+  const [pfCeiling, setPfCeiling] = useState("15000");
+  const [esiOn, setEsiOn] = useState(false);
+  const [esiPct, setEsiPct] = useState("0.75");
+  const [esiThreshold, setEsiThreshold] = useState("21000");
   const [expectedDays, setExpectedDays] = useState<string>("");
   const [cardAccent, setCardAccent] = useState<string>("#4F46E5");
 
@@ -63,6 +75,20 @@ function CompanyProfilePage() {
     setCardAccent((tenant as any).id_card_accent ?? "#4F46E5");
     setPartialPolicy((tenant as any).partial_day_policy ?? "full_day");
     setExpectedDays(((tenant as any).default_monthly_working_days ?? "").toString());
+    const t = tenant as any;
+    setLateAlerts(t.late_alerts_enabled ?? true);
+    setTrackOn(t.live_tracking_enabled ?? false);
+    setTrackInterval(String(t.live_tracking_interval_seconds ?? 120));
+    setTrackStale(String(t.live_tracking_stale_minutes ?? 10));
+    setTrackRetention(String(t.live_tracking_retention_days ?? 7));
+    setLateAfter(String(t.late_alert_after_minutes ?? 2));
+    setPfOn(t.pf_enabled ?? false);
+    setPfPct(String(t.pf_employee_percent ?? 12));
+    // Empty input means "no ceiling", so a null must not become the string "null".
+    setPfCeiling(t.pf_wage_ceiling == null ? "" : String(t.pf_wage_ceiling));
+    setEsiOn(t.esi_enabled ?? false);
+    setEsiPct(String(t.esi_employee_percent ?? 0.75));
+    setEsiThreshold(t.esi_wage_threshold == null ? "" : String(t.esi_wage_threshold));
   }, [tenant]);
 
   if (!tenantId) {
@@ -108,6 +134,19 @@ function CompanyProfilePage() {
           id_card_accent: cardAccent || null,
           partial_day_policy: partialPolicy,
           default_monthly_working_days: expectedDays.trim() ? Number(expectedDays) : null,
+          late_alerts_enabled: lateAlerts,
+          live_tracking_enabled: trackOn,
+          live_tracking_interval_seconds: Number(trackInterval) || 120,
+          live_tracking_stale_minutes: Number(trackStale) || 10,
+          live_tracking_retention_days: Number(trackRetention) || 7,
+          late_alert_after_minutes: Number(lateAfter) || 0,
+          pf_enabled: pfOn,
+          pf_employee_percent: Number(pfPct) || 0,
+          // Blank = no ceiling, deduct on the whole wage.
+          pf_wage_ceiling: pfCeiling.trim() ? Number(pfCeiling) : null,
+          esi_enabled: esiOn,
+          esi_employee_percent: Number(esiPct) || 0,
+          esi_wage_threshold: esiThreshold.trim() ? Number(esiThreshold) : null,
         },
       });
       toast.success("Company profile updated");
@@ -236,6 +275,124 @@ function CompanyProfilePage() {
               <option value="half_day">Pay half day</option>
               <option value="absent">Treat the day as absent</option>
             </select>
+          </div>
+
+          {/* ─── Late arrival alerts ─── */}
+          <div className="space-y-2 border-t pt-5">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" checked={lateAlerts} onChange={(e) => setLateAlerts(e.target.checked)}
+                className="h-4 w-4 rounded border-input" />
+              Alert me when a staff member is late
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Sends you a notification naming the person, minutes after their shift start and grace
+              period have passed. A low number is noisy — anyone caught in traffic will trigger it.
+            </p>
+            {lateAlerts && (
+              <div className="flex items-center gap-2">
+                <Input type="number" min={0} max={240} value={lateAfter}
+                  onChange={(e) => setLateAfter(e.target.value)} className="w-24" />
+                <span className="text-sm text-muted-foreground">minutes after grace period</span>
+              </div>
+            )}
+          </div>
+
+          {/* ─── Live location tracking ─── */}
+          <div className="space-y-2 border-t pt-5">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" checked={trackOn} onChange={(e) => setTrackOn(e.target.checked)}
+                className="h-4 w-4 rounded border-input" />
+              Track staff location while they are on duty
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Shows where on-duty staff are now on the live map, and lists anyone who has stopped
+              sharing. Positions are only reported between check-in and check-out, and only while
+              the app is open — closing the app stops it. Tell your staff you have turned this on.
+            </p>
+            {trackOn && (
+              <div className="grid gap-3 sm:grid-cols-3 pl-6 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-xs">Report every (seconds)</Label>
+                  <Input type="number" min={30} max={600} value={trackInterval}
+                    onChange={(e) => setTrackInterval(e.target.value)} />
+                  <p className="text-[11px] text-muted-foreground">Lower drains battery faster.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Stale after (minutes)</Label>
+                  <Input type="number" min={2} max={120} value={trackStale}
+                    onChange={(e) => setTrackStale(e.target.value)} />
+                  <p className="text-[11px] text-muted-foreground">Older than this counts as not sharing.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Keep history (days)</Label>
+                  <Input type="number" min={1} max={90} value={trackRetention}
+                    onChange={(e) => setTrackRetention(e.target.value)} />
+                  <p className="text-[11px] text-muted-foreground">Older positions are deleted nightly.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ─── Statutory deductions ─── */}
+          <div className="space-y-4 border-t pt-5">
+            <div>
+              <Label className="text-base">Statutory deductions (PF &amp; ESI)</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Turn these on only if you are registered for the scheme. They appear as separate
+                lines on every payslip generated afterwards. Check the rates against your own
+                registration — the defaults are the common values, not advice.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" checked={pfOn} onChange={(e) => setPfOn(e.target.checked)}
+                  className="h-4 w-4 rounded border-input" />
+                Deduct Provident Fund (PF)
+              </label>
+              {pfOn && (
+                <div className="grid gap-3 sm:grid-cols-2 pl-6">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Employee share (%)</Label>
+                    <Input type="number" min={0} max={100} step="0.01" value={pfPct}
+                      onChange={(e) => setPfPct(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Wage ceiling (₹)</Label>
+                    <Input type="number" min={0} step="1" placeholder="Blank = no ceiling"
+                      value={pfCeiling} onChange={(e) => setPfCeiling(e.target.value)} />
+                    <p className="text-[11px] text-muted-foreground">
+                      PF is calculated on wages up to this amount. Leave blank to use the full wage.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" checked={esiOn} onChange={(e) => setEsiOn(e.target.checked)}
+                  className="h-4 w-4 rounded border-input" />
+                Deduct ESI
+              </label>
+              {esiOn && (
+                <div className="grid gap-3 sm:grid-cols-2 pl-6">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Employee share (%)</Label>
+                    <Input type="number" min={0} max={100} step="0.01" value={esiPct}
+                      onChange={(e) => setEsiPct(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Coverage limit (₹)</Label>
+                    <Input type="number" min={0} step="1" placeholder="Blank = everyone"
+                      value={esiThreshold} onChange={(e) => setEsiThreshold(e.target.value)} />
+                    <p className="text-[11px] text-muted-foreground">
+                      Staff earning above this are outside ESI, so nothing is deducted for them.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ─── ID card template picker ─── */}

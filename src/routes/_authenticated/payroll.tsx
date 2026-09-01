@@ -22,6 +22,7 @@ import { BranchFilter } from "@/components/BranchFilter";
 import { toast } from "sonner";
 import { downloadPayslipPdf } from "@/lib/payslip-pdf";
 import { downloadCsv } from "@/lib/csv";
+import { statutoryDeductions } from "@/lib/statutory";
 
 export const Route = createFileRoute("/_authenticated/payroll")({
   component: Payroll,
@@ -46,7 +47,7 @@ function Payroll() {
     queryFn: async () => {
       let q = supabase
         .from("payslips")
-        .select("*, profiles!payslips_user_id_fkey_profiles(full_name, branch_id, staff_id, bank_account_number, bank_ifsc, bank_name, upi_id)")
+        .select("*, profiles!payslips_user_id_fkey_profiles(full_name, branch_id, staff_id, bank_account_number, bank_ifsc, bank_name, upi_id, pf_uan, esi_number)")
         .eq("tenant_id", tenantId!)
         .eq("period_year", year)
         .eq("period_month", month);
@@ -93,6 +94,17 @@ function Payroll() {
       const effectiveEnd = monthEnd <= yesterday ? monthEnd : yesterday;
       if (effectiveEnd < monthStart) throw new Error("That month hasn't started yet");
       const lastCountedDay = Number(effectiveEnd.slice(8, 10));
+
+      // Statutory config is per tenant and identical for every payslip in this
+      // run, so it is read once rather than per staff member.
+      const { data: statutory, error: statutoryError } = await supabase
+        .from("tenants")
+        .select("pf_enabled, pf_employee_percent, pf_wage_ceiling, esi_enabled, esi_employee_percent, esi_wage_threshold")
+        .eq("id", tenantId)
+        .single();
+      // Fail rather than silently generating payslips with no PF/ESI line: a
+      // payslip that under-deducts is worse than one that isn't generated.
+      if (statutoryError) throw statutoryError;
 
       let count = 0;
       for (const s of staff) {
@@ -393,7 +405,13 @@ function Payroll() {
           }
         }
 
-        const deductions = absenceDeduction + lateFine;
+        // PF and ESI apply to wages actually EARNED, so absence comes off
+        // first. A late fine is a penalty levied on pay, not a reduction in
+        // wages, so it does not shrink the PF/ESI base.
+        const grossEarnings = Math.max(0, base - absenceDeduction);
+        const { pf, esi } = statutoryDeductions(statutory, grossEarnings);
+
+        const deductions = absenceDeduction + lateFine + pf + esi;
         const net = Math.max(0, base - deductions);
 
         await supabase.from("payslips").upsert({
@@ -404,6 +422,7 @@ function Payroll() {
           paid_leave_days: paidLeave, unpaid_leave_days: unpaidLeave, working_days: workingDays,
           overtime_hours: 0, deductions, net_pay: net,
           late_days: lateDaysCount, late_fine: lateFine,
+          gross_earnings: grossEarnings, pf_deduction: pf, esi_deduction: esi,
         }, { onConflict: "user_id,period_year,period_month" });
         count++;
       }
@@ -431,6 +450,9 @@ function Payroll() {
       paid_leave: p.paid_leave_days,
       absent: p.absent_days,
       base_salary: p.base_salary,
+      gross_earnings: p.gross_earnings ?? "",
+      pf: p.pf_deduction ?? 0,
+      esi: p.esi_deduction ?? 0,
       deductions: p.deductions,
       net_pay: p.net_pay,
     }));
@@ -553,7 +575,7 @@ function Payroll() {
                           <Wallet className="h-4 w-4" /> Pay
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadPayslipPdf(p, { employeeName: p.profiles?.full_name ?? "Employee", companyName: user?.tenant?.name, staffId: p.profiles?.staff_id })}>
+                      <Button size="sm" variant="ghost" className="gap-1" onClick={() => downloadPayslipPdf(p, { employeeName: p.profiles?.full_name ?? "Employee", companyName: user?.tenant?.name, staffId: p.profiles?.staff_id, pfUan: p.profiles?.pf_uan, esiNumber: p.profiles?.esi_number })}>
                         <Download className="h-4 w-4" /> PDF
                       </Button>
                     </div>
