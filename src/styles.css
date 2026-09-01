@@ -193,3 +193,16 @@
 /* Drives the FeatureStory scene-progress bar. Paused/off-screen scenes simply
    don't run it, so the bar only advances while the story is actually playing. */
 @keyframes story-fill { from { width: 0%; } to { width: 100%; } }
+
+/* Client wall. The track holds two identical sets of logos, so travelling
+   exactly -50% lands the copy where the original began — a seamless loop with
+   no jump. Duration scales with the set, not the viewport, so the logos move
+   at a constant readable speed on any screen. */
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.marquee-track { animation: marquee-scroll 32s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
