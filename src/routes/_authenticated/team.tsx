@@ -76,7 +76,7 @@ function TeamPage() {
     queryKey: ["shifts", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data } = await supabase.from("shifts").select("*").eq("tenant_id", tenantId!);
+      const { data } = await supabase.from("shifts").select("*, branches(name)").eq("tenant_id", tenantId!).order("start_time");
       return data ?? [];
     },
   });
@@ -395,7 +395,7 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
   const [name, setName] = useState("");
   const [designation, setDesignation] = useState(mode === "branch_manager" ? `${branchLabel} Manager` : "");
   const [salary, setSalary] = useState("");
-  const [shiftId, setShiftId] = useState("");
+  const [shiftIds, setShiftIds] = useState<string[]>([]);
   const [branchIdSel, setBranchIdSel] = useState<string>(defaultBranchId ?? "");
   const [loading, setLoading] = useState(false);
 
@@ -416,7 +416,7 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
           password,
           designation,
           monthly_salary: Number(salary) || 0,
-          shift_id: shiftId || null,
+          shift_ids: shiftIds,
           branch_id: branchIdSel || null,
           role: mode,
         },
@@ -469,7 +469,7 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
         <div className="space-y-1"><Label>Monthly salary (₹)</Label><Input type="number" value={salary} onChange={e => setSalary(e.target.value)} placeholder="15000" /></div>
       </div>
       <div className="space-y-1">
-        <Label>{branchLabel}{isManager ? " (required)" : " (optional)"}</Label>
+        <Label>{isManager ? `${branchLabel} (required)` : `Home ${branchLabel.toLowerCase()} (optional)`}</Label>
         <Select value={branchIdSel || "none"} onValueChange={(v) => setBranchIdSel(v === "none" ? "" : v)}>
           <SelectTrigger><SelectValue placeholder={`Assign to a ${branchLabel.toLowerCase()}`} /></SelectTrigger>
           <SelectContent>
@@ -477,15 +477,58 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
             {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        {!isManager && (
+          <p className="text-[11px] text-muted-foreground">
+            Where they are normally based, used for grouping and reports. It does NOT limit where
+            they can work — to put someone across several {branchLabel.toLowerCase()}s, tick a shift
+            for each one below.
+          </p>
+        )}
       </div>
       {!isManager && (
         <div className="space-y-1">
-          <Label>Shift</Label>
+          <Label>Shifts</Label>
           {shifts.length > 0 ? (
-            <Select value={shiftId} onValueChange={setShiftId}>
-              <SelectTrigger><SelectValue placeholder="Assign a shift (optional)" /></SelectTrigger>
-              <SelectContent>{shifts.map(s => <SelectItem key={s.id} value={s.id}>{s.name} · {formatTime12h(s.start_time)}–{formatTime12h(s.end_time)}</SelectItem>)}</SelectContent>
-            </Select>
+            <>
+              <p className="text-[11px] text-muted-foreground">
+                Tick every shift this person works. Each shift carries its own branch and timing, so
+                ticking several is how one person covers several branches in a day — check-in picks
+                the right one by time and place.
+              </p>
+              <div className="max-h-52 space-y-1.5 overflow-y-auto rounded-md border p-2">
+                {shifts.map(s => {
+                  const on = shiftIds.includes(s.id);
+                  return (
+                    <label
+                      key={s.id}
+                      className={`flex cursor-pointer items-center gap-2.5 rounded-md border p-2 transition-colors ${on ? "border-primary/40 bg-primary/5" : "hover:bg-muted/40"}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => setShiftIds(prev =>
+                          prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      <span className="min-w-0 flex-1 text-sm">
+                        {s.name}
+                        {(s as any).branches?.name && (
+                          <span className="text-muted-foreground"> · {(s as any).branches.name}</span>
+                        )}
+                        <span className="block text-[11px] text-muted-foreground">
+                          {formatTime12h(s.start_time)}–{formatTime12h(s.end_time)}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {shiftIds.length > 1 && (
+                <p className="text-[11px] font-medium text-primary">
+                  {shiftIds.length} shifts — this person will be scheduled across each one.
+                </p>
+              )}
+            </>
           ) : (
             <p className="rounded-md border border-dashed p-2.5 text-xs text-muted-foreground">
               No shifts yet — add one in <strong>Shifts & locations</strong> to assign timing here.
