@@ -9,12 +9,12 @@
  *   node scripts/check-statutory-parity.mjs "postgresql://..."
  *
  * With no argument it uses $DATABASE_URL, and falls back to the local test
- * cluster described in supabase/tests/README.md.
+ * cluster described in DEVELOPMENT.md.
  */
 import { execFileSync } from "node:child_process";
 import { statutoryDeductions } from "../src/lib/statutory.ts";
 
-const DB = process.argv[2] ?? process.env.DATABASE_URL ?? "postgresql:///pmain?host=/tmp&port=55432&user=postgres";
+const DB = process.argv[2] ?? process.env.DATABASE_URL ?? "postgresql:///pfresh?host=/tmp&port=55432&user=postgres";
 
 // [label, config, gross]
 const CONFIGS = {
@@ -53,9 +53,20 @@ labels.forEach((label, i) => {
 });
 sql.push(`ROLLBACK;`);
 
-const out = execFileSync("psql", [DB, "-tAF", "|", "-q", "-v", "ON_ERROR_STOP=1", "-c", sql.join("\n")], {
-  encoding: "utf8",
-});
+let out;
+try {
+  out = execFileSync("psql", [DB, "-tAF", "|", "-q", "-v", "ON_ERROR_STOP=1", "-c", sql.join("\n")], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+} catch (e) {
+  // Report the database's own complaint, not a stack trace wrapping 60 lines
+  // of generated SQL.
+  const why = String(e.stderr ?? e.message).trim().split("\n")[0];
+  console.error(`FAIL: could not query ${DB}\n  ${why}`);
+  console.error("\nSee DEVELOPMENT.md for how to build the test database.");
+  process.exit(1);
+}
 
 let checked = 0;
 const failures = [];
