@@ -88,6 +88,45 @@ and how long setup actually took.
 
 ---
 
+## 5. Late alerts cannot tell "late" from "never onboarded"
+
+**Status:** identified on live data 2026-09-01, deliberately not yet built.
+
+On the first production run the job flagged two staff as 93 and 213 minutes
+late. Their shift configuration was correct — the alert was working — but
+neither had punched in **at all in the previous 14 days**. They are dormant
+records: staff who left, or who were set up and never onboarded onto the app.
+
+Because `working_days` is Mon-Fri, each such record raises an alert **every
+working day, indefinitely**, which is how an admin learns to ignore the
+notification bell.
+
+**The fix, and its catch:** skip staff who have never punched at all — someone
+with zero attendance records is an onboarding gap, not a late arrival. But a
+naive "never punched" test would also skip a genuine new hire who is late on
+their first day. So the condition has to be roughly *profile created more than
+a few days ago AND never punched*, which distinguishes a stale record from a
+new starter.
+
+**Deferred on purpose.** Tuning this blind is guessing. A few days of real
+alerts will show whether the right threshold is 2 minutes or 15, whether the
+4-hour window should narrow to 2, and whether the guard needs to be "never
+punched" or something broader.
+
+**Interim, no code needed:** find every record in this state with the dormant
+staff query, and deactivate or unassign the shift for anyone who has actually
+left. Narrow the window with:
+
+```sql
+UPDATE public.tenants SET late_alert_window_hours = 2;
+```
+
+Relevant code: `cron_notify_late_arrivals()` in
+`supabase/migrations/20260901000000_late_arrival_alerts.sql`; tests in
+`supabase/tests/late_alerts_test.sql`.
+
+---
+
 ## Recently finished (for context)
 
 All shipped and verified; nothing outstanding on these.
