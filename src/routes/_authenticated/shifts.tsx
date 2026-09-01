@@ -28,6 +28,7 @@ type Shift = {
   id: string; name: string;
   start_time: string; end_time: string; break_minutes: number;
   grace_minutes?: number;
+  late_alerts_enabled?: boolean;
   late_fine_type?: "none" | "fixed_per_occurrence" | "per_minute" | "half_day_after_minutes";
   late_fine_amount?: number;
   half_day_after_minutes?: number;
@@ -240,6 +241,7 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
   const [end, setEnd] = useState(trimTime(initial?.end_time) || "18:00");
   const [breakMin, setBreakMin] = useState((initial?.break_minutes ?? 60).toString());
   const [graceMin, setGraceMin] = useState((initial?.grace_minutes ?? 10).toString());
+  const [lateAlerts, setLateAlerts] = useState(initial?.late_alerts_enabled ?? true);
   const [fineType, setFineType] = useState<NonNullable<Shift["late_fine_type"]>>(initial?.late_fine_type ?? "none");
   const [fineAmount, setFineAmount] = useState((initial?.late_fine_amount ?? 0).toString());
   const [halfDayMin, setHalfDayMin] = useState((initial?.half_day_after_minutes ?? 120).toString());
@@ -256,6 +258,7 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
       end_time: end,
       break_minutes: Math.max(0, Number(breakMin) || 0),
       grace_minutes: Math.max(0, Number(graceMin) || 0),
+      late_alerts_enabled: lateAlerts,
       late_fine_type: fineType,
       late_fine_amount: Math.max(0, Number(fineAmount) || 0),
       half_day_after_minutes: Math.max(1, Number(halfDayMin) || 120),
@@ -286,6 +289,18 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
         <div className="space-y-1">
           <Label className="text-xs">Grace period (minutes after start time before it's "late")</Label>
           <Input type="number" value={graceMin} onChange={e => setGraceMin(e.target.value)} min={0} max={180} />
+        </div>
+        <div className="space-y-1 rounded-md border p-2.5">
+          <label className="flex items-center gap-2 text-xs font-medium">
+            <input type="checkbox" checked={lateAlerts} onChange={e => setLateAlerts(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-input" />
+            Alert admins when someone on this shift is late
+          </label>
+          <p className="text-[11px] text-muted-foreground">
+            Turn this off for shifts with no real start time — a 24/7 or on-call rotation, where
+            the roster decides when each person begins. Otherwise everyone on the shift is
+            reported late every day.
+          </p>
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Deduction type</Label>

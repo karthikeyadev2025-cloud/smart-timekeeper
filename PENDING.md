@@ -108,6 +108,12 @@ their first day. So the condition has to be roughly *profile created more than
 a few days ago AND never punched*, which distinguishes a stale record from a
 new starter.
 
+**Partly addressed 2026-09-01:** a per-shift opt-out
+(`shifts.late_alerts_enabled`) now covers the related case of a shift with no
+real start time — a 24/7 rotation whose worker begins any time of day. That
+does NOT solve the dormant-record case below, which is about people, not
+shifts.
+
 **Deferred on purpose.** Tuning this blind is guessing. A few days of real
 alerts will show whether the right threshold is 2 minutes or 15, whether the
 4-hour window should narrow to 2, and whether the guard needs to be "never

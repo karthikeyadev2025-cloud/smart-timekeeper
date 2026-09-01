@@ -175,4 +175,68 @@ BEGIN
   RAISE NOTICE 'pass  threshold is honoured (20 min late, 60 min threshold, silent)';
 END $$;
 
+-- ── A shift can opt out entirely ───────────────────────────────────────────
+-- Reproduces the production case: a 24/7 shift recorded with a 00:00 start,
+-- worked by someone whose rotation actually begins any time of day. Reading
+-- start_time literally flags them every morning while they are working.
+DO $$
+DECLARE n INT;
+BEGIN
+  DELETE FROM public.late_alerts;
+  DELETE FROM public.notifications WHERE kind = 'check_in_missed';
+  UPDATE public.tenants
+     SET late_alerts_enabled = true, late_alert_after_minutes = 2
+   WHERE id = 'c0000000-aaaa-aaaa-aaaa-00000000000a';
+
+  -- Baseline: still noisy while the shift is opted IN.
+  SELECT public.cron_notify_late_arrivals() INTO n;
+  IF n = 0 THEN
+    RAISE EXCEPTION 'FAIL: baseline sent nothing, so the opt-out proves nothing';
+  END IF;
+
+  DELETE FROM public.late_alerts;
+  DELETE FROM public.notifications WHERE kind = 'check_in_missed';
+  UPDATE public.shifts SET late_alerts_enabled = false
+   WHERE id = 'c0000000-5555-5555-5555-000000000001';
+
+  SELECT public.cron_notify_late_arrivals() INTO n;
+  IF n <> 0 THEN
+    RAISE EXCEPTION 'FAIL: opted-out shift still alerted (sent %)', n;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.late_alerts) THEN
+    RAISE EXCEPTION 'FAIL: opted-out shift still wrote a ledger row';
+  END IF;
+  RAISE NOTICE 'pass  a shift with late_alerts_enabled=false raises nothing';
+END $$;
+
+-- Opting one shift out must not silence the others.
+DO $$
+DECLARE n INT;
+BEGIN
+  -- Move Larry onto a second, still-enabled leg that is also overdue.
+  INSERT INTO public.shifts (id, tenant_id, name, start_time, end_time, grace_minutes, is_active)
+  VALUES ('c0000000-5555-5555-5555-000000000009', 'c0000000-aaaa-aaaa-aaaa-00000000000a',
+          'Other leg, still policed',
+          ((now() AT TIME ZONE 'Asia/Kolkata') - INTERVAL '20 minutes')::time, '18:00', 0, true);
+  INSERT INTO public.staff_shifts (tenant_id, user_id, shift_id)
+  VALUES ('c0000000-aaaa-aaaa-aaaa-00000000000a', 'c0000000-0000-0000-0000-00000000000b',
+          'c0000000-5555-5555-5555-000000000009');
+
+  SELECT public.cron_notify_late_arrivals() INTO n;
+  IF n = 0 THEN
+    RAISE EXCEPTION 'FAIL: opting one shift out silenced an unrelated shift too';
+  END IF;
+  RAISE NOTICE 'pass  the opt-out is per shift, not global';
+END $$;
+
+-- And the default must preserve today's behaviour for every existing shift.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.shifts WHERE late_alerts_enabled IS NOT TRUE
+               AND id <> 'c0000000-5555-5555-5555-000000000001') THEN
+    RAISE EXCEPTION 'FAIL: the new column did not default to true';
+  END IF;
+  RAISE NOTICE 'pass  existing shifts default to alerting, unchanged';
+END $$;
+
 ROLLBACK;
