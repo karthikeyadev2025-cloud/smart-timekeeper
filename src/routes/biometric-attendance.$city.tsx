@@ -80,7 +80,7 @@ export const Route = createFileRoute("/biometric-attendance/$city")({
                   latitude: city.geo.split(";")[0],
                   longitude: city.geo.split(";")[1],
                 },
-                aggregateRating: { "@type": "AggregateRating", ratingValue: "4.9", reviewCount: "320" },
+                // aggregateRating removed — the 320-review figure was invented.
               },
               {
                 "@type": "BreadcrumbList",

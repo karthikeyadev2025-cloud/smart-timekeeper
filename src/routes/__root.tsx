@@ -151,11 +151,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
                 "priceCurrency": "INR",
                 "description": "Free for teams up to 5 members. Paid plans for larger teams.",
               },
-              "aggregateRating": {
-                "@type": "AggregateRating",
-                "ratingValue": "4.8",
-                "reviewCount": "27",
-              },
+              // aggregateRating removed: the 4.8 / 27-review figure was not
+              // backed by real reviews. Invented review markup is a Google
+              // structured-data violation and risks every rich result on the
+              // domain. Restore it only against reviews that actually exist.
               "url": "https://punchly.online",
               "downloadUrl": "https://punchly.online",
               "description": "Punchly is an all-in-one attendance, payroll, leave and HR app for Indian businesses. GPS + selfie check-in, multi-branch support, automated payslips, and bank-fraud protection.",

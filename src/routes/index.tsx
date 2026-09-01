@@ -133,7 +133,11 @@ export const Route = createFileRoute("/")({
                 { "@type": "City", name: "Warangal" },
               ],
               offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
-              aggregateRating: { "@type": "AggregateRating", ratingValue: "4.9", reviewCount: "1280" },
+              // No aggregateRating here on purpose. It previously claimed 4.9
+              // from 1,280 reviews, which is not a real number — Google treats
+              // invented review markup as a structured-data violation and can
+              // pull every rich result for the domain. Put it back only when
+              // there are genuine, collectable reviews behind it.
             },
             {
               "@type": "Organization",
