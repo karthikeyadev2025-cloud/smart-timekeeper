@@ -736,46 +736,48 @@ function Landing() {
       </section>
 
       <footer className="bg-card/30">
-        <div className="mx-auto max-w-6xl space-y-8 px-4 py-14">
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: "-60px" }}
+          className="mx-auto max-w-6xl space-y-8 px-4 py-14"
+        >
           <div className="grid gap-8 md:grid-cols-4">
-            <div className="space-y-3 md:col-span-2">
+            <motion.div variants={fadeUp} className="space-y-3 md:col-span-2">
               <Logo size={24} />
               <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
                 GPS + selfie attendance, automatic payroll, leave management and staff
                 ID cards — built for Indian businesses and schools.
               </p>
-            </div>
-            <div>
+            </motion.div>
+            <motion.div variants={fadeUp}>
               <p className="font-data mb-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Product</p>
               <div className="flex flex-col gap-2.5 text-sm">
                 <a href="#features" className="text-muted-foreground transition-colors hover:text-foreground">Features</a>
                 <a href="#pricing" className="text-muted-foreground transition-colors hover:text-foreground">Pricing</a>
                 <a href="#how" className="text-muted-foreground transition-colors hover:text-foreground">How it works</a>
               </div>
-            </div>
-            <div>
+            </motion.div>
+            <motion.div variants={fadeUp}>
               <p className="font-data mb-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Company</p>
               <div className="flex flex-col gap-2.5 text-sm">
                 <Link to="/privacy" className="text-muted-foreground transition-colors hover:text-foreground">Privacy Policy</Link>
                 <Link to="/terms" className="text-muted-foreground transition-colors hover:text-foreground">Terms of Service</Link>
                 <Link to="/support" className="text-muted-foreground transition-colors hover:text-foreground">Support</Link>
               </div>
-            </div>
+            </motion.div>
           </div>
 
-          <div className="rounded-2xl border border-border p-6 text-center">
-            <p className="font-data text-[10px] uppercase tracking-[0.3em] text-muted-foreground">An innovation by</p>
-            <p className="font-display mt-2 text-lg tracking-[-0.01em]" style={{ fontWeight: 700 }}>Nikki Tech Labs</p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Powered by <span className="font-semibold text-foreground">K<sup>2</sup> Adexos Global Technologies</span>
-            </p>
-          </div>
+          <motion.div variants={fadeUp}>
+            <MakerPlaque />
+          </motion.div>
 
-          <div className="flex flex-col items-center justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground md:flex-row">
+          <motion.div variants={fadeUp} className="flex flex-col items-center justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground md:flex-row">
             <p>© {new Date().getFullYear()} {BRAND.name}. All rights reserved.</p>
             <p>Made with ❤️ in Hyderabad, India</p>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </footer>
 
       {checkoutPlan && (
@@ -790,6 +792,62 @@ function Landing() {
           onSuccess={() => { setCheckoutPlan(null); window.location.href = "/app"; }}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * The maker's credit, treated as a small engraved plaque rather than a line of
+ * fine print: a slow highlight travels across it every few seconds, the way
+ * light moves over a nameplate on a wall. One quiet flourish at the very
+ * bottom of the page, where it can't compete with anything above it.
+ */
+
+/**
+ * Nikki Technologies' website. EMPTY ON PURPOSE — I don't have the real URL,
+ * and shipping a guessed one would be a dead link on every page view. While
+ * this is empty the name renders as plain text; the moment a URL is filled in
+ * it becomes a proper external link, no other change needed.
+ */
+const NIKKI_URL = "";
+
+function MakerPlaque() {
+  const name = "Nikki Technologies";
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-border p-6 text-center">
+      {/* The travelling highlight. Pointer-events off so it never eats a click
+          on the link underneath, and it stops entirely under reduced motion. */}
+      <span
+        aria-hidden
+        className="plaque-sheen pointer-events-none absolute inset-y-0 -left-1/3 w-1/3"
+      />
+      <p className="font-data relative text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+        An innovation by
+      </p>
+      {NIKKI_URL ? (
+        <a
+          href={NIKKI_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group relative mt-2 inline-block"
+        >
+          <span className="font-display text-lg tracking-[-0.01em] transition-colors group-hover:text-primary" style={{ fontWeight: 700 }}>
+            {name}
+          </span>
+          {/* Underline grows from the left on hover and on keyboard focus. */}
+          <span
+            aria-hidden
+            className="absolute -bottom-0.5 left-0 h-px w-0 bg-primary transition-all duration-300 group-hover:w-full group-focus-visible:w-full"
+          />
+        </a>
+      ) : (
+        <p className="font-display relative mt-2 text-lg tracking-[-0.01em]" style={{ fontWeight: 700 }}>
+          {name}
+        </p>
+      )}
+      <p className="relative mt-2 text-xs text-muted-foreground">
+        Powered by <span className="font-semibold text-foreground">K<sup>2</sup> Adexos Global Technologies</span>
+      </p>
     </div>
   );
 }

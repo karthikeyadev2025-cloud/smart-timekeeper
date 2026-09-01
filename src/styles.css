@@ -206,3 +206,19 @@
 @media (prefers-reduced-motion: reduce) {
   .marquee-track { animation: none; }
 }
+
+/* Maker's plaque in the footer: a slow highlight travels across the panel like
+   light moving over an engraved nameplate. Deliberately faint — it should be
+   noticed on the second look, not the first. */
+@keyframes plaque-sheen {
+  0%        { transform: translateX(0);     opacity: 0; }
+  8%        {                               opacity: 1; }
+  55%, 100% { transform: translateX(420%);  opacity: 0; }
+}
+.plaque-sheen {
+  background: linear-gradient(100deg, transparent, color-mix(in oklab, var(--color-primary) 14%, transparent), transparent);
+  animation: plaque-sheen 7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .plaque-sheen { animation: none; opacity: 0; }
+}
