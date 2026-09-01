@@ -2241,6 +2241,29 @@ export type Database = {
         Args: { _perm: string; _tenant_id: string; _user_id: string }
         Returns: boolean
       }
+      claim_push_batch: {
+        Args: { _limit?: number }
+        Returns: {
+          notification_id: string
+          user_id: string
+          title: string
+          body: string
+          action_url: string | null
+          kind: string | null
+          attempts: number
+          tokens: { id: string; token: string; platform: string }[]
+        }[]
+      }
+      settle_push: {
+        Args: {
+          _sent?: string[]
+          _skipped?: string[]
+          _failed?: { id: string; error: string }[]
+          _dead_tokens?: string[]
+          _max_attempts?: number
+        }
+        Returns: undefined
+      }
       live_staff_positions: {
         Args: { _tenant_id: string }
         Returns: {

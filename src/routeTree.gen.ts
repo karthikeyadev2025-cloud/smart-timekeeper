@@ -49,6 +49,7 @@ import { Route as AuthenticatedShiftSwapsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedShiftsRouteImport } from './routes/_authenticated/shifts'
 import { Route as AuthenticatedSignatureApprovalsRouteImport } from './routes/_authenticated/signature-approvals'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
+import { Route as ApiPushDispatchRouteImport } from './routes/api/push-dispatch'
 import { Route as BiometricAttendanceCityRouteImport } from './routes/biometric-attendance.$city'
 import { Route as VerifyStaffIdRouteImport } from './routes/verify.$staffId'
 import { Route as WebhookRazorpayRouteImport } from './routes/webhook/razorpay'
@@ -262,6 +263,11 @@ const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
   path: '/team',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPushDispatchRoute = ApiPushDispatchRouteImport.update({
+  id: '/api/push-dispatch',
+  path: '/api/push-dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BiometricAttendanceCityRoute = BiometricAttendanceCityRouteImport.update({
   id: '/biometric-attendance/$city',
   path: '/biometric-attendance/$city',
@@ -324,6 +330,7 @@ export interface FileRoutesByFullPath {
   '/shifts': typeof AuthenticatedShiftsRoute
   '/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/team': typeof AuthenticatedTeamRoute
+  '/api/push-dispatch': typeof ApiPushDispatchRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
   '/verify/$staffId': typeof VerifyStaffIdRoute
   '/webhook/razorpay': typeof WebhookRazorpayRoute
@@ -369,6 +376,7 @@ export interface FileRoutesByTo {
   '/shifts': typeof AuthenticatedShiftsRoute
   '/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/team': typeof AuthenticatedTeamRoute
+  '/api/push-dispatch': typeof ApiPushDispatchRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
   '/verify/$staffId': typeof VerifyStaffIdRoute
   '/webhook/razorpay': typeof WebhookRazorpayRoute
@@ -416,6 +424,7 @@ export interface FileRoutesById {
   '/_authenticated/shifts': typeof AuthenticatedShiftsRoute
   '/_authenticated/signature-approvals': typeof AuthenticatedSignatureApprovalsRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
+  '/api/push-dispatch': typeof ApiPushDispatchRoute
   '/biometric-attendance/$city': typeof BiometricAttendanceCityRoute
   '/verify/$staffId': typeof VerifyStaffIdRoute
   '/webhook/razorpay': typeof WebhookRazorpayRoute
@@ -463,6 +472,7 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/signature-approvals'
     | '/team'
+    | '/api/push-dispatch'
     | '/biometric-attendance/$city'
     | '/verify/$staffId'
     | '/webhook/razorpay'
@@ -508,6 +518,7 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/signature-approvals'
     | '/team'
+    | '/api/push-dispatch'
     | '/biometric-attendance/$city'
     | '/verify/$staffId'
     | '/webhook/razorpay'
@@ -554,6 +565,7 @@ export interface FileRouteTypes {
     | '/_authenticated/shifts'
     | '/_authenticated/signature-approvals'
     | '/_authenticated/team'
+    | '/api/push-dispatch'
     | '/biometric-attendance/$city'
     | '/verify/$staffId'
     | '/webhook/razorpay'
@@ -568,6 +580,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SupportRoute: typeof SupportRoute
   TermsRoute: typeof TermsRoute
+  ApiPushDispatchRoute: typeof ApiPushDispatchRoute
   BiometricAttendanceCityRoute: typeof BiometricAttendanceCityRoute
   VerifyStaffIdRoute: typeof VerifyStaffIdRoute
   WebhookRazorpayRoute: typeof WebhookRazorpayRoute
@@ -855,6 +868,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTeamRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/push-dispatch': {
+      id: '/api/push-dispatch'
+      path: '/api/push-dispatch'
+      fullPath: '/api/push-dispatch'
+      preLoaderRoute: typeof ApiPushDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/biometric-attendance/$city': {
       id: '/biometric-attendance/$city'
       path: '/biometric-attendance/$city'
@@ -971,6 +991,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SupportRoute: SupportRoute,
   TermsRoute: TermsRoute,
+  ApiPushDispatchRoute: ApiPushDispatchRoute,
   BiometricAttendanceCityRoute: BiometricAttendanceCityRoute,
   VerifyStaffIdRoute: VerifyStaffIdRoute,
   WebhookRazorpayRoute: WebhookRazorpayRoute,
