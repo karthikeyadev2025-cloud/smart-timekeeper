@@ -804,12 +804,10 @@ function Landing() {
  */
 
 /**
- * Nikki Technologies' website. EMPTY ON PURPOSE — I don't have the real URL,
- * and shipping a guessed one would be a dead link on every page view. While
- * this is empty the name renders as plain text; the moment a URL is filled in
- * it becomes a proper external link, no other change needed.
+ * Nikki Technologies' website. Leave this empty to render the name as plain
+ * text instead — the component degrades to no link rather than a dead one.
  */
-const NIKKI_URL = "";
+const NIKKI_URL = "https://nikkitechnologies.com";
 
 function MakerPlaque() {
   const name = "Nikki Technologies";
