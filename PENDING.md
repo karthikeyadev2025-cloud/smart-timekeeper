@@ -133,6 +133,31 @@ Relevant code: `cron_notify_late_arrivals()` in
 
 ---
 
+## 6. API: writes, and everything beyond two read endpoints
+
+**Status:** read-only v1 shipped. Deliberately stopped there.
+
+`attendance:read` and `staff:read` exist. What does not, and why:
+
+- **Writes** (create staff from an HRMS, post attendance from an external
+  clock). These need idempotency keys so a retried request does not double a
+  punch, and a much longer think about abuse. Nobody has asked yet.
+- **Payroll and salary endpoints.** Deliberately absent — that data leaving
+  the building needs a contract, not a scope.
+- **Webhooks** (push to the customer instead of them polling). Usually what an
+  integrator actually wants, and cheaper than a polled API.
+
+**Before giving a key to anyone outside the company:** the DPDP Act needs a
+lawful basis and a written agreement for sharing employee data with a third
+party. Get advice; this is not it.
+
+**Worth doing when there is a second consumer:** an RLS audit specifically for
+hostile traffic. The API path itself avoids RLS by design (SECURITY DEFINER
+functions that derive the tenant from the key), but a public surface raises the
+stakes on every other policy in the schema.
+
+---
+
 ## Recently finished (for context)
 
 All shipped and verified; nothing outstanding on these.

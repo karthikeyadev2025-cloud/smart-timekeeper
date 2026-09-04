@@ -18,6 +18,7 @@ import { Route as SupportRouteImport } from './routes/support'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAnnouncementsRouteImport } from './routes/_authenticated/announcements'
+import { Route as AuthenticatedApiKeysRouteImport } from './routes/_authenticated/api-keys'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedBankApprovalsRouteImport } from './routes/_authenticated/bank-approvals'
@@ -54,6 +55,8 @@ import { Route as BiometricAttendanceCityRouteImport } from './routes/biometric-
 import { Route as VerifyStaffIdRouteImport } from './routes/verify.$staffId'
 import { Route as WebhookRazorpayRouteImport } from './routes/webhook/razorpay'
 import { Route as AuthenticatedStaffStaffIdRouteImport } from './routes/_authenticated/staff.$staffId'
+import { Route as ApiV1AttendanceRouteImport } from './routes/api/v1/attendance'
+import { Route as ApiV1StaffRouteImport } from './routes/api/v1/staff'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -100,6 +103,11 @@ const AuthenticatedAnnouncementsRoute =
     path: '/announcements',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedApiKeysRoute = AuthenticatedApiKeysRouteImport.update({
+  id: '/api-keys',
+  path: '/api-keys',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -289,6 +297,16 @@ const AuthenticatedStaffStaffIdRoute =
     path: '/staff/$staffId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiV1AttendanceRoute = ApiV1AttendanceRouteImport.update({
+  id: '/api/v1/attendance',
+  path: '/api/v1/attendance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1StaffRoute = ApiV1StaffRouteImport.update({
+  id: '/api/v1/staff',
+  path: '/api/v1/staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -299,6 +317,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/announcements': typeof AuthenticatedAnnouncementsRoute
+  '/api-keys': typeof AuthenticatedApiKeysRoute
   '/app': typeof AuthenticatedAppRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/bank-approvals': typeof AuthenticatedBankApprovalsRoute
@@ -335,6 +354,8 @@ export interface FileRoutesByFullPath {
   '/verify/$staffId': typeof VerifyStaffIdRoute
   '/webhook/razorpay': typeof WebhookRazorpayRoute
   '/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
+  '/api/v1/attendance': typeof ApiV1AttendanceRoute
+  '/api/v1/staff': typeof ApiV1StaffRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -345,6 +366,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/announcements': typeof AuthenticatedAnnouncementsRoute
+  '/api-keys': typeof AuthenticatedApiKeysRoute
   '/app': typeof AuthenticatedAppRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/bank-approvals': typeof AuthenticatedBankApprovalsRoute
@@ -381,6 +403,8 @@ export interface FileRoutesByTo {
   '/verify/$staffId': typeof VerifyStaffIdRoute
   '/webhook/razorpay': typeof WebhookRazorpayRoute
   '/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
+  '/api/v1/attendance': typeof ApiV1AttendanceRoute
+  '/api/v1/staff': typeof ApiV1StaffRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -393,6 +417,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/announcements': typeof AuthenticatedAnnouncementsRoute
+  '/_authenticated/api-keys': typeof AuthenticatedApiKeysRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/bank-approvals': typeof AuthenticatedBankApprovalsRoute
@@ -429,6 +454,8 @@ export interface FileRoutesById {
   '/verify/$staffId': typeof VerifyStaffIdRoute
   '/webhook/razorpay': typeof WebhookRazorpayRoute
   '/_authenticated/staff/$staffId': typeof AuthenticatedStaffStaffIdRoute
+  '/api/v1/attendance': typeof ApiV1AttendanceRoute
+  '/api/v1/staff': typeof ApiV1StaffRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -441,6 +468,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin'
     | '/announcements'
+    | '/api-keys'
     | '/app'
     | '/audit'
     | '/bank-approvals'
@@ -477,6 +505,8 @@ export interface FileRouteTypes {
     | '/verify/$staffId'
     | '/webhook/razorpay'
     | '/staff/$staffId'
+    | '/api/v1/attendance'
+    | '/api/v1/staff'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -487,6 +517,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin'
     | '/announcements'
+    | '/api-keys'
     | '/app'
     | '/audit'
     | '/bank-approvals'
@@ -523,6 +554,8 @@ export interface FileRouteTypes {
     | '/verify/$staffId'
     | '/webhook/razorpay'
     | '/staff/$staffId'
+    | '/api/v1/attendance'
+    | '/api/v1/staff'
   id:
     | '__root__'
     | '/'
@@ -534,6 +567,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/_authenticated/admin'
     | '/_authenticated/announcements'
+    | '/_authenticated/api-keys'
     | '/_authenticated/app'
     | '/_authenticated/audit'
     | '/_authenticated/bank-approvals'
@@ -570,6 +604,8 @@ export interface FileRouteTypes {
     | '/verify/$staffId'
     | '/webhook/razorpay'
     | '/_authenticated/staff/$staffId'
+    | '/api/v1/attendance'
+    | '/api/v1/staff'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -584,6 +620,8 @@ export interface RootRouteChildren {
   BiometricAttendanceCityRoute: typeof BiometricAttendanceCityRoute
   VerifyStaffIdRoute: typeof VerifyStaffIdRoute
   WebhookRazorpayRoute: typeof WebhookRazorpayRoute
+  ApiV1AttendanceRoute: typeof ApiV1AttendanceRoute
+  ApiV1StaffRoute: typeof ApiV1StaffRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -649,6 +687,13 @@ declare module '@tanstack/react-router' {
       path: '/announcements'
       fullPath: '/announcements'
       preLoaderRoute: typeof AuthenticatedAnnouncementsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/api-keys': {
+      id: '/_authenticated/api-keys'
+      path: '/api-keys'
+      fullPath: '/api-keys'
+      preLoaderRoute: typeof AuthenticatedApiKeysRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/app': {
@@ -903,12 +948,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedStaffStaffIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/v1/attendance': {
+      id: '/api/v1/attendance'
+      path: '/api/v1/attendance'
+      fullPath: '/api/v1/attendance'
+      preLoaderRoute: typeof ApiV1AttendanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/staff': {
+      id: '/api/v1/staff'
+      path: '/api/v1/staff'
+      fullPath: '/api/v1/staff'
+      preLoaderRoute: typeof ApiV1StaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnnouncementsRoute: typeof AuthenticatedAnnouncementsRoute
+  AuthenticatedApiKeysRoute: typeof AuthenticatedApiKeysRoute
   AuthenticatedAppRoute: typeof AuthenticatedAppRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedBankApprovalsRoute: typeof AuthenticatedBankApprovalsRoute
@@ -946,6 +1006,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnnouncementsRoute: AuthenticatedAnnouncementsRoute,
+  AuthenticatedApiKeysRoute: AuthenticatedApiKeysRoute,
   AuthenticatedAppRoute: AuthenticatedAppRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedBankApprovalsRoute: AuthenticatedBankApprovalsRoute,
@@ -995,6 +1056,8 @@ const rootRouteChildren: RootRouteChildren = {
   BiometricAttendanceCityRoute: BiometricAttendanceCityRoute,
   VerifyStaffIdRoute: VerifyStaffIdRoute,
   WebhookRazorpayRoute: WebhookRazorpayRoute,
+  ApiV1AttendanceRoute: ApiV1AttendanceRoute,
+  ApiV1StaffRoute: ApiV1StaffRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

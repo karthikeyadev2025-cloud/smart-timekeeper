@@ -21,6 +21,7 @@ Runs in two modes: **business** (hospitals, retail, field teams) and
 | Ship a release | [DEPLOY.md](DEPLOY.md) |
 | Know what is unfinished | [PENDING.md](PENDING.md) |
 | Turn on push notifications | [PUSH_SETUP.md](PUSH_SETUP.md) |
+| Integrate with the API | [API.md](API.md) |
 
 ## Run it locally
 

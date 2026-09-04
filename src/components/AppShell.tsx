@@ -91,6 +91,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/signature-approvals", label: "Signature approvals", icon: PenLine },
       { to: "/announcements", label: "Announcements", icon: Megaphone },
       { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
+      { to: "/api-keys", label: "API keys", icon: KeyRound },
       { to: "/billing", label: "Billing", icon: Receipt },
     ];
   }

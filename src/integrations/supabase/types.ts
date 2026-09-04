@@ -2003,6 +2003,81 @@ export type Database = {
         }
         Relationships: []
       }
+      api_keys: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          key_prefix: string
+          key_hash: string
+          scopes: string[]
+          rate_limit_per_hour: number
+          created_by: string | null
+          created_at: string
+          last_used_at: string | null
+          expires_at: string | null
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          name: string
+          key_prefix: string
+          key_hash: string
+          scopes?: string[]
+          rate_limit_per_hour?: number
+          created_by?: string | null
+          created_at?: string
+          last_used_at?: string | null
+          expires_at?: string | null
+          revoked_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          name?: string
+          key_prefix?: string
+          key_hash?: string
+          scopes?: string[]
+          rate_limit_per_hour?: number
+          created_by?: string | null
+          created_at?: string
+          last_used_at?: string | null
+          expires_at?: string | null
+          revoked_at?: string | null
+        }
+        Relationships: []
+      }
+      api_request_log: {
+        Row: {
+          id: number
+          key_id: string | null
+          tenant_id: string | null
+          endpoint: string
+          status: number
+          row_count: number | null
+          requested_at: string
+        }
+        Insert: {
+          id?: number
+          key_id?: string | null
+          tenant_id?: string | null
+          endpoint: string
+          status: number
+          row_count?: number | null
+          requested_at?: string
+        }
+        Update: {
+          id?: number
+          key_id?: string | null
+          tenant_id?: string | null
+          endpoint?: string
+          status?: number
+          row_count?: number | null
+          requested_at?: string
+        }
+        Relationships: []
+      }
       tenants: {
         Row: {
           live_tracking_enabled: boolean
@@ -2266,6 +2341,40 @@ export type Database = {
           _max_attempts?: number
         }
         Returns: undefined
+      }
+      api_attendance: {
+        Args: { _key_hash: string; _from?: string | null; _to?: string | null; _limit?: number; _offset?: number }
+        Returns: {
+          ok: boolean
+          reason: string
+          retry_after_seconds: number | null
+          record_id: string | null
+          staff_id: string | null
+          full_name: string | null
+          kind: string | null
+          occurred_at: string | null
+          attendance_date: string | null
+          branch_name: string | null
+          shift_name: string | null
+          latitude: number | null
+          longitude: number | null
+          enforcement_status: string | null
+        }[]
+      }
+      api_staff: {
+        Args: { _key_hash: string }
+        Returns: {
+          ok: boolean
+          reason: string
+          retry_after_seconds: number | null
+          user_id: string | null
+          staff_id: string | null
+          full_name: string | null
+          designation: string | null
+          branch_name: string | null
+          is_active: boolean | null
+          date_of_joining: string | null
+        }[]
       }
       live_staff_positions: {
         Args: { _tenant_id: string }

@@ -1,5 +1,5 @@
 -- ============================================================================
--- VERIFY THE FOUR NEW FEATURE MIGRATIONS
+-- VERIFY THE NEW FEATURE MIGRATIONS
 --
 -- Read-only: it reads nothing but catalogues and settings, and changes no
 -- data. (It defines one helper function in pg_temp, which lives only for this
@@ -11,6 +11,8 @@
 --   20260901010000_statutory_deductions.sql
 --   20260901020000_live_location_tracking.sql
 --   20260901030000_push_delivery_outbox.sql
+--   20260901040000_shift_late_alert_optout.sql
+--   20260904000000_tenant_api_keys.sql
 --
 -- Every check is one row. The verdict is the last line.
 -- ============================================================================
@@ -135,6 +137,31 @@ WITH checks(ord, feature, object, ok) AS (VALUES
        JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='cron_notify_late_arrivals'$$)),
 
+  -- ── 6. API KEYS ───────────────────────────────────────────────────────────
+  (50, 'API keys', 'api_keys table', pg_temp.chk(
+     $$SELECT to_regclass('public.api_keys') IS NOT NULL$$)),
+  (51, 'API keys', 'key hash is unique (lookup index)', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+       AND tablename='api_keys' AND indexdef ILIKE '%UNIQUE%key_hash%')$$)),
+  (52, 'API keys', 'api_key_resolve()', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='api_key_resolve')$$)),
+  (53, 'API keys', 'endpoints take no tenant argument', pg_temp.chk(
+     $$SELECT NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname IN ('api_attendance','api_staff')
+         AND pg_get_function_arguments(p.oid) ILIKE '%tenant%')$$)),
+  (54, 'API keys', 'anon/authenticated cannot call the endpoints', pg_temp.chk(
+     $$SELECT NOT (has_function_privilege('anon', 'public.api_staff(text)', 'EXECUTE')
+                OR has_function_privilege('authenticated', 'public.api_staff(text)', 'EXECUTE'))$$)),
+  (55, 'API keys', 'request log RLS enabled', pg_temp.chk(
+     $$SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass('public.api_request_log')$$)),
+  (56, 'API keys', 'nightly log pruning scheduled', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM cron.job WHERE jobname='prune_api_logs')$$)),
+  (57, 'API keys', 'no plaintext key column exists', pg_temp.chk(
+     $$SELECT NOT EXISTS(SELECT 1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='api_keys'
+         AND column_name IN ('key','secret','plaintext','raw_key'))$$)),
+
   (44, 'Semantics', 'Late-alert threshold within 0-240 min', pg_temp.chk(
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants
        WHERE late_alert_after_minutes < 0 OR late_alert_after_minutes > 240)$$))
@@ -153,7 +180,7 @@ FROM (
          'VERDICT',
          count(*) FILTER (WHERE ok) || ' of ' || count(*) || ' checks passed',
          CASE WHEN bool_and(ok)
-              THEN 'All four migrations are live. Safe to deploy the app.'
+              THEN 'Every migration is live. Safe to deploy the app.'
               ELSE 'DO NOT deploy the app yet — fix the rows marked above.'
          END
   FROM checks
