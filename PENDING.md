@@ -219,6 +219,39 @@ Code: `supabase/migrations/20260907040000_late_alert_audit.sql`,
 
 ---
 
+## 5c. Late alerts: the noise is shift assignments — TOOLING BUILT 2026-09-07
+
+The first real audit run settled it. Across four days at one college, every
+single alert fell into one of three buckets and **none was the alert job
+misbehaving**:
+
+* Staff assigned to MORNING **and** AFTERNOON **and** NIGHT — all three
+  branchless — who punch once a day. Two legs alert, per person, every day.
+  That is where the volume comes from.
+* Offline punches: made before the alert, synced hours later, invisible to the
+  job at the time it ran.
+* Two dormant records at another site, already covered by the dormant guard.
+
+`fix_shift_assignments.sql` fixes the first and largest bucket. It decides which
+legs are real from when people actually punch, rather than asking anybody to
+remember, and it is deliberately timid:
+
+* Sections 1-3 are read-only; the change in section 4 is commented out.
+* An assignment is only removed with **zero** punches landing in its window.
+* Somebody with fewer than five days of history is left alone — a new starter
+  has not yet shown which legs they work.
+* Nobody is left with no shift at all, which would silently stop their alerts
+  and their payroll legs. A person whose punches land in none of their legs is
+  skipped rather than emptied, and looked at by hand.
+* The apply step aborts if it would remove more than the dry run showed.
+
+Proven against a fixture holding all six shapes: a morning-only and a
+night-only person reduced to one leg each, a genuine split shift keeping both,
+and the new starter, the never-punched record and the odd-hours person all
+untouched.
+
+---
+
 ## 6. API: writes, and everything beyond two read endpoints
 
 **Status:** read-only v1 shipped. Deliberately stopped there.

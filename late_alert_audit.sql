@@ -103,8 +103,12 @@ SELECT * FROM public.late_alert_audit_all();
 -- ── 5b. THE USUAL ROOT CAUSE: PEOPLE ON MORE SHIFTS THAN THEY WORK ──────────
 -- Somebody assigned three shift legs but punching once a day trips the other
 -- two, every single day. That is where most alert noise comes from, and it is
--- a data fix, not a code one. Anyone with more legs than punches-per-day is
--- listed here.
+-- a data fix, not a code one. Anyone with more than one leg is listed here.
+--
+-- To FIX it rather than just see it, run `fix_shift_assignments.sql`. That one
+-- works out which legs each person actually punches into and removes only the
+-- dead ones, leaving genuine split shifts and anybody with too little history
+-- alone.
 SELECT
   t.name                          AS company,
   p.full_name,
