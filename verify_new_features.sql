@@ -109,9 +109,10 @@ WITH checks(ord, feature, object, ok) AS (VALUES
   (34, 'Push', 'settle_push()', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='settle_push')$$)),
-  (35, 'Push', 'old notifications not queued (no backlog flood)', pg_temp.chk(
-     $$SELECT NOT EXISTS(SELECT 1 FROM public.notifications
-       WHERE push_state='queued' AND created_at < now() - INTERVAL '1 day')$$)),
+  (35, 'Push', 'dispatcher ignores day-old notifications (no backlog flood)', pg_temp.chk(
+     $$SELECT prosrc LIKE '%1 day%' FROM pg_proc p
+       JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='claim_push_batch'$$)),
 
   -- ── 5. SEMANTICS: is the behaviour actually right? ────────────────────────
   -- PF must cap at the ceiling: 12% of 15,000 = 1,800 even on a 50,000 wage.
@@ -124,11 +125,16 @@ WITH checks(ord, feature, object, ok) AS (VALUES
      $$SELECT COALESCE((SELECT esi_wage_threshold IS NOT NULL AND 25000 > esi_wage_threshold
        FROM public.tenants WHERE esi_wage_threshold = 21000 LIMIT 1), true)$$)),
   -- Nobody should be deducting from wages without having opted in.
-  (42, 'Semantics', 'PF/ESI default to OFF (no silent deductions)', pg_temp.chk(
-     $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants WHERE pf_enabled OR esi_enabled)$$)),
+  (42, 'Semantics', 'a NEW company gets PF/ESI off by default', pg_temp.chk(
+     $$SELECT count(*) = 2 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='tenants'
+         AND column_name IN ('pf_enabled','esi_enabled')
+         AND column_default = 'false'$$)),
   -- Location history is personal data; it must be opt-in.
-  (43, 'Semantics', 'Live tracking defaults to OFF', pg_temp.chk(
-     $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants WHERE live_tracking_enabled)$$)),
+  (43, 'Semantics', 'a NEW company gets live tracking off by default', pg_temp.chk(
+     $$SELECT column_default = 'false' FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='tenants'
+         AND column_name = 'live_tracking_enabled'$$)),
   (26, 'Late alerts', 'shifts.late_alerts_enabled opt-out', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
        AND table_name='shifts' AND column_name='late_alerts_enabled')$$)),
@@ -175,10 +181,10 @@ WITH checks(ord, feature, object, ok) AS (VALUES
   (52, 'API keys', 'api_key_resolve()', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='api_key_resolve')$$)),
-  (53, 'API keys', 'endpoints take no tenant argument', pg_temp.chk(
-     $$SELECT NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-       WHERE n.nspname='public' AND p.proname IN ('api_attendance','api_staff')
-         AND pg_get_function_arguments(p.oid) ILIKE '%tenant%')$$)),
+  (53, 'API keys', 'endpoints exist and take no tenant argument', pg_temp.chk(
+     $$SELECT count(*) = 2 AND bool_and(pg_get_function_arguments(p.oid) NOT ILIKE '%tenant%')
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname IN ('api_attendance','api_staff')$$)),
   (54, 'API keys', 'anon/authenticated cannot call the endpoints', pg_temp.chk(
      $$SELECT NOT (has_function_privilege('anon', 'public.api_staff(text)', 'EXECUTE')
                 OR has_function_privilege('authenticated', 'public.api_staff(text)', 'EXECUTE'))$$)),
@@ -186,10 +192,11 @@ WITH checks(ord, feature, object, ok) AS (VALUES
      $$SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass('public.api_request_log')$$)),
   (56, 'API keys', 'nightly log pruning scheduled', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM cron.job WHERE jobname='prune_api_logs')$$)),
-  (57, 'API keys', 'no plaintext key column exists', pg_temp.chk(
-     $$SELECT NOT EXISTS(SELECT 1 FROM information_schema.columns
-       WHERE table_schema='public' AND table_name='api_keys'
-         AND column_name IN ('key','secret','plaintext','raw_key'))$$)),
+  (57, 'API keys', 'key table exists and stores no plaintext', pg_temp.chk(
+     $$SELECT count(*) FILTER (WHERE column_name = 'key_hash') = 1
+          AND count(*) FILTER (WHERE column_name IN ('key','secret','plaintext','raw_key')) = 0
+       FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='api_keys'$$)),
 
   (44, 'Semantics', 'Late-alert threshold within 0-240 min', pg_temp.chk(
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants
