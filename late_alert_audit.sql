@@ -13,6 +13,29 @@
 -- ============================================================================
 
 
+-- ── 0. IS THE RIGHT VERSION APPLIED? ────────────────────────────────────────
+-- Without this, running the file against the older function fails with
+-- 'column "punched_at_ist" does not exist', which says nothing about the cause.
+DO $guard$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = 'late_alert_audit_all'
+      AND 'reached_server_ist' = ANY (p.proargnames)
+  ) THEN
+    RAISE EXCEPTION E'This file needs a newer version of the audit.\n\n'
+      'Apply supabase/migrations/20260907060000_late_alert_audit_sync_time.sql '
+      'first, then run this file again.\n\n'
+      'That migration is the one that judges an alert on when the punch REACHED '
+      'THE SERVER rather than when it was made — without it, every offline punch '
+      'is wrongly reported as a bug.';
+  END IF;
+END
+$guard$;
+
+
 -- ── 1. THE HEADLINE ─────────────────────────────────────────────────────────
 -- How many alerts were wrong, how many were right, and over what span.
 SELECT
