@@ -252,6 +252,51 @@ untouched.
 
 ---
 
+## 5d. Late alerts: staff on a rota — BUILT 2026-09-07
+
+The audit and the assignment fixer between them settled where the noise came
+from, and it was neither a bug nor a bad assignment.
+
+Ten staff at one college are each assigned MORNING, AFTERNOON and NIGHT. Their
+punch times across a fortnight: D RAMESH 07:54 one day and 21:12 another;
+LAKSHMAN 05:54 and 18:50; PRASAD 06:08 and 21:31. Nobody works morning AND
+night on the same day. They work **one leg a day and which one changes** —
+a rota. Assigning all three is how the college says "can be rostered to any
+shift", because there is no other way to say it.
+
+The job read that as "must be present for all three", so two legs alerted per
+person per day. `fix_shift_assignments.sql` only found seven genuinely dead
+assignments, which is correct: the legs are not dead, they are rotated.
+
+**`tenants.staff_work_one_shift_per_day`**, off by default so no existing
+tenant changes behaviour:
+
+* ON — a punch anywhere in the day means they attended whichever leg they were
+  rostered to, so no leg alerts. No punch at all raises **one** alert for the
+  day, against the earliest leg, rather than one per leg.
+* OFF — unchanged. A genuine split-shift worker who skips the afternoon is
+  still caught.
+
+Not inferred from the data on purpose. "Three legs, punches once" describes a
+rota and equally describes somebody skipping two thirds of their job, and those
+need opposite responses. The employer knows which; the schema does not.
+
+Set it on **Company profile → Alert me when a staff member is late**.
+
+Two things the test had to be rebuilt around, both of which would have made it
+pass while proving nothing:
+
+* Fixed clock times in the fixture fell outside the alert window, so *nothing*
+  alerted and "the rota worker got no alerts" was vacuously true. The legs are
+  now relative to the run time, and an explicit check fails the suite if the
+  job raised no alerts at all.
+* A punch with no branch already matches every leg (`NULL IS NOT DISTINCT FROM
+  NULL`), so a branchless fixture showed no difference. Real punches record the
+  campus while these shifts do not, and that asymmetry is what breaks the
+  match — recording the campus makes alerts *more* likely, not less.
+
+---
+
 ## 6. API: writes, and everything beyond two read endpoints
 
 **Status:** read-only v1 shipped. Deliberately stopped there.

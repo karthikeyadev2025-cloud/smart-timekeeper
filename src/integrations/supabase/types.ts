@@ -2109,6 +2109,7 @@ export type Database = {
         Row: {
           late_alert_dormant_days: number
           professional_tax_enabled: boolean
+          staff_work_one_shift_per_day: boolean
           pf_registration_number: string | null
           esi_registration_number: string | null
           pt_registration_number: string | null
@@ -2148,6 +2149,7 @@ export type Database = {
         Insert: {
           late_alert_dormant_days?: number
           professional_tax_enabled?: boolean
+          staff_work_one_shift_per_day?: boolean
           pf_registration_number?: string | null
           esi_registration_number?: string | null
           pt_registration_number?: string | null
@@ -2187,6 +2189,7 @@ export type Database = {
         Update: {
           late_alert_dormant_days?: number
           professional_tax_enabled?: boolean
+          staff_work_one_shift_per_day?: boolean
           pf_registration_number?: string | null
           esi_registration_number?: string | null
           pt_registration_number?: string | null

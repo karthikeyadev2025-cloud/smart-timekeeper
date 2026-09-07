@@ -19,6 +19,8 @@
 --   20260907030000_super_admin_tenant_access.sql
 --   20260907040000_late_alert_audit.sql
 --   20260907050000_statutory_confirmation.sql
+--   20260907060000_late_alert_audit_sync_time.sql
+--   20260907070000_rota_shifts.sql
 --
 -- Every check is one row. The verdict is the last line.
 -- ============================================================================
@@ -254,6 +256,20 @@ WITH checks(ord, feature, object, ok) AS (VALUES
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants t
        WHERE t.statutory_confirmed_at IS NOT NULL
          AND t.statutory_confirmed_fingerprint IS DISTINCT FROM public.statutory_fingerprint(t.id))$$)),
+
+  -- ── 10. ROTA SHIFTS ───────────────────────────────────────────────────────
+  (80, 'Rota', 'tenants.staff_work_one_shift_per_day', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='tenants' AND column_name='staff_work_one_shift_per_day')$$)),
+  (81, 'Rota', 'the alert job reads it', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) LIKE '%staff_work_one_shift_per_day%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='cron_notify_late_arrivals'$$)),
+  (82, 'Rota', 'defaults to OFF (nobody changes behaviour silently)', pg_temp.chk(
+     $$SELECT NOT EXISTS(SELECT 1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='tenants'
+         AND column_name='staff_work_one_shift_per_day'
+         AND column_default IS DISTINCT FROM 'false')$$)),
 
   (44, 'Semantics', 'Late-alert threshold within 0-240 min', pg_temp.chk(
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants

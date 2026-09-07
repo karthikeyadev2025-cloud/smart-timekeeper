@@ -333,6 +333,7 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     pf_registration_number?: string | null;
     esi_registration_number?: string | null;
     pt_registration_number?: string | null;
+    staff_work_one_shift_per_day?: boolean;
   }) => data)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -460,6 +461,9 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     }
     if (data.pt_registration_number !== undefined) {
       update.pt_registration_number = code(data.pt_registration_number);
+    }
+    if (data.staff_work_one_shift_per_day !== undefined) {
+      update.staff_work_one_shift_per_day = data.staff_work_one_shift_per_day;
     }
 
     if (data.id_card_accent !== undefined) {

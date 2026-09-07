@@ -68,6 +68,7 @@ function CompanyProfilePage() {
   const [trackStale, setTrackStale] = useState("10");
   const [trackRetention, setTrackRetention] = useState("7");
   const [lateAfter, setLateAfter] = useState("2");
+  const [rotaShifts, setRotaShifts] = useState(false);
   const [pfOn, setPfOn] = useState(false);
   const [pfPct, setPfPct] = useState("12");
   const [pfCeiling, setPfCeiling] = useState("15000");
@@ -101,6 +102,7 @@ function CompanyProfilePage() {
     setTrackStale(String(t.live_tracking_stale_minutes ?? 10));
     setTrackRetention(String(t.live_tracking_retention_days ?? 7));
     setLateAfter(String(t.late_alert_after_minutes ?? 2));
+    setRotaShifts(t.staff_work_one_shift_per_day ?? false);
     setPfOn(t.pf_enabled ?? false);
     setPfPct(String(t.pf_employee_percent ?? 12));
     // Empty input means "no ceiling", so a null must not become the string "null".
@@ -211,6 +213,7 @@ function CompanyProfilePage() {
           live_tracking_stale_minutes: Number(trackStale) || 10,
           live_tracking_retention_days: Number(trackRetention) || 7,
           late_alert_after_minutes: Number(lateAfter) || 0,
+          staff_work_one_shift_per_day: rotaShifts,
           pf_enabled: pfOn,
           pf_employee_percent: Number(pfPct) || 0,
           // Blank = no ceiling, deduct on the whole wage.
@@ -400,6 +403,29 @@ function CompanyProfilePage() {
                 <Input type="number" min={0} max={240} value={lateAfter}
                   onChange={(e) => setLateAfter(e.target.value)} className="w-24" />
                 <span className="text-sm text-muted-foreground">minutes after grace period</span>
+              </div>
+            )}
+
+            {lateAlerts && (
+              <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input type="checkbox" checked={rotaShifts}
+                    onChange={(e) => setRotaShifts(e.target.checked)}
+                    className="h-4 w-4 rounded border-input" />
+                  Staff work one of their shifts each day, on a rota
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Turn this on if somebody assigned Morning, Afternoon and Night works{" "}
+                  <strong>one</strong> of them on any given day, and which one changes. Their single
+                  check-in then counts for the day, instead of the other two shifts reporting them
+                  late every morning. If they do not come in at all you still get one alert, not
+                  three.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Leave it off for a genuine split shift — somebody who works 9-1 at one branch{" "}
+                  <em>and</em> 2-6 at another on the same day — so skipping the afternoon is still
+                  caught.
+                </p>
               </div>
             )}
           </div>
