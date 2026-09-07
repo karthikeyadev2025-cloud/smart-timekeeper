@@ -115,12 +115,24 @@ SELECT
   p.staff_id,
   count(*)                        AS shift_legs,
   string_agg(s.name, ', ' ORDER BY s.start_time) AS legs,
+  -- 30 days, matching the window fix_shift_assignments.sql judges on, so what
+  -- you read here is what that script will act on. A 14-day window showed
+  -- fewer punch-days and made people look thinner than the fixer considers
+  -- them.
   (SELECT count(*) FROM public.attendance_records ar
     WHERE ar.user_id = p.id AND ar.kind = 'check_in'
-      AND ar.attendance_date > current_date - 14)                    AS punches_14d,
+      AND ar.attendance_date > current_date - 30)                    AS punches_30d,
   (SELECT count(DISTINCT ar.attendance_date) FROM public.attendance_records ar
     WHERE ar.user_id = p.id AND ar.kind = 'check_in'
-      AND ar.attendance_date > current_date - 14)                    AS days_punched_14d
+      AND ar.attendance_date > current_date - 30)                    AS days_punched_30d,
+  -- Below 5 punch-days the fixer leaves the person alone: too little history
+  -- to say which legs they work. Those need a human, not a script.
+  CASE WHEN (SELECT count(DISTINCT ar.attendance_date) FROM public.attendance_records ar
+              WHERE ar.user_id = p.id AND ar.kind = 'check_in'
+                AND ar.attendance_date > current_date - 30) >= 5
+       THEN 'the fixer will act on this one'
+       ELSE 'too little history — fix by hand, or deactivate if they have left'
+  END                                                                AS fixer_verdict
 FROM public.profiles p
 JOIN public.tenants t       ON t.id = p.tenant_id
 JOIN public.staff_shifts ss ON ss.user_id = p.id
