@@ -2104,6 +2104,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          late_alert_dormant_days: number
           professional_tax_enabled: boolean
           live_tracking_enabled: boolean
           live_tracking_interval_seconds: number
@@ -2136,6 +2137,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          late_alert_dormant_days?: number
           professional_tax_enabled?: boolean
           live_tracking_enabled?: boolean
           live_tracking_interval_seconds?: number
@@ -2168,6 +2170,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          late_alert_dormant_days?: number
           professional_tax_enabled?: boolean
           live_tracking_enabled?: boolean
           live_tracking_interval_seconds?: number
@@ -2401,6 +2404,17 @@ export type Database = {
           branch_name: string | null
           is_active: boolean | null
           date_of_joining: string | null
+        }[]
+      }
+      dormant_staff: {
+        Args: { _tenant_id: string }
+        Returns: {
+          user_id: string
+          full_name: string | null
+          staff_id: string | null
+          profile_age_days: number
+          last_punch: string | null
+          reason: string
         }[]
       }
       live_staff_positions: {

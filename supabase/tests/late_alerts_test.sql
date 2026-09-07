@@ -239,4 +239,79 @@ BEGIN
   RAISE NOTICE 'pass  existing shifts default to alerting, unchanged';
 END $$;
 
+-- ── The dormant guard: the case that started this ──────────────────────────
+-- A new starter who is late on day one must still be alerted; a record that
+-- has sat unused for months must not be. Both halves of the rule are checked
+-- here, because either alone gets one of those two wrong.
+DO $$
+DECLARE n INT; v_who TEXT;
+BEGIN
+  DELETE FROM public.late_alerts;
+  DELETE FROM public.notifications WHERE kind = 'check_in_missed';
+  UPDATE public.tenants
+     SET late_alerts_enabled = true, late_alert_after_minutes = 2, late_alert_dormant_days = 30
+   WHERE id = 'c0000000-aaaa-aaaa-aaaa-00000000000a';
+  UPDATE public.shifts SET late_alerts_enabled = true
+   WHERE id = 'c0000000-5555-5555-5555-000000000001';
+
+  -- Larry is a long-standing record with no punches at all: dormant.
+  UPDATE public.profiles SET created_at = now() - INTERVAL '200 days'
+   WHERE id = 'c0000000-0000-0000-0000-00000000000b';
+
+  SELECT public.cron_notify_late_arrivals() INTO n;
+  IF n <> 0 THEN
+    RAISE EXCEPTION 'FAIL: a 200-day-old record that has never punched was still alerted';
+  END IF;
+  RAISE NOTICE 'pass  a long-dormant record no longer alerts every morning';
+
+  -- Same person, same absence — but the profile is two days old, so they are
+  -- a new hire late on their first morning and MUST be reported.
+  UPDATE public.profiles SET created_at = now() - INTERVAL '2 days'
+   WHERE id = 'c0000000-0000-0000-0000-00000000000b';
+
+  SELECT public.cron_notify_late_arrivals() INTO n;
+  IF n = 0 THEN
+    RAISE EXCEPTION 'FAIL: a brand-new hire late on day one was silently skipped';
+  END IF;
+  RAISE NOTICE 'pass  a new starter late on day one is still alerted';
+END $$;
+
+-- Somebody who punched recently but not today is late, not dormant.
+DO $$
+DECLARE n INT;
+BEGIN
+  DELETE FROM public.late_alerts;
+  DELETE FROM public.notifications WHERE kind = 'check_in_missed';
+  UPDATE public.profiles SET created_at = now() - INTERVAL '200 days'
+   WHERE id = 'c0000000-0000-0000-0000-00000000000b';
+  -- One punch three days ago: an ordinary employee, late this morning.
+  INSERT INTO public.attendance_records (tenant_id, user_id, kind, occurred_at, attendance_date)
+  VALUES ('c0000000-aaaa-aaaa-aaaa-00000000000a', 'c0000000-0000-0000-0000-00000000000b',
+          'check_in', now() - INTERVAL '3 days',
+          (now() AT TIME ZONE 'Asia/Kolkata')::date - 3);
+
+  SELECT public.cron_notify_late_arrivals() INTO n;
+  IF n = 0 THEN
+    RAISE EXCEPTION 'FAIL: an active employee who punched 3 days ago was treated as dormant';
+  END IF;
+  RAISE NOTICE 'pass  a recent punch keeps an employee on the roll';
+END $$;
+
+-- The guard can be switched off entirely.
+DO $$
+DECLARE n INT;
+BEGIN
+  DELETE FROM public.late_alerts;
+  DELETE FROM public.notifications WHERE kind = 'check_in_missed';
+  DELETE FROM public.attendance_records WHERE user_id = 'c0000000-0000-0000-0000-00000000000b';
+  UPDATE public.tenants SET late_alert_dormant_days = 0
+   WHERE id = 'c0000000-aaaa-aaaa-aaaa-00000000000a';
+
+  SELECT public.cron_notify_late_arrivals() INTO n;
+  IF n = 0 THEN
+    RAISE EXCEPTION 'FAIL: setting the guard to 0 did not restore the old behaviour';
+  END IF;
+  RAISE NOTICE 'pass  setting dormant_days to 0 alerts on everyone, as before';
+END $$;
+
 ROLLBACK;

@@ -88,9 +88,9 @@ and how long setup actually took.
 
 ---
 
-## 5. Late alerts cannot tell "late" from "never onboarded"
+## 5. Late alerts: dormant-staff guard — BUILT 2026-09-07
 
-**Status:** identified on live data 2026-09-01, deliberately not yet built.
+**Status:** shipped. Kept here for the reasoning, which is easy to get wrong.
 
 On the first production run the job flagged two staff as 93 and 213 minutes
 late. Their shift configuration was correct — the alert was working — but
@@ -114,10 +114,14 @@ real start time — a 24/7 rotation whose worker begins any time of day. That
 does NOT solve the dormant-record case below, which is about people, not
 shifts.
 
-**Deferred on purpose.** Tuning this blind is guessing. A few days of real
-alerts will show whether the right threshold is 2 minutes or 15, whether the
-4-hour window should narrow to 2, and whether the guard needs to be "never
-punched" or something broader.
+**What was built:** a staff member is skipped only when BOTH hold — no punch
+in the last N days (default 30, per tenant, 0 disables) AND their profile is
+older than N days. The second half is what makes the first safe: "has not
+punched recently" alone would silently exclude a genuine new hire who is late
+on their first morning, which is the case you would most want to hear about.
+
+`dormant_staff(tenant)` lists who is being skipped and why, so the guard does
+not become the next invisible problem.
 
 **Interim, no code needed:** find every record in this state with the dormant
 staff query, and deactivate or unassign the shift for anyone who has actually

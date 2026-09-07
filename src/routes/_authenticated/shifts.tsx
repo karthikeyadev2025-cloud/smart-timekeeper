@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Plus, MapPin, Clock, RefreshCw, Pencil, Trash2 } from "lucide-react";
+import { Plus, MapPin, Clock, RefreshCw, Pencil, Trash2, Archive, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { TimeInput12h, formatTime12h } from "@/components/ui/time-input";
@@ -29,6 +29,7 @@ type Shift = {
   start_time: string; end_time: string; break_minutes: number;
   grace_minutes?: number;
   branch_id?: string | null;
+  is_active?: boolean;
   working_days?: number[] | null;
   late_alerts_enabled?: boolean;
   late_fine_type?: "none" | "fixed_per_occurrence" | "per_minute" | "half_day_after_minutes";
@@ -180,12 +181,28 @@ function LocationForm({ tenantId, initial, onDone }: { tenantId: string; initial
 function ShiftsPanel({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [editShift, setEditShift] = useState<Shift | null>(null);
 
-  const { data } = useQuery<Shift[]>({
+  const { data: allShifts } = useQuery<Shift[]>({
     queryKey: ["shifts", tenantId],
     queryFn: async () => (await supabase.from("shifts").select("*, branches(name)").eq("tenant_id", tenantId).order("start_time")).data as any ?? [],
   });
+
+  // Archived shifts stay in the database — a shift with attendance history
+  // cannot be deleted without those punches forgetting which shift they
+  // belonged to — but they are hidden until asked for.
+  const archivedCount = (allShifts ?? []).filter((s) => s.is_active === false).length;
+  const data = (allShifts ?? []).filter((s) => showArchived || s.is_active !== false);
+
+  const setArchived = async (s: Shift, archived: boolean) => {
+    const { error } = await supabase.from("shifts").update({ is_active: !archived }).eq("id", s.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(archived ? `"${s.name}" archived` : `"${s.name}" restored`);
+      qc.invalidateQueries({ queryKey: ["shifts"] });
+    }
+  };
 
   const deleteShift = async (s: Shift) => {
     if (!confirm(`Delete shift "${s.name}"? Staff assigned to this shift will be unassigned.`)) return;
@@ -201,6 +218,15 @@ function ShiftsPanel({ tenantId }: { tenantId: string }) {
         <DialogContent><ShiftForm tenantId={tenantId} initial={null} onDone={() => { setAddOpen(false); qc.invalidateQueries({ queryKey: ["shifts"] }); }} /></DialogContent>
       </Dialog>
 
+      {archivedCount > 0 && (
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-input" />
+          Show {archivedCount} archived shift{archivedCount === 1 ? "" : "s"}
+        </label>
+      )}
+
       <Dialog open={!!editShift} onOpenChange={(v) => !v && setEditShift(null)}>
         <DialogContent>
           {editShift && <ShiftForm tenantId={tenantId} initial={editShift} onDone={() => { setEditShift(null); qc.invalidateQueries({ queryKey: ["shifts"] }); }} />}
@@ -212,7 +238,14 @@ function ShiftsPanel({ tenantId }: { tenantId: string }) {
           <Card key={s.id} className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="font-semibold truncate">{s.name}</h3>
+                <h3 className="font-semibold truncate">
+                  {s.name}
+                  {s.is_active === false && (
+                    <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal align-middle">
+                      Archived
+                    </span>
+                  )}
+                </h3>
                 <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
                   <Clock className="h-3.5 w-3.5" /> {formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}
                 </p>
@@ -228,6 +261,12 @@ function ShiftsPanel({ tenantId }: { tenantId: string }) {
               <div className="flex flex-col items-end gap-2 shrink-0">
                 <Badge variant="outline">{s.break_minutes}m break</Badge>
                 <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" title={s.is_active === false ? "Restore" : "Archive"}
+                    onClick={() => setArchived(s, s.is_active !== false)}>
+                    {s.is_active === false
+                      ? <RotateCcw className="h-3.5 w-3.5" />
+                      : <Archive className="h-3.5 w-3.5" />}
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => setEditShift(s)} title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
                   <Button size="sm" variant="ghost" onClick={() => deleteShift(s)} title="Delete"><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                 </div>
