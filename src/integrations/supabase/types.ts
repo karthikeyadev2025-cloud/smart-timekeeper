@@ -1549,6 +1549,7 @@ export type Database = {
       }
       shifts: {
         Row: {
+          is_timetable_slot: boolean
           late_alerts_enabled: boolean
           branch_id: string | null
           break_minutes: number | null
@@ -1567,6 +1568,7 @@ export type Database = {
           working_days: number[] | null
         }
         Insert: {
+          is_timetable_slot?: boolean
           late_alerts_enabled?: boolean
           branch_id?: string | null
           break_minutes?: number | null
@@ -1585,6 +1587,7 @@ export type Database = {
           working_days?: number[] | null
         }
         Update: {
+          is_timetable_slot?: boolean
           late_alerts_enabled?: boolean
           branch_id?: string | null
           break_minutes?: number | null
@@ -2415,6 +2418,21 @@ export type Database = {
           profile_age_days: number
           last_punch: string | null
           reason: string
+        }[]
+      }
+      set_staff_timetable: {
+        Args: { _tenant_id: string; _user_id: string; _slots: unknown }
+        Returns: { slots_applied: number; shifts_created: number; shifts_reused: number }[]
+      }
+      staff_timetable: {
+        Args: { _tenant_id: string; _user_id: string }
+        Returns: {
+          shift_id: string
+          start_time: string
+          end_time: string
+          branch_id: string | null
+          branch_name: string | null
+          generated: boolean
         }[]
       }
       live_staff_positions: {

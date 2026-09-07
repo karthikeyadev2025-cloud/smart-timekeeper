@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
+import { DayTimetable } from "@/components/DayTimetable";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -781,9 +782,12 @@ function ShiftsTab({ tenantId, staffId }: { tenantId: string; staffId: string })
     .sort((a: any, b: any) => String(a.start_time).localeCompare(String(b.start_time)));
 
   return (
+    <div className="space-y-4">
+    <DayTimetable tenantId={tenantId} userId={staffId} />
+
     <Card className="p-5 space-y-4">
       <div>
-        <h3 className="font-semibold">Shifts & branches</h3>
+        <h3 className="font-semibold">Shifts &amp; branches</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
           Tick every shift this person works. Assign more than one to cover several branches in a day — check-in
           automatically picks the right one based on the time.
@@ -844,5 +848,6 @@ function ShiftsTab({ tenantId, staffId }: { tenantId: string; staffId: string })
         Save shifts
       </Button>
     </Card>
+    </div>
   );
 }
