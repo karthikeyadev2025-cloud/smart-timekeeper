@@ -137,6 +137,17 @@ WITH checks(ord, feature, object, ok) AS (VALUES
        JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='cron_notify_late_arrivals'$$)),
 
+  (28, 'Late alerts', 'dormant guard column', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='tenants' AND column_name='late_alert_dormant_days')$$)),
+  (29, 'Late alerts', 'job honours the dormant guard', pg_temp.chk(
+     $$SELECT prosrc LIKE '%late_alert_dormant_days%' FROM pg_proc p
+       JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='cron_notify_late_arrivals'$$)),
+  (30, 'Late alerts', 'dormant_staff() so skipped people stay visible', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='dormant_staff')$$)),
+
   -- ── 6. PROFESSIONAL TAX ───────────────────────────────────────────────────
   (60, 'Prof. tax', 'tenants.professional_tax_enabled', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'

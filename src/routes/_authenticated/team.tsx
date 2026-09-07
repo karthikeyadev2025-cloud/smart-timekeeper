@@ -76,7 +76,7 @@ function TeamPage() {
     queryKey: ["shifts", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data } = await supabase.from("shifts").select("*, branches(name)").eq("tenant_id", tenantId!).order("start_time");
+      const { data } = await supabase.from("shifts").select("*, branches(name)").eq("tenant_id", tenantId!).neq("is_active", false).order("start_time");
       return data ?? [];
     },
   });
