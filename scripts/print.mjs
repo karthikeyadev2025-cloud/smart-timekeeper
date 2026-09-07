@@ -1,14 +1,25 @@
 import { chromium } from 'playwright';
+import { mkdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+// Everything is resolved from this file, so the command in the docs works from
+// anywhere in the checkout and on a machine that is not this one.
+const HERE = dirname(fileURLToPath(import.meta.url));
+const BUILD = resolve(HERE, '..', 'build', 'print');
+mkdirSync(BUILD, { recursive: true });
+
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const jobs = [
-  ['flyer.html',    '/home/user/out/punchly-flyer-A5.pdf',    '154mm', '216mm'],
-  ['onepager.html', '/home/user/out/punchly-onepager-A4.pdf', '216mm', '303mm'],
+  ['flyer.html',    'punchly-flyer-A5.pdf',    '154mm', '216mm'],
+  ['onepager.html', 'punchly-onepager-A4.pdf', '216mm', '303mm'],
 ];
-for (const [file, out, width, height] of jobs) {
+for (const [file, outName, width, height] of jobs) {
+  const out = join(BUILD, outName);
   const p = await b.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push(e.message));
-  await p.goto('file:///tmp/pgtest/' + file, { waitUntil: 'networkidle' });
+  await p.goto(pathToFileURL(join(BUILD, file)).href, { waitUntil: 'networkidle' });
   // Fail loudly if the layout overflows its own page box — that is exactly
   // the bug that put a section header through the middle of the checklist.
   const overflow = await p.evaluate(() => {

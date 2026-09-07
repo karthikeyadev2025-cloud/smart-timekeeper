@@ -1,0 +1,18 @@
+{
+  "_readme": [
+    "Contact details printed on the flyer and the one-pager.",
+    "",
+    "Both are blank because there is no business phone number or contact email",
+    "anywhere in this codebase, and inventing one on a piece handed to hospitals",
+    "and colleges is not a guess worth making.",
+    "",
+    "Fill in phone and email, then rebuild:",
+    "    python3 scripts/make_print.py",
+    "    node scripts/print.mjs",
+    "",
+    "make_print.py prints a warning naming whichever of these is still empty, so",
+    "a blank cannot reach a printer without somebody having been told twice."
+  ],
+  "phone": "",
+  "email": ""
+}

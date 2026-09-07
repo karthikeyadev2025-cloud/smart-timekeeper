@@ -13,6 +13,12 @@
 --   20260901030000_push_delivery_outbox.sql
 --   20260901040000_shift_late_alert_optout.sql
 --   20260904000000_tenant_api_keys.sql
+--   20260907000000_professional_tax.sql
+--   20260907010000_late_alert_dormant_guard.sql
+--   20260907020000_staff_timetable.sql
+--   20260907030000_super_admin_tenant_access.sql
+--   20260907040000_late_alert_audit.sql
+--   20260907050000_statutory_confirmation.sql
 --
 -- Every check is one row. The verdict is the last line.
 -- ============================================================================
@@ -155,14 +161,14 @@ WITH checks(ord, feature, object, ok) AS (VALUES
        WHERE n.nspname='public' AND p.proname='dormant_staff')$$)),
 
   -- ── SUPER ADMIN ACCESS ────────────────────────────────────────────────────
-  (58, 'Access', 'super admins can manage tenant data', pg_temp.chk(
+  (66, 'Access', 'super admins can manage tenant data', pg_temp.chk(
      $$SELECT prosrc LIKE '%is_super_admin%' FROM pg_proc p
        JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='is_tenant_admin'$$)),
-  (59, 'Access', 'day-timetable builder present', pg_temp.chk(
+  (67, 'Access', 'day-timetable builder present', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='set_staff_timetable')$$)),
-  (60, 'Access', 'timetable slots cannot duplicate', pg_temp.chk(
+  (68, 'Access', 'timetable slots cannot duplicate', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
        AND tablename='shifts' AND indexname='uq_timetable_slot')$$)),
 
@@ -209,6 +215,45 @@ WITH checks(ord, feature, object, ok) AS (VALUES
           AND count(*) FILTER (WHERE column_name IN ('key','secret','plaintext','raw_key')) = 0
        FROM information_schema.columns
        WHERE table_schema='public' AND table_name='api_keys'$$)),
+
+  -- ── 8. LATE-ALERT AUDIT ───────────────────────────────────────────────────
+  (70, 'Alert audit', 'late_alert_audit() for the app', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='late_alert_audit')$$)),
+  (71, 'Alert audit', 'late_alert_audit_all() for the SQL editor', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='late_alert_audit_all')$$)),
+  (72, 'Alert audit', 'the raw body is NOT callable by a signed-in user', pg_temp.chk(
+     $$SELECT NOT has_function_privilege('authenticated',
+       'public.late_alert_audit_all(uuid,date,date)', 'EXECUTE')$$)),
+  (73, 'Alert audit', 'the authorised one IS callable by a signed-in user', pg_temp.chk(
+     $$SELECT has_function_privilege('authenticated',
+       'public.late_alert_audit(uuid,date,date)', 'EXECUTE')$$)),
+
+  -- ── 9. STATUTORY RATE CONFIRMATION ────────────────────────────────────────
+  (74, 'Rate check', 'tenants.statutory_confirmed_fingerprint', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='tenants' AND column_name='statutory_confirmed_fingerprint')$$)),
+  (75, 'Rate check', 'registration-number columns', pg_temp.chk(
+     $$SELECT count(*) = 3 FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='tenants' AND column_name IN
+       ('pf_registration_number','esi_registration_number','pt_registration_number')$$)),
+  (76, 'Rate check', 'statutory_status()', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='statutory_status')$$)),
+  (77, 'Rate check', 'confirm_statutory_rates()', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='confirm_statutory_rates')$$)),
+  (78, 'Rate check', 'a fingerprint actually computes', pg_temp.chk(
+     -- "No companies yet" is not a missing migration, so an empty table passes
+     -- rather than reporting a fault that is not there.
+     $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants)
+        OR EXISTS(SELECT 1 FROM public.tenants t
+                  WHERE public.statutory_fingerprint(t.id) IS NOT NULL)$$)),
+  (79, 'Rate check', 'no company is marked confirmed against stale settings', pg_temp.chk(
+     $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants t
+       WHERE t.statutory_confirmed_at IS NOT NULL
+         AND t.statutory_confirmed_fingerprint IS DISTINCT FROM public.statutory_fingerprint(t.id))$$)),
 
   (44, 'Semantics', 'Late-alert threshold within 0-240 min', pg_temp.chk(
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants

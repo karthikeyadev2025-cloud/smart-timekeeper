@@ -330,6 +330,9 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     esi_employee_percent?: number;
     esi_wage_threshold?: number | null;
     professional_tax_enabled?: boolean;
+    pf_registration_number?: string | null;
+    esi_registration_number?: string | null;
+    pt_registration_number?: string | null;
   }) => data)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -441,6 +444,22 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     }
     if (data.esi_wage_threshold !== undefined) {
       update.esi_wage_threshold = wage(data.esi_wage_threshold, "ESI wage threshold");
+    }
+
+    // Registration codes. Kept so a payslip queried a year later can be traced
+    // to the registration its rates came from. Not validated against a format:
+    // EPFO, ESIC and each state's PT authority all issue different shapes, and
+    // rejecting a real code because it does not match a guessed pattern would
+    // be worse than storing whatever the employer reads off their certificate.
+    const code = (v: string | null) => (v ?? "").trim() || null;
+    if (data.pf_registration_number !== undefined) {
+      update.pf_registration_number = code(data.pf_registration_number);
+    }
+    if (data.esi_registration_number !== undefined) {
+      update.esi_registration_number = code(data.esi_registration_number);
+    }
+    if (data.pt_registration_number !== undefined) {
+      update.pt_registration_number = code(data.pt_registration_number);
     }
 
     if (data.id_card_accent !== undefined) {

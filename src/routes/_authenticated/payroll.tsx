@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Sparkles, Download, FileSpreadsheet, MessageSquareText, Wallet } from "lucide-react";
+import { Sparkles, Download, FileSpreadsheet, MessageSquareText, Wallet, ShieldAlert } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,6 +40,18 @@ function Payroll() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [generating, setGenerating] = useState(false);
   const [payFor, setPayFor] = useState<any | null>(null);
+
+  // Read once for the banner. Cheap, and the answer decides whether the person
+  // about to press Generate is told anything at all.
+  const { data: statutoryStatus } = useQuery({
+    queryKey: ["statutory-status", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("statutory_status", { _tenant_id: tenantId! });
+      if (error) throw error;
+      return Array.isArray(data) ? data[0] : data;
+    },
+  });
 
   const { data: payslips } = useQuery({
     queryKey: ["payslips", tenantId, year, month, branchId],
@@ -526,6 +538,25 @@ function Payroll() {
           <h1 className="text-3xl font-bold tracking-tight">Payroll</h1>
           <p className="text-muted-foreground">Auto-calculate monthly payslips from attendance. Exports respect the selected {branchLabel.toLowerCase()}.</p>
         </header>
+
+        {/* Statutory deductions come out of every payslip this button creates.
+            If nobody has vouched for the rates, say so here — the moment before
+            generating is the last one where checking still costs nothing. */}
+        {statutoryStatus?.any_scheme_on && !statutoryStatus.is_confirmed && (
+          <Card className="flex gap-3 border-amber-500/40 bg-amber-500/5 p-4">
+            <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600" />
+            <div className="space-y-1 text-sm">
+              <p className="font-medium">
+                {statutoryStatus.schemes_on} will be deducted, and nobody has confirmed the rates.
+              </p>
+              <p className="text-muted-foreground">
+                They are the common Indian defaults, not advice. Open{" "}
+                <Link to="/company" className="underline">Company profile</Link> to see what they
+                take out of each person's pay and mark them as checked.
+              </p>
+            </div>
+          </Card>
+        )}
 
         <Card className="p-4">
           <div className="flex flex-wrap items-end gap-3">

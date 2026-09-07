@@ -4,7 +4,7 @@ Everything here is **deliberately deferred**, not forgotten. The code is
 finished and merged-ready; these items are blocked on information or
 credentials that only the owner has.
 
-Last reviewed: 2026-09-01
+Last reviewed: 2026-09-07
 
 ---
 
@@ -29,23 +29,44 @@ missing.
 
 ---
 
-## 2. PF / ESI rates — need verification against a real registration
+## 2. PF / ESI / professional-tax rates — need checking against a real registration
 
-**Status:** implemented with the common Indian defaults; **off by default**,
-so nothing is being deducted from anyone today.
+**Status:** the product now makes the check visible instead of asking for it in
+a comment. Still **off by default**, so nothing is deducted from anyone today.
 
-Defaults used: PF 12% of wages capped at ₹15,000 (so ₹1,800 max); ESI 0.75%
-of gross, coverage stopping above ₹21,000.
+Defaults used: PF 12% of wages capped at ₹15,000 (so ₹1,800 max); ESI 0.75% of
+gross, coverage stopping above ₹21,000. Professional-tax bands are entered by
+the employer, nothing assumed.
 
-**Two things to confirm before running a real payroll:**
+**What was built (2026-09-07):**
 
-1. Check those percentages and limits against the employer's own PF/ESI
-   registration. They are defaults, not advice.
-2. **Known limitation:** `profiles` stores a single `monthly_salary` with no
-   basic/HRA split, so PF is computed on the whole wage. Employers who
-   calculate PF on a separate *basic* component need a schema change — an
-   extra salary-component column and a payroll change to match. Not built,
-   because no employer on the system currently needs it.
+* **Company profile** shows what the settings would take out of *your own
+  staff's* pay, worked out with the same functions payroll uses. Abstract bands
+  are hard to check; "₹18,000 → ₹2,295 deducted" can be held against a real
+  challan.
+* **Registration numbers** (PF establishment code, ESI employer code, PT
+  registration) are stored, so a payslip queried next year traces back to the
+  registration its rates came from.
+* **A confirmation that goes stale.** "I have checked these" records who and
+  when, against a fingerprint of every rate and band. Change any of them and the
+  badge reverts to unchecked — it can never claim a number was vouched for when
+  it was not.
+* **The payroll screen says so** before you press Generate.
+
+**What is still yours to do:** press the button — after actually comparing one
+row against your EPFO/ESIC statement and your state's current PT notification.
+Nobody else can do that part.
+
+**Known limitation, unchanged:** `profiles` stores a single `monthly_salary`
+with no basic/HRA split, so PF is computed on the whole wage. Employers who
+compute PF on a separate *basic* component will see higher figures here than on
+their challan. The preview says this in plain words underneath the table. Fixing
+it needs an extra salary-component column and a payroll change; not built,
+because no employer on the system currently needs it.
+
+Code: `supabase/migrations/20260907050000_statutory_confirmation.sql`,
+`src/components/StatutoryCheck.tsx`; tests in
+`supabase/tests/statutory_confirmation_test.sql`.
 
 ---
 
@@ -55,17 +76,21 @@ of gross, coverage stopping above ₹21,000.
 print-ready otherwise: CMYK, 3mm bleed, QR verified to decode to
 `https://punchly.online/`.
 
-Both carry deliberately blank contact fields — a phone line on the flyer,
-phone + email on the one-pager. **There is no business phone number or
-contact email anywhere in this codebase**, and inventing one on a piece
-handed to hospitals and colleges is not a guess worth making.
+Both carry deliberately blank contact fields — a phone line on the flyer, phone
++ email on the one-pager. **There is no business phone number or contact email
+anywhere in this codebase**, and inventing one on a piece handed to hospitals
+and colleges is not a guess worth making.
 
-**To finish:** supply the phone and email, then rebuild:
+**To finish:** put them in `scripts/print_contact.json` — a one-line edit each,
+no layout code involved — then:
 
 ```bash
-python3 scripts/make_print.py     # writes flyer.html + onepager.html
+python3 scripts/make_print.py     # writes build/print/*.html
 node scripts/print.mjs            # renders both PDFs, checks page overflow
 ```
+
+`make_print.py` prints a warning naming whichever field is still empty, so a
+blank rule cannot reach a printer without somebody having been told twice.
 
 Then convert to CMYK (requires ghostscript):
 
@@ -76,15 +101,31 @@ gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -dProcessColorModel=/DeviceCMYK \
    -sOutputFile=out-CMYK.pdf out.pdf
 ```
 
+**Fixed 2026-09-07:** the artwork module (the QR and four client logos, 127 KB)
+lived only in a scratch directory outside the checkout, so `make_print.py`
+failed with `ModuleNotFoundError` on a fresh clone — and those logos existed in
+exactly one place, on a machine that gets wiped. It is now
+`scripts/print_assets.py`, in the repository, and both scripts resolve every
+path relative to themselves instead of hard-coded absolute ones.
+
 ---
 
-## 4. Rithvika case study — needs four facts
+## 4. Customer case study — needs one fact, not four
 
-A customer case study was drafted but never finished, because writing one
-from invention would misrepresent a real client.
+**Three of the four are in the database.** `case_study_facts.sql` reads staff
+count, branches and setup time (account created → first real punch) for every
+company, biggest user first. It changes nothing.
 
-**Needed:** staff count, number of branches, what they used before Punchly,
-and how long setup actually took.
+**The one nothing can answer: what did they use before Punchly?** That has to
+come from asking them. `CASE_STUDY.md` has the frame, the follow-up questions
+worth asking, and a pre-publication checklist — attendance records are personal
+data under the DPDP Act and a case study is publication.
+
+One caution, spelled out in both files: `days_to_first_punch` measures the gap
+between the account being created and the first punch landing. If the account
+was created weeks before anyone was ready to start, that number is waiting, not
+setup, and should not be quoted as setup time. The query prints both dates so
+you can tell which it is.
 
 ---
 
@@ -134,6 +175,45 @@ UPDATE public.tenants SET late_alert_window_hours = 2;
 Relevant code: `cron_notify_late_arrivals()` in
 `supabase/migrations/20260901000000_late_arrival_alerts.sql`; tests in
 `supabase/tests/late_alerts_test.sql`.
+
+---
+
+## 5b. Late alerts: were the ones already sent correct? — ANSWERABLE 2026-09-07
+
+**Status:** the question is now answered by the product rather than by
+remembering to run a query one morning.
+
+Eleven alerts were raised and nobody could say whether they were true. The
+suggested fix was a manual query, which is a bad answer twice over: it only
+covers the morning you happen to remember, and it cannot look at the eleven
+alerts that already happened.
+
+`late_alert_audit()` looks **backwards** over the ledger instead. Every alert is
+on file with the time it fired, every punch with the time it happened, so each
+alert can be settled on its own evidence months later.
+
+**The test that matters is alert time vs punch time.** A punch that landed
+*before* the alert means the job had the evidence in front of it and alerted
+anyway — a bug, and the only pattern here that is one. A punch that landed
+*after* means the alert was true when it was sent and the person turned up late
+— the system working. "Did they punch that day?" cannot tell those apart, and
+they need opposite responses.
+
+The other verdicts separate the remaining causes, each with a different fix: a
+wrong campus assignment, a dormant record, an approved leave the job should have
+honoured, or a genuine no-show.
+
+**Where to look:** the **Late alerts** page in the admin nav. Pick a date range
+and it grades every alert with a count of wrong / worth-a-look / correct.
+
+**In the Supabase SQL editor** use `late_alert_audit_all()` instead —
+`auth.uid()` is NULL there, so the authorised version would correctly return
+nothing and it would read as "no alerts, nothing wrong". Both share one copy of
+the logic, and a test asserts they never disagree.
+
+Code: `supabase/migrations/20260907040000_late_alert_audit.sql`,
+`src/routes/_authenticated/late-alerts.tsx`; tests in
+`supabase/tests/late_alert_audit_test.sql`.
 
 ---
 

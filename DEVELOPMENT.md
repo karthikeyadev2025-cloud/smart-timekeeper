@@ -39,13 +39,23 @@ createdb pfresh
 psql -q -d pfresh -f supabase/tests/00_local_harness.sql
 for f in supabase/migrations/*.sql; do psql -q -v ON_ERROR_STOP=1 -d pfresh -f "$f"; done
 
-for t in profiles_self_update_guard attendance_integrity admin_permissions \
-         late_alerts live_positions push_outbox; do
-  psql -q -d pfresh -f supabase/tests/${t}_test.sql
+# Every suite, rather than a list that goes stale each time one is added.
+for f in supabase/tests/*_test.sql; do
+  echo "── $(basename "$f")"
+  psql -q -d pfresh -f "$f"
 done
 
 node --experimental-strip-types scripts/check-statutory-parity.mjs
+node --experimental-strip-types scripts/check-api-key-parity.mjs
 ```
+
+Currently 13 suites, 134 assertions. A pass prints `NOTICE: pass …`; anything
+printing `ERROR:` is a failure.
+
+One migration fails locally and is expected to: `20260623010000_notifications_cron.sql`
+needs the `pg_cron` extension, which Supabase has and a plain PostgreSQL does
+not. For the same reason `verify_new_features.sql` reports its three
+"scheduled to run" checks as ❌ locally and ✅ on Supabase.
 
 Every suite is `BEGIN … ROLLBACK`, so nothing persists. A failing assertion
 raises an exception with a message saying what was expected.

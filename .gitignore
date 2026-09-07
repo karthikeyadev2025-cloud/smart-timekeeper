@@ -53,3 +53,8 @@ ios/App/Pods/
 ios/App/DerivedData/
 *.keystore
 *.jks
+
+# Generated print pieces. Rebuild with scripts/make_print.py + scripts/print.mjs;
+# the sources are scripts/print_assets.py and scripts/print_contact.json.
+build/print/
+__pycache__/

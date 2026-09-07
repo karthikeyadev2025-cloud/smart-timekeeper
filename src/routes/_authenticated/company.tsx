@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
@@ -13,6 +13,7 @@ import { updateOwnCompanyProfile } from "@/lib/admin.functions";
 import { IdCardTemplateChooser } from "@/components/IdCardTemplateChooser";
 import { SignaturePad } from "@/components/SignaturePad";
 import { Building2, Upload, Trash2 } from "lucide-react";
+import { StatutoryCheck, type RegNumbers } from "@/components/StatutoryCheck";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/company")({
@@ -74,6 +75,7 @@ function CompanyProfilePage() {
   const [esiPct, setEsiPct] = useState("0.75");
   const [esiThreshold, setEsiThreshold] = useState("21000");
   const [ptOn, setPtOn] = useState(false);
+  const [reg, setReg] = useState<RegNumbers>({ pf: "", esi: "", pt: "" });
   // Slabs are edited as strings so a half-typed number does not become NaN
   // under the user's fingers.
   const [ptSlabs, setPtSlabs] = useState<{ min: string; amount: string }[]>([]);
@@ -107,6 +109,11 @@ function CompanyProfilePage() {
     setEsiPct(String(t.esi_employee_percent ?? 0.75));
     setEsiThreshold(t.esi_wage_threshold == null ? "" : String(t.esi_wage_threshold));
     setPtOn(t.professional_tax_enabled ?? false);
+    setReg({
+      pf: t.pf_registration_number ?? "",
+      esi: t.esi_registration_number ?? "",
+      pt: t.pt_registration_number ?? "",
+    });
   }, [tenant]);
 
   // Slabs arrive from their own query, so hydrate them separately from the
@@ -118,6 +125,42 @@ function CompanyProfilePage() {
       amount: String(r.monthly_amount),
     })));
   }, [existingSlabs]);
+
+  // Whether the statutory settings on screen differ from what is stored.
+  // Confirming rates you have not saved would stamp the OLD ones as checked,
+  // so the confirm button waits for a save. Only the statutory fields matter
+  // here — an unsaved logo has nothing to do with whether PF is right.
+  const statutoryDirty = useMemo(() => {
+    if (!tenant) return false;
+    const t = tenant as any;
+    const sameNum = (form: string, stored: unknown) => {
+      const a = form.trim();
+      const bNull = stored === null || stored === undefined;
+      if (a === "") return bNull;
+      if (bNull) return false;
+      return Number(a) === Number(stored);
+    };
+    if (pfOn !== (t.pf_enabled ?? false)) return true;
+    if (esiOn !== (t.esi_enabled ?? false)) return true;
+    if (ptOn !== (t.professional_tax_enabled ?? false)) return true;
+    if (!sameNum(pfPct, t.pf_employee_percent)) return true;
+    if (!sameNum(pfCeiling, t.pf_wage_ceiling)) return true;
+    if (!sameNum(esiPct, t.esi_employee_percent)) return true;
+    if (!sameNum(esiThreshold, t.esi_wage_threshold)) return true;
+    if (reg.pf.trim() !== (t.pf_registration_number ?? "")) return true;
+    if (reg.esi.trim() !== (t.esi_registration_number ?? "")) return true;
+    if (reg.pt.trim() !== (t.pt_registration_number ?? "")) return true;
+
+    const stored = (existingSlabs ?? [])
+      .map((r) => `${Number(r.min_amount)}:${Number(r.monthly_amount)}`)
+      .sort();
+    const onScreen = ptSlabs
+      .filter((r) => r.min.trim() !== "" && r.amount.trim() !== "")
+      .map((r) => `${Number(r.min)}:${Number(r.amount)}`)
+      .sort();
+    return stored.join("|") !== onScreen.join("|");
+  }, [tenant, existingSlabs, pfOn, pfPct, pfCeiling, esiOn, esiPct, esiThreshold, ptOn, ptSlabs, reg]);
+
 
   if (!tenantId) {
     return <AppShell><Card className="p-6">You need a company first.</Card></AppShell>;
@@ -176,6 +219,9 @@ function CompanyProfilePage() {
           esi_employee_percent: Number(esiPct) || 0,
           esi_wage_threshold: esiThreshold.trim() ? Number(esiThreshold) : null,
           professional_tax_enabled: ptOn,
+          pf_registration_number: reg.pf,
+          esi_registration_number: reg.esi,
+          pt_registration_number: reg.pt,
         },
       });
       // Slabs are replace-the-whole-set: deleting a band must actually remove
@@ -207,6 +253,10 @@ function CompanyProfilePage() {
       }
 
       toast.success("Company profile updated");
+      // The confirmation badge is derived from the saved settings, so it has
+      // to be re-read after a save or it would still describe the old ones.
+      qc.invalidateQueries({ queryKey: ["statutory-status", tenantId] });
+      qc.invalidateQueries({ queryKey: ["statutory-preview-salaries", tenantId] });
       qc.invalidateQueries({ queryKey: ["company-profile"] });
       qc.invalidateQueries({ queryKey: ["current-user"] });
     } catch (e: any) {
@@ -537,6 +587,23 @@ function CompanyProfilePage() {
               </div>
             )}
           </div>
+
+          <StatutoryCheck
+            tenantId={tenantId}
+            config={{
+              pf_enabled: pfOn,
+              pf_employee_percent: pfPct,
+              pf_wage_ceiling: pfCeiling.trim() ? pfCeiling : null,
+              esi_enabled: esiOn,
+              esi_employee_percent: esiPct,
+              esi_wage_threshold: esiThreshold.trim() ? esiThreshold : null,
+              professional_tax_enabled: ptOn,
+            }}
+            slabs={ptSlabs.map((r) => ({ min_amount: r.min, monthly_amount: r.amount }))}
+            reg={reg}
+            onRegChange={setReg}
+            hasUnsavedChanges={statutoryDirty}
+          />
 
           {/* ─── ID card template picker ─── */}
           <div className="space-y-3 border-t pt-5">

@@ -7,9 +7,26 @@ a page that looks like the paper in their hand.
 Page geometry: trim size + 3mm bleed on every edge. All content sits at least
 8mm inside the trim so nothing important dies in the guillotine.
 """
-import sys, pathlib
-sys.path.insert(0, "/tmp/pgtest")
-from assets import QR, LOGOS
+import json, pathlib, sys
+
+HERE = pathlib.Path(__file__).resolve().parent
+# Import from this script's own directory rather than the working directory, so
+# the command in the docs works from anywhere in the checkout.
+sys.path.insert(0, str(HERE))
+from print_assets import QR, LOGOS
+
+OUT = HERE.parent / "build" / "print"
+
+# Contact details live in a JSON file next to this script so filling them in is
+# a one-line edit and not a hunt through the layout code. Blank renders as the
+# same underscore rule it always did, and the script says so on the way out.
+_contact = json.loads((HERE / "print_contact.json").read_text())
+PHONE = (_contact.get("phone") or "").strip()
+EMAIL = (_contact.get("email") or "").strip()
+
+def contact(value, width):
+    """The detail if we have it, otherwise a rule of the right width to write on."""
+    return value if value else "_" * width
 
 BLEED = 3          # mm
 SAFE = 8           # mm inside trim
@@ -152,7 +169,7 @@ def flyer():
           <span class="data" style="color:{INDIGO};font-weight:500;">punchly.online</span>
         </div>
         <div class="data" style="font-size:2.5mm;margin-top:2mm;">
-          7-day free trial · ☎ <b>__________</b>
+          7-day free trial · ☎ <b>{contact(PHONE, 10)}</b>
         </div>
       </div>
     </div>
@@ -268,8 +285,8 @@ def onepager():
     </div>
     <div style="text-align:right;font-size:3mm;line-height:1.6;">
       <div class="eyebrow" style="font-size:2.2mm;">Talk to us</div>
-      <div class="data" style="font-size:3.4mm;font-weight:600;margin-top:1mm;">☎ ______________</div>
-      <div class="data" style="font-size:2.9mm;color:{MUTED};">✉ ______________</div>
+      <div class="data" style="font-size:3.4mm;font-weight:600;margin-top:1mm;">☎ {contact(PHONE, 14)}</div>
+      <div class="data" style="font-size:2.9mm;color:{MUTED};">✉ {contact(EMAIL, 14)}</div>
     </div>
   </div>
 
@@ -280,6 +297,16 @@ def onepager():
 </div></div></body></html>"""
 
 
-pathlib.Path("/tmp/pgtest/flyer.html").write_text(flyer())
-pathlib.Path("/tmp/pgtest/onepager.html").write_text(onepager())
-print("flyer.html + onepager.html written")
+OUT.mkdir(parents=True, exist_ok=True)
+(OUT / "flyer.html").write_text(flyer())
+(OUT / "onepager.html").write_text(onepager())
+print(f"flyer.html + onepager.html written to {OUT}")
+
+missing = [label for label, value in (("phone", PHONE), ("email", EMAIL)) if not value]
+if missing:
+    print(
+        f"\n  WARNING: no {' or '.join(missing)} — those fields print as a blank rule.\n"
+        f"  Fill them in at {HERE / 'print_contact.json'} and run this again\n"
+        f"  before sending anything to a printer.",
+        file=sys.stderr,
+    )

@@ -30,6 +30,7 @@ import { Route as AuthenticatedClassesRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedCompanyRouteImport } from './routes/_authenticated/company'
 import { Route as AuthenticatedKioskRouteImport } from './routes/_authenticated/kiosk'
+import { Route as AuthenticatedLateAlertsRouteImport } from './routes/_authenticated/late-alerts'
 import { Route as AuthenticatedLeaveTypesRouteImport } from './routes/_authenticated/leave-types'
 import { Route as AuthenticatedLeavesAdminRouteImport } from './routes/_authenticated/leaves-admin'
 import { Route as AuthenticatedLiveMapRouteImport } from './routes/_authenticated/live-map'
@@ -163,6 +164,11 @@ const AuthenticatedCompanyRoute = AuthenticatedCompanyRouteImport.update({
 const AuthenticatedKioskRoute = AuthenticatedKioskRouteImport.update({
   id: '/kiosk',
   path: '/kiosk',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLateAlertsRoute = AuthenticatedLateAlertsRouteImport.update({
+  id: '/late-alerts',
+  path: '/late-alerts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedLeaveTypesRoute = AuthenticatedLeaveTypesRouteImport.update({
@@ -329,6 +335,7 @@ export interface FileRoutesByFullPath {
   '/clients': typeof AuthenticatedClientsRoute
   '/company': typeof AuthenticatedCompanyRoute
   '/kiosk': typeof AuthenticatedKioskRoute
+  '/late-alerts': typeof AuthenticatedLateAlertsRoute
   '/leave-types': typeof AuthenticatedLeaveTypesRoute
   '/leaves-admin': typeof AuthenticatedLeavesAdminRoute
   '/live-map': typeof AuthenticatedLiveMapRoute
@@ -378,6 +385,7 @@ export interface FileRoutesByTo {
   '/clients': typeof AuthenticatedClientsRoute
   '/company': typeof AuthenticatedCompanyRoute
   '/kiosk': typeof AuthenticatedKioskRoute
+  '/late-alerts': typeof AuthenticatedLateAlertsRoute
   '/leave-types': typeof AuthenticatedLeaveTypesRoute
   '/leaves-admin': typeof AuthenticatedLeavesAdminRoute
   '/live-map': typeof AuthenticatedLiveMapRoute
@@ -429,6 +437,7 @@ export interface FileRoutesById {
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/company': typeof AuthenticatedCompanyRoute
   '/_authenticated/kiosk': typeof AuthenticatedKioskRoute
+  '/_authenticated/late-alerts': typeof AuthenticatedLateAlertsRoute
   '/_authenticated/leave-types': typeof AuthenticatedLeaveTypesRoute
   '/_authenticated/leaves-admin': typeof AuthenticatedLeavesAdminRoute
   '/_authenticated/live-map': typeof AuthenticatedLiveMapRoute
@@ -480,6 +489,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/company'
     | '/kiosk'
+    | '/late-alerts'
     | '/leave-types'
     | '/leaves-admin'
     | '/live-map'
@@ -529,6 +539,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/company'
     | '/kiosk'
+    | '/late-alerts'
     | '/leave-types'
     | '/leaves-admin'
     | '/live-map'
@@ -579,6 +590,7 @@ export interface FileRouteTypes {
     | '/_authenticated/clients'
     | '/_authenticated/company'
     | '/_authenticated/kiosk'
+    | '/_authenticated/late-alerts'
     | '/_authenticated/leave-types'
     | '/_authenticated/leaves-admin'
     | '/_authenticated/live-map'
@@ -771,6 +783,13 @@ declare module '@tanstack/react-router' {
       path: '/kiosk'
       fullPath: '/kiosk'
       preLoaderRoute: typeof AuthenticatedKioskRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/late-alerts': {
+      id: '/_authenticated/late-alerts'
+      path: '/late-alerts'
+      fullPath: '/late-alerts'
+      preLoaderRoute: typeof AuthenticatedLateAlertsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/leave-types': {
@@ -980,6 +999,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedCompanyRoute: typeof AuthenticatedCompanyRoute
   AuthenticatedKioskRoute: typeof AuthenticatedKioskRoute
+  AuthenticatedLateAlertsRoute: typeof AuthenticatedLateAlertsRoute
   AuthenticatedLeaveTypesRoute: typeof AuthenticatedLeaveTypesRoute
   AuthenticatedLeavesAdminRoute: typeof AuthenticatedLeavesAdminRoute
   AuthenticatedLiveMapRoute: typeof AuthenticatedLiveMapRoute
@@ -1018,6 +1038,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedCompanyRoute: AuthenticatedCompanyRoute,
   AuthenticatedKioskRoute: AuthenticatedKioskRoute,
+  AuthenticatedLateAlertsRoute: AuthenticatedLateAlertsRoute,
   AuthenticatedLeaveTypesRoute: AuthenticatedLeaveTypesRoute,
   AuthenticatedLeavesAdminRoute: AuthenticatedLeavesAdminRoute,
   AuthenticatedLiveMapRoute: AuthenticatedLiveMapRoute,

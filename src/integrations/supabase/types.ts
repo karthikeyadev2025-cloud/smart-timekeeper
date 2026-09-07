@@ -2109,6 +2109,12 @@ export type Database = {
         Row: {
           late_alert_dormant_days: number
           professional_tax_enabled: boolean
+          pf_registration_number: string | null
+          esi_registration_number: string | null
+          pt_registration_number: string | null
+          statutory_confirmed_at: string | null
+          statutory_confirmed_by: string | null
+          statutory_confirmed_fingerprint: string | null
           live_tracking_enabled: boolean
           live_tracking_interval_seconds: number
           live_tracking_stale_minutes: number
@@ -2142,6 +2148,12 @@ export type Database = {
         Insert: {
           late_alert_dormant_days?: number
           professional_tax_enabled?: boolean
+          pf_registration_number?: string | null
+          esi_registration_number?: string | null
+          pt_registration_number?: string | null
+          statutory_confirmed_at?: string | null
+          statutory_confirmed_by?: string | null
+          statutory_confirmed_fingerprint?: string | null
           live_tracking_enabled?: boolean
           live_tracking_interval_seconds?: number
           live_tracking_stale_minutes?: number
@@ -2175,6 +2187,12 @@ export type Database = {
         Update: {
           late_alert_dormant_days?: number
           professional_tax_enabled?: boolean
+          pf_registration_number?: string | null
+          esi_registration_number?: string | null
+          pt_registration_number?: string | null
+          statutory_confirmed_at?: string | null
+          statutory_confirmed_by?: string | null
+          statutory_confirmed_fingerprint?: string | null
           live_tracking_enabled?: boolean
           live_tracking_interval_seconds?: number
           live_tracking_stale_minutes?: number
@@ -2418,6 +2436,39 @@ export type Database = {
           profile_age_days: number
           last_punch: string | null
           reason: string
+        }[]
+      }
+      statutory_status: {
+        Args: { _tenant_id: string }
+        Returns: {
+          any_scheme_on: boolean
+          is_confirmed: boolean
+          confirmed_at: string | null
+          confirmed_by: string | null
+          schemes_on: string | null
+          missing_numbers: string | null
+        }[]
+      }
+      confirm_statutory_rates: {
+        Args: { _tenant_id: string }
+        Returns: string
+      }
+      late_alert_audit: {
+        Args: { _tenant_id?: string | null; _from?: string | null; _to?: string | null }
+        Returns: {
+          alert_date: string
+          tenant_id: string
+          company: string
+          full_name: string | null
+          staff_id: string | null
+          shift_name: string
+          branch_name: string
+          alerted_at_ist: string
+          alerted_minutes: number
+          first_punch_ist: string | null
+          punch_branch: string
+          verdict: string
+          what_to_do: string
         }[]
       }
       set_staff_timetable: {
