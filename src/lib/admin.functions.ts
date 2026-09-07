@@ -329,6 +329,7 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     esi_enabled?: boolean;
     esi_employee_percent?: number;
     esi_wage_threshold?: number | null;
+    professional_tax_enabled?: boolean;
   }) => data)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -434,6 +435,9 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     if (data.esi_enabled !== undefined) update.esi_enabled = data.esi_enabled;
     if (data.esi_employee_percent !== undefined) {
       update.esi_employee_percent = pct(data.esi_employee_percent, "ESI percentage");
+    }
+    if (data.professional_tax_enabled !== undefined) {
+      update.professional_tax_enabled = data.professional_tax_enabled;
     }
     if (data.esi_wage_threshold !== undefined) {
       update.esi_wage_threshold = wage(data.esi_wage_threshold, "ESI wage threshold");

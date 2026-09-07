@@ -137,7 +137,25 @@ WITH checks(ord, feature, object, ok) AS (VALUES
        JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='cron_notify_late_arrivals'$$)),
 
-  -- ── 6. API KEYS ───────────────────────────────────────────────────────────
+  -- ── 6. PROFESSIONAL TAX ───────────────────────────────────────────────────
+  (60, 'Prof. tax', 'tenants.professional_tax_enabled', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='tenants' AND column_name='professional_tax_enabled')$$)),
+  (61, 'Prof. tax', 'professional_tax_slabs table', pg_temp.chk(
+     $$SELECT to_regclass('public.professional_tax_slabs') IS NOT NULL$$)),
+  (62, 'Prof. tax', 'payslips.professional_tax', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='payslips' AND column_name='professional_tax')$$)),
+  (63, 'Prof. tax', 'professional_tax() function', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='professional_tax')$$)),
+  (64, 'Prof. tax', 'duplicate bands impossible (PK on tenant+min)', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_constraint
+       WHERE conrelid=to_regclass('public.professional_tax_slabs') AND contype='p')$$)),
+  (65, 'Prof. tax', 'defaults to OFF (no silent deductions)', pg_temp.chk(
+     $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants WHERE professional_tax_enabled)$$)),
+
+  -- ── 7. API KEYS ───────────────────────────────────────────────────────────
   (50, 'API keys', 'api_keys table', pg_temp.chk(
      $$SELECT to_regclass('public.api_keys') IS NOT NULL$$)),
   (51, 'API keys', 'key hash is unique (lookup index)', pg_temp.chk(

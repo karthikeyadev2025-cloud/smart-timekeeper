@@ -816,6 +816,7 @@ export type Database = {
       }
       payslips: {
         Row: {
+          professional_tax: number
           pf_deduction: number
           esi_deduction: number
           gross_earnings: number | null
@@ -842,6 +843,7 @@ export type Database = {
           working_days: number
         }
         Insert: {
+          professional_tax?: number
           pf_deduction?: number
           esi_deduction?: number
           gross_earnings?: number | null
@@ -868,6 +870,7 @@ export type Database = {
           working_days?: number
         }
         Update: {
+          professional_tax?: number
           pf_deduction?: number
           esi_deduction?: number
           gross_earnings?: number | null
@@ -2078,8 +2081,30 @@ export type Database = {
         }
         Relationships: []
       }
+      professional_tax_slabs: {
+        Row: {
+          tenant_id: string
+          min_amount: number
+          monthly_amount: number
+          created_at: string
+        }
+        Insert: {
+          tenant_id: string
+          min_amount: number
+          monthly_amount: number
+          created_at?: string
+        }
+        Update: {
+          tenant_id?: string
+          min_amount?: number
+          monthly_amount?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       tenants: {
         Row: {
+          professional_tax_enabled: boolean
           live_tracking_enabled: boolean
           live_tracking_interval_seconds: number
           live_tracking_stale_minutes: number
@@ -2111,6 +2136,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          professional_tax_enabled?: boolean
           live_tracking_enabled?: boolean
           live_tracking_interval_seconds?: number
           live_tracking_stale_minutes?: number
@@ -2142,6 +2168,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          professional_tax_enabled?: boolean
           live_tracking_enabled?: boolean
           live_tracking_interval_seconds?: number
           live_tracking_stale_minutes?: number
@@ -2393,6 +2420,10 @@ export type Database = {
           is_stale: boolean
           position_source: string
         }[]
+      }
+      professional_tax: {
+        Args: { _tenant_id: string; _gross: number }
+        Returns: number
       }
       statutory_deductions: {
         Args: { _tenant_id: string; _gross: number }

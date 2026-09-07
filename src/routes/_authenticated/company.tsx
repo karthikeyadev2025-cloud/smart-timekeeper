@@ -26,13 +26,26 @@ function CompanyProfilePage() {
   const qc = useQueryClient();
   const updateFn = useServerFn(updateOwnCompanyProfile);
 
+  const { data: existingSlabs } = useQuery({
+    queryKey: ["pt-slabs", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("professional_tax_slabs")
+        .select("min_amount, monthly_amount")
+        .eq("tenant_id", tenantId!)
+        .order("min_amount");
+      return data ?? [];
+    },
+  });
+
   const { data: tenant } = useQuery({
     queryKey: ["company-profile", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
       const { data } = await supabase
         .from("tenants")
-        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent, partial_day_policy, default_monthly_working_days, late_alerts_enabled, late_alert_after_minutes, pf_enabled, pf_employee_percent, pf_wage_ceiling, esi_enabled, esi_employee_percent, esi_wage_threshold, live_tracking_enabled, live_tracking_interval_seconds, live_tracking_stale_minutes, live_tracking_retention_days")
+        .select("name, logo_url, primary_color, contact_email, contact_phone, slug, tenant_type, id_card_template, id_card_accent, partial_day_policy, default_monthly_working_days, late_alerts_enabled, late_alert_after_minutes, pf_enabled, pf_employee_percent, pf_wage_ceiling, esi_enabled, esi_employee_percent, esi_wage_threshold, professional_tax_enabled, live_tracking_enabled, live_tracking_interval_seconds, live_tracking_stale_minutes, live_tracking_retention_days")
         .eq("id", tenantId!)
         .maybeSingle();
       return data;
@@ -60,6 +73,10 @@ function CompanyProfilePage() {
   const [esiOn, setEsiOn] = useState(false);
   const [esiPct, setEsiPct] = useState("0.75");
   const [esiThreshold, setEsiThreshold] = useState("21000");
+  const [ptOn, setPtOn] = useState(false);
+  // Slabs are edited as strings so a half-typed number does not become NaN
+  // under the user's fingers.
+  const [ptSlabs, setPtSlabs] = useState<{ min: string; amount: string }[]>([]);
   const [expectedDays, setExpectedDays] = useState<string>("");
   const [cardAccent, setCardAccent] = useState<string>("#4F46E5");
 
@@ -89,7 +106,18 @@ function CompanyProfilePage() {
     setEsiOn(t.esi_enabled ?? false);
     setEsiPct(String(t.esi_employee_percent ?? 0.75));
     setEsiThreshold(t.esi_wage_threshold == null ? "" : String(t.esi_wage_threshold));
+    setPtOn(t.professional_tax_enabled ?? false);
   }, [tenant]);
+
+  // Slabs arrive from their own query, so hydrate them separately from the
+  // tenant row rather than waiting for both.
+  useEffect(() => {
+    if (!existingSlabs) return;
+    setPtSlabs(existingSlabs.map((r) => ({
+      min: String(r.min_amount),
+      amount: String(r.monthly_amount),
+    })));
+  }, [existingSlabs]);
 
   if (!tenantId) {
     return <AppShell><Card className="p-6">You need a company first.</Card></AppShell>;
@@ -147,8 +175,37 @@ function CompanyProfilePage() {
           esi_enabled: esiOn,
           esi_employee_percent: Number(esiPct) || 0,
           esi_wage_threshold: esiThreshold.trim() ? Number(esiThreshold) : null,
+          professional_tax_enabled: ptOn,
         },
       });
+      // Slabs are replace-the-whole-set: deleting a band must actually remove
+      // it, and a partial update would leave an orphan band still charging.
+      if (ptOn) {
+        const rows = ptSlabs
+          .filter((r) => r.min.trim() !== "" && r.amount.trim() !== "")
+          .map((r) => ({
+            tenant_id: tenantId!,
+            min_amount: Number(r.min),
+            monthly_amount: Number(r.amount),
+          }))
+          .filter((r) => Number.isFinite(r.min_amount) && Number.isFinite(r.monthly_amount)
+                      && r.min_amount >= 0 && r.monthly_amount >= 0);
+
+        // Two bands starting at the same amount is ambiguous; the primary key
+        // would reject it anyway, so say so clearly instead.
+        const mins = rows.map((r) => r.min_amount);
+        if (new Set(mins).size !== mins.length) {
+          throw new Error("Two professional-tax bands start at the same amount");
+        }
+
+        await supabase.from("professional_tax_slabs").delete().eq("tenant_id", tenantId!);
+        if (rows.length > 0) {
+          const { error: slabErr } = await supabase.from("professional_tax_slabs").insert(rows);
+          if (slabErr) throw new Error(`Could not save the tax bands: ${slabErr.message}`);
+        }
+        qc.invalidateQueries({ queryKey: ["pt-slabs", tenantId] });
+      }
+
       toast.success("Company profile updated");
       qc.invalidateQueries({ queryKey: ["company-profile"] });
       qc.invalidateQueries({ queryKey: ["current-user"] });
@@ -393,6 +450,92 @@ function CompanyProfilePage() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* ─── Professional tax ─── */}
+          <div className="space-y-3 border-t pt-5">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" checked={ptOn} onChange={(e) => setPtOn(e.target.checked)}
+                className="h-4 w-4 rounded border-input" />
+              Deduct professional tax
+            </label>
+            <p className="text-xs text-muted-foreground">
+              A state tax, deducted monthly, banded by salary. The bands differ by state and change
+              from time to time, so you set them yourself — nothing is assumed. Check them against
+              your own state's current notification.
+            </p>
+
+            {ptOn && (
+              <div className="space-y-2 pl-6">
+                <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-[11px] font-medium text-muted-foreground">
+                  <span>Monthly gross from (₹)</span>
+                  <span>Tax per month (₹)</span>
+                  <span />
+                </div>
+
+                {ptSlabs.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No bands yet. Add one, or load the Telangana / Andhra Pradesh defaults below
+                    and edit them.
+                  </p>
+                )}
+
+                {ptSlabs.map((slab, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+                    <Input type="number" min={0} value={slab.min} placeholder="0"
+                      onChange={(e) => setPtSlabs((prev) =>
+                        prev.map((r, j) => (j === i ? { ...r, min: e.target.value } : r)))} />
+                    <Input type="number" min={0} value={slab.amount} placeholder="0"
+                      onChange={(e) => setPtSlabs((prev) =>
+                        prev.map((r, j) => (j === i ? { ...r, amount: e.target.value } : r)))} />
+                    <Button type="button" size="sm" variant="ghost" className="text-destructive"
+                      onClick={() => setPtSlabs((prev) => prev.filter((_, j) => j !== i))}>
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button type="button" size="sm" variant="outline"
+                    onClick={() => setPtSlabs((prev) => [...prev, { min: "", amount: "" }])}>
+                    Add band
+                  </Button>
+                  {ptSlabs.length === 0 && (
+                    <Button type="button" size="sm" variant="ghost"
+                      onClick={() => setPtSlabs([
+                        { min: "0", amount: "0" },
+                        { min: "15001", amount: "150" },
+                        { min: "20001", amount: "200" },
+                      ])}>
+                      Load Telangana / AP defaults
+                    </Button>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  A band applies from its amount upwards, until the next band starts. With bands at
+                  0, 15,001 and 20,001, someone earning ₹15,000 pays the first band and someone on
+                  ₹15,001 pays the second.
+                </p>
+
+                {(() => {
+                  // India caps professional tax at ₹2,500 a year. Warn rather
+                  // than block: the limit is a matter of state law, and the
+                  // employer is the one who has to answer for it.
+                  const highest = ptSlabs.reduce((max, r) => {
+                    const n = Number(r.amount);
+                    return Number.isFinite(n) && n > max ? n : max;
+                  }, 0);
+                  return highest * 12 > 2500 ? (
+                    <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[11px]">
+                      ₹{highest} a month is ₹{(highest * 12).toLocaleString("en-IN")} a year, above
+                      the ₹2,500 annual ceiling that applies in India. Double-check the band before
+                      you run payroll.
+                    </p>
+                  ) : null;
+                })()}
+              </div>
+            )}
           </div>
 
           {/* ─── ID card template picker ─── */}
