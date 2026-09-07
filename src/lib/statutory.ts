@@ -16,6 +16,12 @@
  * employee's payslip.
  */
 
+/** One professional-tax band: "monthly gross at or above this → pay this". */
+export type PtSlab = {
+  min_amount: number | string;
+  monthly_amount: number | string;
+};
+
 export type StatutoryConfig = {
   pf_enabled?: boolean | null;
   pf_employee_percent?: number | string | null;
@@ -25,6 +31,7 @@ export type StatutoryConfig = {
   esi_employee_percent?: number | string | null;
   /** Above this monthly gross the employee is outside ESI coverage. */
   esi_wage_threshold?: number | string | null;
+  professional_tax_enabled?: boolean | null;
 };
 
 const num = (v: number | string | null | undefined, fallback: number): number => {
@@ -60,4 +67,37 @@ export function statutoryDeductions(
   }
 
   return { pf, esi };
+}
+
+/**
+ * Professional tax for a monthly wage, from the employer's own slab table.
+ *
+ * Mirrors `public.professional_tax(uuid, numeric)`. The applicable band is the
+ * one with the greatest `min_amount` at or below the wage — the same rule, so
+ * a wage falling between two bands lands on the lower one in both places
+ * rather than differing by language.
+ *
+ * Returns 0 when the scheme is off, when no slabs are configured, or when the
+ * wage is not positive. Nothing is ever deducted by default.
+ */
+export function professionalTax(
+  enabled: boolean | null | undefined,
+  slabs: PtSlab[] | null | undefined,
+  gross: number,
+): number {
+  if (!enabled || !slabs?.length) return 0;
+  if (!Number.isFinite(gross) || gross <= 0) return 0;
+
+  let best: { min: number; amount: number } | null = null;
+  for (const slab of slabs) {
+    const min = num(slab.min_amount, NaN);
+    const amount = num(slab.monthly_amount, NaN);
+    // A malformed row is skipped rather than treated as zero, which would
+    // silently suppress a band that should have applied.
+    if (!Number.isFinite(min) || !Number.isFinite(amount)) continue;
+    if (min > gross) continue;
+    if (!best || min > best.min) best = { min, amount };
+  }
+
+  return best ? round2(best.amount) : 0;
 }

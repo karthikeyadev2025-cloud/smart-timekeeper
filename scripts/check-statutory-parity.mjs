@@ -12,7 +12,7 @@
  * cluster described in DEVELOPMENT.md.
  */
 import { execFileSync } from "node:child_process";
-import { statutoryDeductions } from "../src/lib/statutory.ts";
+import { statutoryDeductions, professionalTax } from "../src/lib/statutory.ts";
 
 const DB = process.argv[2] ?? process.env.DATABASE_URL ?? "postgresql:///pfresh?host=/tmp&port=55432&user=postgres";
 
@@ -96,3 +96,61 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(`pass  TypeScript and SQL agree on all ${checked} PF/ESI cases`);
+
+// ── Professional tax: the same rule, in two languages ──────────────────────
+// Telangana's current bands, plus a deliberately awkward one to check that a
+// wage between bands lands on the lower band identically in both.
+const PT_SLABS = [
+  { min_amount: 0, monthly_amount: 0 },
+  { min_amount: 15001, monthly_amount: 150 },
+  { min_amount: 20001, monthly_amount: 200 },
+];
+const PT_GROSSES = [0, 1, 14999, 15000, 15000.5, 15001, 19999.99, 20000, 20001,
+                    25000, 100000, -500];
+
+const ptId = "e0000000-0000-0000-0000-0000000000ff";
+const ptSql = [
+  "BEGIN;",
+  `INSERT INTO public.tenants (id,name,slug,professional_tax_enabled) VALUES ('${ptId}','PT','parity-pt',true);`,
+  ...PT_SLABS.map((s) =>
+    `INSERT INTO public.professional_tax_slabs (tenant_id,min_amount,monthly_amount) VALUES ('${ptId}',${s.min_amount},${s.monthly_amount});`),
+  `SELECT g, public.professional_tax('${ptId}', g) FROM unnest(ARRAY[${PT_GROSSES.join(",")}]::numeric[]) g;`,
+  "ROLLBACK;",
+].join("\n");
+
+let ptOut;
+try {
+  ptOut = execFileSync("psql", [DB, "-tAF", "|", "-q", "-v", "ON_ERROR_STOP=1", "-c", ptSql], {
+    encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+  });
+} catch (e) {
+  console.error(`FAIL: professional-tax query failed\n  ${String(e.stderr ?? e.message).trim().split("\n")[0]}`);
+  process.exit(1);
+}
+
+let ptChecked = 0;
+const ptFailures = [];
+for (const line of ptOut.split("\n")) {
+  const parts = line.trim().split("|");
+  if (parts.length !== 2) continue;
+  const [gross, sqlVal] = parts;
+  if (!Number.isFinite(Number(gross))) continue;
+  const ts = professionalTax(true, PT_SLABS, Number(gross));
+  ptChecked++;
+  if (ts !== Number(sqlVal)) {
+    ptFailures.push(`  gross ${gross}: sql=${sqlVal} ts=${ts}`);
+  }
+}
+
+if (!ptChecked) { console.error("FAIL: no professional-tax rows compared"); process.exit(1); }
+if (ptFailures.length) {
+  console.error(`FAIL: PT disagrees on ${ptFailures.length}/${ptChecked} cases:`);
+  console.error(ptFailures.join("\n"));
+  process.exit(1);
+}
+
+// Off, and no-slabs, must both yield nothing in TypeScript too.
+if (professionalTax(false, PT_SLABS, 50000) !== 0) { console.error("FAIL: PT charged while disabled"); process.exit(1); }
+if (professionalTax(true, [], 50000) !== 0) { console.error("FAIL: PT charged with no slabs"); process.exit(1); }
+
+console.log(`pass  TypeScript and SQL agree on all ${ptChecked} professional-tax cases`);

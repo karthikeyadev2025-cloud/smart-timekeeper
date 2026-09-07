@@ -22,7 +22,7 @@ import { BranchFilter } from "@/components/BranchFilter";
 import { toast } from "sonner";
 import { downloadPayslipPdf } from "@/lib/payslip-pdf";
 import { downloadCsv } from "@/lib/csv";
-import { statutoryDeductions } from "@/lib/statutory";
+import { statutoryDeductions, professionalTax } from "@/lib/statutory";
 
 export const Route = createFileRoute("/_authenticated/payroll")({
   component: Payroll,
@@ -99,12 +99,20 @@ function Payroll() {
       // run, so it is read once rather than per staff member.
       const { data: statutory, error: statutoryError } = await supabase
         .from("tenants")
-        .select("pf_enabled, pf_employee_percent, pf_wage_ceiling, esi_enabled, esi_employee_percent, esi_wage_threshold")
+        .select("pf_enabled, pf_employee_percent, pf_wage_ceiling, esi_enabled, esi_employee_percent, esi_wage_threshold, professional_tax_enabled")
         .eq("id", tenantId)
         .single();
       // Fail rather than silently generating payslips with no PF/ESI line: a
       // payslip that under-deducts is worse than one that isn't generated.
       if (statutoryError) throw statutoryError;
+
+      // Professional-tax bands, read once for the whole run like the rest of
+      // the statutory config.
+      const { data: ptSlabs, error: ptError } = await supabase
+        .from("professional_tax_slabs")
+        .select("min_amount, monthly_amount")
+        .eq("tenant_id", tenantId);
+      if (ptError) throw ptError;
 
       let count = 0;
       for (const s of staff) {
@@ -410,8 +418,12 @@ function Payroll() {
         // wages, so it does not shrink the PF/ESI base.
         const grossEarnings = Math.max(0, base - absenceDeduction);
         const { pf, esi } = statutoryDeductions(statutory, grossEarnings);
+        // Professional tax is a flat monthly amount for the band the wage
+        // falls in — not a percentage, so it does not scale with the wage
+        // inside a band.
+        const ptax = professionalTax(statutory.professional_tax_enabled, ptSlabs, grossEarnings);
 
-        const deductions = absenceDeduction + lateFine + pf + esi;
+        const deductions = absenceDeduction + lateFine + pf + esi + ptax;
         const net = Math.max(0, base - deductions);
 
         await supabase.from("payslips").upsert({
@@ -423,6 +435,7 @@ function Payroll() {
           overtime_hours: 0, deductions, net_pay: net,
           late_days: lateDaysCount, late_fine: lateFine,
           gross_earnings: grossEarnings, pf_deduction: pf, esi_deduction: esi,
+          professional_tax: ptax,
         }, { onConflict: "user_id,period_year,period_month" });
         count++;
       }
@@ -453,6 +466,7 @@ function Payroll() {
       gross_earnings: p.gross_earnings ?? "",
       pf: p.pf_deduction ?? 0,
       esi: p.esi_deduction ?? 0,
+      professional_tax: p.professional_tax ?? 0,
       deductions: p.deductions,
       net_pay: p.net_pay,
     }));

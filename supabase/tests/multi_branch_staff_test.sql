@@ -121,4 +121,70 @@ BEGIN
   RAISE NOTICE 'pass  the day reads as a route: %', v_route;
 END $$;
 
+-- ── Hour-by-hour campus hopping ────────────────────────────────────────────
+-- The college case: a teacher at one campus for the 09:00 hour, another for
+-- the 10:00 hour, back to the first at 11:00. Nothing constrains a shift's
+-- length, so an hour-long leg is as valid as a full day.
+DO $$
+DECLARE v_n INT; v_route TEXT;
+BEGIN
+  INSERT INTO public.shifts (id, tenant_id, branch_id, name, start_time, end_time, grace_minutes, is_active) VALUES
+    ('b2000000-6666-6666-6666-000000000001', 'b2000000-aaaa-aaaa-aaaa-00000000000a',
+     'b2000000-bbbb-bbbb-bbbb-000000000001', 'P1 Boys',  '09:00', '10:00', 5, true),
+    ('b2000000-6666-6666-6666-000000000002', 'b2000000-aaaa-aaaa-aaaa-00000000000a',
+     'b2000000-bbbb-bbbb-bbbb-000000000002', 'P2 Day',   '10:00', '11:00', 5, true),
+    ('b2000000-6666-6666-6666-000000000003', 'b2000000-aaaa-aaaa-aaaa-00000000000a',
+     'b2000000-bbbb-bbbb-bbbb-000000000001', 'P3 Boys',  '11:00', '12:00', 5, true),
+    ('b2000000-6666-6666-6666-000000000004', 'b2000000-aaaa-aaaa-aaaa-00000000000a',
+     'b2000000-bbbb-bbbb-bbbb-000000000003', 'P4 Girls', '12:00', '13:00', 5, true);
+
+  INSERT INTO auth.users (id, email)
+  VALUES ('b2000000-0000-0000-0000-00000000000c', 'lecturer@multi.test') ON CONFLICT DO NOTHING;
+  DELETE FROM public.user_roles WHERE user_id = 'b2000000-0000-0000-0000-00000000000c';
+  INSERT INTO public.profiles (id, tenant_id, full_name)
+  VALUES ('b2000000-0000-0000-0000-00000000000c', 'b2000000-aaaa-aaaa-aaaa-00000000000a', 'Lecturer Latha')
+  ON CONFLICT (id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, full_name = EXCLUDED.full_name;
+  INSERT INTO public.user_roles (user_id, role, tenant_id)
+  VALUES ('b2000000-0000-0000-0000-00000000000c', 'staff', 'b2000000-aaaa-aaaa-aaaa-00000000000a')
+  ON CONFLICT DO NOTHING;
+
+  INSERT INTO public.staff_shifts (tenant_id, user_id, shift_id)
+  SELECT 'b2000000-aaaa-aaaa-aaaa-00000000000a', 'b2000000-0000-0000-0000-00000000000c', id
+  FROM public.shifts WHERE id::TEXT LIKE 'b2000000-6666-%';
+
+  SELECT count(*), string_agg(shift_name || '@' || COALESCE(branch_name, '?'), ' -> ' ORDER BY seq)
+    INTO v_n, v_route
+  FROM public.staff_day_segments(
+    'b2000000-aaaa-aaaa-aaaa-00000000000a',
+    (now() AT TIME ZONE 'Asia/Kolkata')::date,
+    'b2000000-0000-0000-0000-00000000000c');
+
+  IF v_n <> 4 THEN
+    RAISE EXCEPTION 'FAIL: expected 4 hourly legs, got % (%)', v_n, v_route;
+  END IF;
+  IF v_route <> 'P1 Boys@BOYS CAMPUS -> P2 Day@DAY CAMPUS -> P3 Boys@BOYS CAMPUS -> P4 Girls@GIRLS CAMPUS'
+  THEN
+    RAISE EXCEPTION 'FAIL: hourly route came back wrong: %', v_route;
+  END IF;
+  RAISE NOTICE 'pass  four one-hour legs across three campuses, in order: %', v_route;
+END $$;
+
+-- Returning to a campus later in the day must stay two separate legs, not be
+-- collapsed into one.
+DO $$
+DECLARE v_boys INT;
+BEGIN
+  SELECT count(*) INTO v_boys
+  FROM public.staff_day_segments(
+    'b2000000-aaaa-aaaa-aaaa-00000000000a',
+    (now() AT TIME ZONE 'Asia/Kolkata')::date,
+    'b2000000-0000-0000-0000-00000000000c')
+  WHERE branch_name = 'BOYS CAMPUS';
+
+  IF v_boys <> 2 THEN
+    RAISE EXCEPTION 'FAIL: two separate visits to one campus collapsed into % leg(s)', v_boys;
+  END IF;
+  RAISE NOTICE 'pass  visiting the same campus twice in a day stays two legs';
+END $$;
+
 ROLLBACK;

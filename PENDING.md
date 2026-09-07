@@ -158,6 +158,20 @@ stakes on every other policy in the schema.
 
 ---
 
+## 7. Professional tax: two things deliberately not modelled
+
+Shipped with employer-defined slabs. Two known gaps, both documented in the
+migration header:
+
+- **The ₹2,500 annual cap.** With ordinary AP/Telangana bands (₹200 × 12 =
+  ₹2,400) it never binds, so enforcing it would mean year-to-date tracking for
+  a case that does not arise. The admin screen warns when entered bands would
+  exceed it; it does not block. Build the cap if a client sets higher bands.
+- **Month-specific amounts.** Maharashtra charges more in February. Bands here
+  are the same every month. Only matters if a client operates outside AP/TG.
+
+---
+
 ## Recently finished (for context)
 
 All shipped and verified; nothing outstanding on these.
