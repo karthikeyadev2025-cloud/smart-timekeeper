@@ -28,6 +28,8 @@ type Shift = {
   id: string; name: string;
   start_time: string; end_time: string; break_minutes: number;
   grace_minutes?: number;
+  branch_id?: string | null;
+  working_days?: number[] | null;
   late_alerts_enabled?: boolean;
   late_fine_type?: "none" | "fixed_per_occurrence" | "per_minute" | "half_day_after_minutes";
   late_fine_amount?: number;
@@ -182,7 +184,7 @@ function ShiftsPanel({ tenantId }: { tenantId: string }) {
 
   const { data } = useQuery<Shift[]>({
     queryKey: ["shifts", tenantId],
-    queryFn: async () => (await supabase.from("shifts").select("*").eq("tenant_id", tenantId).order("start_time")).data as any ?? [],
+    queryFn: async () => (await supabase.from("shifts").select("*, branches(name)").eq("tenant_id", tenantId).order("start_time")).data as any ?? [],
   });
 
   const deleteShift = async (s: Shift) => {
@@ -214,6 +216,14 @@ function ShiftsPanel({ tenantId }: { tenantId: string }) {
                 <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
                   <Clock className="h-3.5 w-3.5" /> {formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}
                 </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {(s as any).branches?.name ?? (
+                    <span className="text-amber-600">No branch set</span>
+                  )}
+                  {Array.isArray(s.working_days) && s.working_days.length > 0
+                    ? ` · ${s.working_days.map((d) => ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][d - 1]).join(", ")}`
+                    : " · Every day"}
+                </p>
               </div>
               <div className="flex flex-col items-end gap-2 shrink-0">
                 <Badge variant="outline">{s.break_minutes}m break</Badge>
@@ -232,6 +242,15 @@ function ShiftsPanel({ tenantId }: { tenantId: string }) {
 }
 
 function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: Shift | null; onDone: () => void }) {
+  const { data: branches } = useQuery({
+    queryKey: ["branches-for-shift", tenantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("branches").select("id, name").eq("tenant_id", tenantId).order("name");
+      return data ?? [];
+    },
+  });
+
   const isEdit = !!initial;
   // Time values from Postgres come back as "HH:MM:SS"; <input type="time"> wants "HH:MM"
   const trimTime = (t?: string) => (t ?? "").slice(0, 5);
@@ -242,6 +261,10 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
   const [breakMin, setBreakMin] = useState((initial?.break_minutes ?? 60).toString());
   const [graceMin, setGraceMin] = useState((initial?.grace_minutes ?? 10).toString());
   const [lateAlerts, setLateAlerts] = useState(initial?.late_alerts_enabled ?? true);
+  const [branchId, setBranchId] = useState(initial?.branch_id ?? "");
+  // ISO day numbers, 1 = Monday. Empty means every day, matching the column's
+  // NULL semantics everywhere else in the app.
+  const [workingDays, setWorkingDays] = useState<number[]>(initial?.working_days ?? []);
   const [fineType, setFineType] = useState<NonNullable<Shift["late_fine_type"]>>(initial?.late_fine_type ?? "none");
   const [fineAmount, setFineAmount] = useState((initial?.late_fine_amount ?? 0).toString());
   const [halfDayMin, setHalfDayMin] = useState((initial?.half_day_after_minutes ?? 120).toString());
@@ -259,6 +282,12 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
       break_minutes: Math.max(0, Number(breakMin) || 0),
       grace_minutes: Math.max(0, Number(graceMin) || 0),
       late_alerts_enabled: lateAlerts,
+      // The branch is what makes one person able to work several campuses in a
+      // day: each shift carries its own, and check-in, payroll, the live map
+      // and the late alerts all read it.
+      branch_id: branchId || null,
+      // NULL means every day, which is what the rest of the app expects.
+      working_days: workingDays.length > 0 ? [...workingDays].sort((a, b) => a - b) : null,
       late_fine_type: fineType,
       late_fine_amount: Math.max(0, Number(fineAmount) || 0),
       half_day_after_minutes: Math.max(1, Number(halfDayMin) || 120),
@@ -286,6 +315,53 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
         <p className="text-xs text-muted-foreground -mt-2">
           Staff can check in any time — these rules only affect payroll deductions, never block check-in.
         </p>
+        <div className="space-y-1">
+          <Label className="text-xs">Branch / campus</Label>
+          <select
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+            className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+          >
+            <option value="">— No specific branch —</option>
+            {(branches ?? []).map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+          <p className="text-[11px] text-muted-foreground">
+            Where this shift is worked. This is what lets one person cover several campuses in a
+            day — give each campus visit its own shift with its own branch and timing, then tick
+            them all on that person's profile.
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs">Days this shift runs</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, idx) => {
+              const day = idx + 1; // ISO: 1 = Monday
+              const on = workingDays.includes(day);
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => setWorkingDays((prev) =>
+                    prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day])}
+                  className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${
+                    on ? "border-primary bg-primary/10 font-medium" : "hover:bg-muted/50"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {workingDays.length === 0
+              ? "None ticked = runs every day."
+              : `Runs ${workingDays.length} day${workingDays.length === 1 ? "" : "s"} a week. Late alerts and payroll skip the other days.`}
+          </p>
+        </div>
+
         <div className="space-y-1">
           <Label className="text-xs">Grace period (minutes after start time before it's "late")</Label>
           <Input type="number" value={graceMin} onChange={e => setGraceMin(e.target.value)} min={0} max={180} />
