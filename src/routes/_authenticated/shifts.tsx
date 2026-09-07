@@ -331,12 +331,24 @@ function ShiftForm({ tenantId, initial, onDone }: { tenantId: string; initial: S
       late_fine_amount: Math.max(0, Number(fineAmount) || 0),
       half_day_after_minutes: Math.max(1, Number(halfDayMin) || 120),
     };
-    const { error } = isEdit
-      ? await supabase.from("shifts").update(payload).eq("id", initial!.id)
-      : await supabase.from("shifts").insert(payload);
+    // .select() so we can tell a blocked write from a successful one. A row
+    // that RLS hides is not an error to PostgREST — the update simply matches
+    // nothing and returns success, so without this the form reports "saved"
+    // while the change was silently discarded.
+    const { data: saved, error } = isEdit
+      ? await supabase.from("shifts").update(payload).eq("id", initial!.id).select("id")
+      : await supabase.from("shifts").insert(payload).select("id");
     setLoading(false);
-    if (error) toast.error(error.message);
-    else { toast.success(isEdit ? "Shift updated" : "Shift created"); onDone(); }
+    if (error) { toast.error(error.message); return; }
+    if (!saved || saved.length === 0) {
+      toast.error(
+        "Nothing was saved — you do not have permission to change this shift. " +
+        "Sign in as this company's admin, or use the admin panel.",
+      );
+      return;
+    }
+    toast.success(isEdit ? "Shift updated" : "Shift created");
+    onDone();
   };
 
   return (
