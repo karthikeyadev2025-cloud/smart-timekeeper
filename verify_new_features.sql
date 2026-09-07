@@ -154,6 +154,18 @@ WITH checks(ord, feature, object, ok) AS (VALUES
      $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='dormant_staff')$$)),
 
+  -- ── SUPER ADMIN ACCESS ────────────────────────────────────────────────────
+  (58, 'Access', 'super admins can manage tenant data', pg_temp.chk(
+     $$SELECT prosrc LIKE '%is_super_admin%' FROM pg_proc p
+       JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='is_tenant_admin'$$)),
+  (59, 'Access', 'day-timetable builder present', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='set_staff_timetable')$$)),
+  (60, 'Access', 'timetable slots cannot duplicate', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+       AND tablename='shifts' AND indexname='uq_timetable_slot')$$)),
+
   -- ── 6. PROFESSIONAL TAX ───────────────────────────────────────────────────
   (60, 'Prof. tax', 'tenants.professional_tax_enabled', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
