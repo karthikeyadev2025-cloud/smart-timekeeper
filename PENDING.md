@@ -232,7 +232,11 @@ misbehaving**:
   job at the time it ran.
 * Two dormant records at another site, already covered by the dormant guard.
 
-`fix_shift_assignments.sql` fixes the first and largest bucket. It decides which
+`fix_shift_assignments.sql` fixes the first bucket **for companies on fixed
+shifts**. It now skips any company running a rota entirely: there, "no punches
+in this leg over 30 days" means the rota has not come round to it, not that the
+leg is dead, and removing it would misattribute a later punch and split payroll
+against the wrong leg. Section 1b lists what was skipped and why. It decides which
 legs are real from when people actually punch, rather than asking anybody to
 remember, and it is deliberately timid:
 

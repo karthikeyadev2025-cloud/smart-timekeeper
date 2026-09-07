@@ -23,6 +23,21 @@
 --     leg for them.
 --   * It only removes assignments with ZERO matching punches. One punch inside
 --     the window is enough to keep the leg.
+--   * It skips any company running a ROTA entirely. See below.
+--
+-- WHY A ROTA IS EXCLUDED:
+--
+--   Where staff are rostered to ONE of their shifts each day and which one
+--   changes (tenants.staff_work_one_shift_per_day), "no punches in this leg
+--   over 30 days" does not mean the leg is dead. It means the rota has not
+--   reached it yet. Somebody who has not worked nights since July may well be
+--   on nights in October, and removing the assignment would then misattribute
+--   their punch and split their payroll against the wrong leg.
+--
+--   For those companies the late-alert noise is already handled by the rota
+--   setting itself — alerts become per-day rather than per-leg — so there is
+--   nothing to gain here and a real way to get it wrong. Section 1b lists the
+--   companies skipped for this reason.
 -- ============================================================================
 
 
@@ -54,6 +69,20 @@ WHERE p.is_active
 GROUP BY t.name, p.id, p.full_name, p.staff_id
 HAVING count(DISTINCT ss.shift_id) > 1
 ORDER BY count(DISTINCT ss.shift_id) DESC, t.name, p.full_name;
+
+
+-- ── 1b. COMPANIES SKIPPED BECAUSE THEY RUN A ROTA ───────────────────────────
+-- Nothing below will touch these. If a company you expected to see in section 3
+-- is listed here, that is why, and it is deliberate.
+SELECT
+  t.name AS company,
+  'runs a rota — a leg with no punches has not come round yet, not died'::text AS why_skipped,
+  (SELECT count(DISTINCT ss.user_id) FROM public.staff_shifts ss
+    JOIN public.profiles p2 ON p2.id = ss.user_id
+    WHERE p2.tenant_id = t.id)                                     AS staff_on_shifts
+FROM public.tenants t
+WHERE t.staff_work_one_shift_per_day
+ORDER BY t.name;
 
 
 -- ── 2. EVERY ASSIGNMENT, SCORED BY WHETHER ANYBODY PUNCHES INTO IT ──────────
@@ -107,7 +136,9 @@ JOIN public.tenants t       ON t.id = p.tenant_id
 JOIN public.staff_shifts ss ON ss.user_id = p.id
 JOIN public.shifts s        ON s.id = ss.shift_id AND s.is_active
 WHERE p.is_active
-  AND s.start_time IS NOT NULL;
+  AND s.start_time IS NOT NULL
+  -- Rota companies are out of scope entirely; see the header.
+  AND NOT t.staff_work_one_shift_per_day;
 
 SELECT company, full_name, staff_id, shift_name, starts, ends,
        days_punched_30d, punches_in_window, legs_assigned
