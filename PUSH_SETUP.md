@@ -28,8 +28,14 @@ variables. Nothing below requires a code change or an app re-install.
 
 1. Go to **https://console.firebase.google.com** → Add project →
    name it "Punchly" → no Analytics needed
+
+   *Already done: the project is `punchly-27a6d`.*
 2. In the project → **Project settings (gear icon) → General**
-3. Scroll to **Your apps** → click the Android icon
+3. Scroll to **Your apps** → click the **Android** icon
+
+   The **Web** app registration is a different thing and does not deliver push
+   here: the client path is Capacitor/Android only (`src/lib/push.ts`), with no
+   web-push or VAPID implementation. An Android registration is what is needed.
 4. Fill in:
    - **Android package name**: `online.punchly.app` (matches your APK)
    - **App nickname**: Punchly
@@ -37,18 +43,24 @@ variables. Nothing below requires a code change or an app re-install.
 5. Click **Register app**
 6. Download `google-services.json` — save it to your computer
 
-### Part 2: Add Firebase to the Android project (5 min)
+### Part 2: Add Firebase to the Android project (1 min)
 
-1. Copy `google-services.json` into `android/app/` in your repo
-2. Open `android/build.gradle` (the project-level one) and add inside `buildscript { dependencies { ... } }`:
-   ```gradle
-   classpath 'com.google.gms:google-services:4.4.0'
-   ```
-3. Open `android/app/build.gradle` and add at the very bottom:
-   ```gradle
-   apply plugin: 'com.google.gms.google-services'
-   ```
-4. Commit + rebuild the APK (`gradlew assembleDebug`)
+**The gradle wiring is already in the repo** — `android/build.gradle` has the
+classpath and `android/app/build.gradle` applies the plugin, but only when the
+JSON is present, so a checkout without it still builds:
+
+```gradle
+def servicesJSON = file('google-services.json')
+if (servicesJSON.text) { apply plugin: 'com.google.gms.google-services' }
+```
+
+So the only step is:
+
+1. Copy `google-services.json` into `android/app/`
+2. Rebuild the APK (`gradlew assembleDebug`)
+
+Unlike the service-account key, `google-services.json` is not a secret — it
+ships inside every APK — so committing it is fine.
 
 ### Part 3: Create a service account (3 min)
 
@@ -58,13 +70,28 @@ which is what this app uses.
 
 1. Firebase console → **Project settings → Service accounts**
 2. Click **Generate new private key** → confirm → a `.json` file downloads
-3. Open it. You need three values out of it:
+3. Set it as an environment variable. **Either form works:**
+
+   **Simplest — paste the whole file** as one variable:
+
+   | Variable                       | Value                        |
+   | ------------------------------ | ---------------------------- |
+   | `FIREBASE_SERVICE_ACCOUNT_JSON` | the entire JSON file contents |
+
+   Prefer this. The PEM key keeps its real newlines inside a JSON string,
+   instead of having to survive being pasted into a dashboard field — which is
+   the single most common way this setup goes wrong.
+
+   **Or pick out three fields** by hand:
 
    | JSON field     | Environment variable    |
    | -------------- | ----------------------- |
    | `project_id`   | `FIREBASE_PROJECT_ID`   |
    | `client_email` | `FIREBASE_CLIENT_EMAIL` |
    | `private_key`  | `FIREBASE_PRIVATE_KEY`  |
+
+   A separate variable wins over the same field in the pasted JSON, so you can
+   override one without re-pasting the rest.
 
 Keep that file out of the repository. It is a credential: anyone holding it
 can send notifications to every device that has your app installed.
@@ -74,18 +101,25 @@ can send notifications to every device that has your app installed.
 In Vercel → your project → **Settings → Environment Variables**, add:
 
 ```
-FIREBASE_PROJECT_ID        = punchly-1234
-FIREBASE_CLIENT_EMAIL      = firebase-adminsdk-xxxxx@punchly-1234.iam.gserviceaccount.com
+FIREBASE_SERVICE_ACCOUNT_JSON = {"type":"service_account","project_id":"punchly-27a6d", ... }
+PUSH_DISPATCH_SECRET          = <any long random string you invent>
+SUPABASE_SERVICE_ROLE_KEY     = <Supabase → Settings → API → service_role>
+```
+
+Or, if you would rather split the Firebase credential into three:
+
+```
+FIREBASE_PROJECT_ID        = punchly-27a6d
+FIREBASE_CLIENT_EMAIL      = firebase-adminsdk-xxxxx@punchly-27a6d.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY       = -----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n
-PUSH_DISPATCH_SECRET       = <any long random string you invent>
-SUPABASE_SERVICE_ROLE_KEY  = <Supabase → Settings → API → service_role>
 ```
 
 Notes:
 
-- Paste `FIREBASE_PRIVATE_KEY` exactly as it appears in the JSON, `\n`
-  escapes and all. The code un-escapes them, because most dashboards mangle
-  real newlines.
+- Pasting the whole JSON is less error-prone. If you do split it out instead,
+  paste `FIREBASE_PRIVATE_KEY` exactly as it appears in the file, `\n` escapes
+  and all — the code un-escapes them, because most dashboards mangle real
+  newlines.
 - `PUSH_DISPATCH_SECRET` is yours to invent. It is the only thing stopping a
   stranger from triggering your push dispatcher. Generate one with
   `openssl rand -hex 32`.
@@ -97,8 +131,18 @@ Notes:
 browser. It reports what is still missing:
 
 ```json
-{ "status": "ok", "fcm_configured": true, "missing": [] }
+{
+  "status": "ok",
+  "fcm_configured": true,
+  "firebase_from": "FIREBASE_SERVICE_ACCOUNT_JSON",
+  "service_account_json_unparseable": false,
+  "missing": []
+}
 ```
+
+`service_account_json_unparseable: true` means the paste is there but is not
+valid JSON — usually a truncated copy. That is reported separately because
+otherwise it looks identical to having set nothing at all.
 
 ### Part 5: Schedule the dispatcher (2 min)
 

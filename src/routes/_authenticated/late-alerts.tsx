@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { BellRing, CheckCircle2, AlertTriangle, Siren } from "lucide-react";
+import { BellRing, CheckCircle2, AlertTriangle, Siren, WifiOff } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/late-alerts")({
   component: LateAlertsPage,
@@ -34,6 +34,9 @@ const dateStr = (d: Date) => d.toISOString().slice(0, 10);
 function verdictTone(v: string) {
   if (v.startsWith("🚨")) return { cls: "bg-destructive/10 text-destructive border-destructive/30", Icon: Siren };
   if (v.startsWith("⚠️")) return { cls: "bg-amber-500/10 text-amber-700 border-amber-500/30", Icon: AlertTriangle };
+  // An offline punch is neither a fault nor a clean pass — the alert was right
+  // when it went out, and the phone was simply behind.
+  if (v.startsWith("⏳")) return { cls: "bg-sky-500/10 text-sky-700 border-sky-500/30", Icon: WifiOff };
   return { cls: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30", Icon: CheckCircle2 };
 }
 
@@ -65,13 +68,14 @@ function LateAlertsPage() {
   const rows = data ?? [];
 
   const counts = useMemo(() => {
-    let wrong = 0, check = 0, right = 0;
+    let wrong = 0, check = 0, offline = 0, right = 0;
     for (const r of rows) {
       if (r.verdict.startsWith("🚨")) wrong++;
       else if (r.verdict.startsWith("⚠️")) check++;
+      else if (r.verdict.startsWith("⏳")) offline++;
       else right++;
     }
-    return { wrong, check, right };
+    return { wrong, check, offline, right };
   }, [rows]);
 
   return (
@@ -107,7 +111,7 @@ function LateAlertsPage() {
         )}
 
         {rows.length > 0 && (
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Card className="p-4">
               <p className="text-2xl font-bold text-destructive">{counts.wrong}</p>
               <p className="text-xs text-muted-foreground">
@@ -118,6 +122,12 @@ function LateAlertsPage() {
               <p className="text-2xl font-bold text-amber-600">{counts.check}</p>
               <p className="text-xs text-muted-foreground">
                 worth a look — wrong campus, or a staff record nobody uses
+              </p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-2xl font-bold text-sky-600">{counts.offline}</p>
+              <p className="text-xs text-muted-foreground">
+                offline punches — the alert was right when it went out
               </p>
             </Card>
             <Card className="p-4">
@@ -161,9 +171,17 @@ function LateAlertsPage() {
                       {String(r.alerted_at_ist).slice(0, 5)}
                     </TableCell>
                     <TableCell className="whitespace-nowrap font-mono text-xs">
-                      {r.first_punch_ist ? (
+                      {r.punched_at_ist ? (
                         <>
-                          {String(r.first_punch_ist).slice(0, 5)}
+                          {String(r.punched_at_ist).slice(0, 5)}
+                          {/* When the record actually reached us. If it lagged,
+                              that gap is the reason the alert went out. */}
+                          {r.reached_server_ist &&
+                            String(r.reached_server_ist).slice(0, 5) !== String(r.punched_at_ist).slice(0, 5) && (
+                              <div className="font-sans text-[11px] text-sky-700">
+                                reached us {String(r.reached_server_ist).slice(0, 5)}
+                              </div>
+                            )}
                           {r.punch_branch && r.punch_branch !== "—" && (
                             <div className="font-sans text-[11px] text-muted-foreground">{r.punch_branch}</div>
                           )}
@@ -195,9 +213,11 @@ function LateAlertsPage() {
         </Card>
 
         <p className="text-xs text-muted-foreground">
-          An alert counts as wrongly sent only when the punch landed <em>before</em> the alert did. If
-          somebody punched in afterwards, the alert was true when it was sent and they simply arrived
-          late — raise <strong>Alert after</strong> on the company profile if that is too twitchy.
+          An alert counts as wrongly sent only when the punch had <em>reached the server</em> before
+          the alert went out. A punch made earlier on a phone with no signal does not count: it
+          synced later, so the job could not have seen it, and the alert was true when it was sent.
+          Both times are shown above so you can check. If the alerts are simply too twitchy, raise
+          <strong> Alert after</strong> on the company profile.
         </p>
       </div>
     </AppShell>

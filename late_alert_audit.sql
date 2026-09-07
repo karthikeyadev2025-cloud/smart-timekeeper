@@ -27,19 +27,36 @@ ORDER BY count(*) DESC;
 
 
 -- ── 2. THE ONES THAT ARE ACTUALLY WRONG ─────────────────────────────────────
--- 🚨 rows only. A punch that landed BEFORE the alert means the job had the
--- evidence in front of it and alerted anyway. If this returns rows, that is a
--- bug and the rows are the report.
+-- 🚨 rows only. The punch had REACHED THE SERVER before the alert went out, so
+-- the job had the evidence in front of it and alerted anyway. If this returns
+-- rows, that is a bug and the rows are the report.
+--
+-- A punch made earlier but synced later is NOT here — it is in 2b. The job
+-- could not see what had not arrived, and calling that a bug sends people
+-- hunting something that is not there.
 SELECT alert_date, company, full_name, shift_name, branch_name,
-       alerted_at_ist, first_punch_ist, punch_branch, verdict
+       alerted_at_ist, punched_at_ist, reached_server_ist, punch_branch, verdict
 FROM public.late_alert_audit_all()
 WHERE verdict LIKE '🚨%'
 ORDER BY alert_date DESC, company, full_name;
 
 
+-- ── 2b. OFFLINE PUNCHES ─────────────────────────────────────────────────────
+-- ⏳ rows: the person punched before the alert, but on a phone with no signal,
+-- so the record only reached the server afterwards. The alert was correct when
+-- it went out. sync_lag says how far behind that phone was — a consistently
+-- large lag is worth chasing with the person, not with the code.
+SELECT alert_date, full_name, shift_name, alerted_at_ist,
+       punched_at_ist, reached_server_ist, sync_lag
+FROM public.late_alert_audit_all()
+WHERE verdict LIKE '⏳%'
+ORDER BY sync_lag DESC;
+
+
 -- ── 3. THE ONES WORTH A LOOK ────────────────────────────────────────────────
--- ⚠️ rows: a wrong campus assignment, or a staff record nobody uses any more.
--- Not bugs — configuration, with the fix named in what_to_do.
+-- ⚠️ rows: a wrong campus assignment, somebody on more shift legs than they
+-- work, or a staff record nobody uses any more. Not bugs — configuration, with
+-- the fix named in what_to_do.
 SELECT alert_date, company, full_name, shift_name, branch_name,
        punch_branch, verdict, what_to_do
 FROM public.late_alert_audit_all()
@@ -58,6 +75,33 @@ SELECT * FROM public.late_alert_audit_all();
 --   DATE '2026-09-01',                             -- from, inclusive
 --   DATE '2026-09-30'                              -- to, inclusive
 -- );
+
+
+-- ── 5b. THE USUAL ROOT CAUSE: PEOPLE ON MORE SHIFTS THAN THEY WORK ──────────
+-- Somebody assigned three shift legs but punching once a day trips the other
+-- two, every single day. That is where most alert noise comes from, and it is
+-- a data fix, not a code one. Anyone with more legs than punches-per-day is
+-- listed here.
+SELECT
+  t.name                          AS company,
+  p.full_name,
+  p.staff_id,
+  count(*)                        AS shift_legs,
+  string_agg(s.name, ', ' ORDER BY s.start_time) AS legs,
+  (SELECT count(*) FROM public.attendance_records ar
+    WHERE ar.user_id = p.id AND ar.kind = 'check_in'
+      AND ar.attendance_date > current_date - 14)                    AS punches_14d,
+  (SELECT count(DISTINCT ar.attendance_date) FROM public.attendance_records ar
+    WHERE ar.user_id = p.id AND ar.kind = 'check_in'
+      AND ar.attendance_date > current_date - 14)                    AS days_punched_14d
+FROM public.profiles p
+JOIN public.tenants t       ON t.id = p.tenant_id
+JOIN public.staff_shifts ss ON ss.user_id = p.id
+JOIN public.shifts s        ON s.id = ss.shift_id AND s.is_active
+WHERE p.is_active
+GROUP BY t.name, p.id, p.full_name, p.staff_id
+HAVING count(*) > 1
+ORDER BY count(*) DESC, t.name, p.full_name;
 
 
 -- ── 6. WHO IS BEING SKIPPED BY THE DORMANT GUARD ────────────────────────────

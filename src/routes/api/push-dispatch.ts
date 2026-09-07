@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
-import { fcmConfigured, sendPush } from "@/lib/fcm";
+import {
+  fcmConfigured,
+  missingFirebaseFields,
+  sendPush,
+  serviceAccountJsonBroken,
+} from "@/lib/fcm";
 
 /**
  * Drains the push outbox: claims queued notifications, sends them to each of
@@ -36,14 +41,21 @@ export const Route = createFileRoute("/api/push-dispatch")({
           JSON.stringify({
             status: "ok",
             fcm_configured: fcmConfigured(),
+            // Which way the Firebase credentials were supplied, so a report of
+            // "missing" cannot mean "you used the other supported form".
+            firebase_from: uses("FIREBASE_SERVICE_ACCOUNT_JSON")
+              ? "FIREBASE_SERVICE_ACCOUNT_JSON"
+              : "separate variables",
+            // A pasted JSON that does not parse looks identical to no
+            // credentials at all from the outside, so say which it is.
+            service_account_json_unparseable: serviceAccountJsonBroken(),
             // Enough to diagnose a misconfiguration without echoing secrets.
+            // The three Firebase fields are reported as missing only when
+            // neither form supplies them.
             missing: [
-              "FIREBASE_PROJECT_ID",
-              "FIREBASE_CLIENT_EMAIL",
-              "FIREBASE_PRIVATE_KEY",
-              "PUSH_DISPATCH_SECRET",
-              "SUPABASE_SERVICE_ROLE_KEY",
-            ].filter((k) => !uses(k)),
+              ...missingFirebaseFields(),
+              ...["PUSH_DISPATCH_SECRET", "SUPABASE_SERVICE_ROLE_KEY"].filter((k) => !uses(k)),
+            ],
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         ),

@@ -18,6 +18,8 @@ INSERT INTO auth.users (id, email) VALUES
   ('e1000000-0000-0000-0000-000000000004', 'leaver@audit.test'),
   ('e1000000-0000-0000-0000-000000000005', 'onleave@audit.test'),
   ('e1000000-0000-0000-0000-000000000006', 'wrongcampus@audit.test'),
+  ('e1000000-0000-0000-0000-000000000007', 'offline@audit.test'),
+  ('e1000000-0000-0000-0000-000000000008', 'threelegs@audit.test'),
   ('e1000000-0000-0000-0000-0000000000ff', 'outsider@audit.test')
 ON CONFLICT DO NOTHING;
 
@@ -37,7 +39,22 @@ INSERT INTO public.shifts (id, tenant_id, name, start_time, end_time, branch_id,
   -- The other company's own shift. late_alerts.shift_id is part of the primary
   -- key, so it can never be NULL and every alert names a real shift.
   ('e1000000-cccc-cccc-cccc-000000000002', 'e1000000-aaaa-aaaa-aaaa-000000000002',
-   'Other Morning', '09:00', '17:00', NULL, 10);
+   'Other Morning', '09:00', '17:00', NULL, 10),
+  -- Three branchless legs, the shape a college with MORNING/AFTERNOON/NIGHT
+  -- has. Somebody assigned all three but punching once a day trips two of them
+  -- every day, which is a shift-assignment problem rather than a bug.
+  ('e1000000-cccc-cccc-cccc-000000000004', 'e1000000-aaaa-aaaa-aaaa-000000000001',
+   'Afternoon (no campus)', '14:00', '18:00', NULL, 5),
+  ('e1000000-cccc-cccc-cccc-000000000005', 'e1000000-aaaa-aaaa-aaaa-000000000001',
+   'Night (no campus)', '18:00', '22:00', NULL, 5),
+  ('e1000000-cccc-cccc-cccc-000000000006', 'e1000000-aaaa-aaaa-aaaa-000000000001',
+   'Morning (no campus)', '06:00', '14:00', NULL, 5);
+
+INSERT INTO public.staff_shifts (tenant_id, user_id, shift_id) VALUES
+  ('e1000000-aaaa-aaaa-aaaa-000000000001', 'e1000000-0000-0000-0000-000000000008', 'e1000000-cccc-cccc-cccc-000000000004'),
+  ('e1000000-aaaa-aaaa-aaaa-000000000001', 'e1000000-0000-0000-0000-000000000008', 'e1000000-cccc-cccc-cccc-000000000005'),
+  ('e1000000-aaaa-aaaa-aaaa-000000000001', 'e1000000-0000-0000-0000-000000000008', 'e1000000-cccc-cccc-cccc-000000000006')
+ON CONFLICT DO NOTHING;
 
 DELETE FROM public.user_roles WHERE user_id::text LIKE 'e1000000-%';
 
@@ -49,6 +66,8 @@ INSERT INTO public.profiles (id, tenant_id, full_name, staff_id, created_at) VAL
   ('e1000000-0000-0000-0000-000000000004', 'e1000000-aaaa-aaaa-aaaa-000000000001', 'Leaver',      'S4', now() - INTERVAL '400 days'),
   ('e1000000-0000-0000-0000-000000000005', 'e1000000-aaaa-aaaa-aaaa-000000000001', 'Onleave',     'S5', now() - INTERVAL '400 days'),
   ('e1000000-0000-0000-0000-000000000006', 'e1000000-aaaa-aaaa-aaaa-000000000001', 'Wrongcampus', 'S6', now() - INTERVAL '400 days'),
+  ('e1000000-0000-0000-0000-000000000007', 'e1000000-aaaa-aaaa-aaaa-000000000001', 'Offline',     'S7', now() - INTERVAL '400 days'),
+  ('e1000000-0000-0000-0000-000000000008', 'e1000000-aaaa-aaaa-aaaa-000000000001', 'Threelegs',   'S8', now() - INTERVAL '400 days'),
   ('e1000000-0000-0000-0000-0000000000ff', 'e1000000-aaaa-aaaa-aaaa-000000000002', 'Outsider',    'X1', now() - INTERVAL '400 days')
 ON CONFLICT (id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, full_name = EXCLUDED.full_name;
 
@@ -79,21 +98,21 @@ BEGIN
     'e1000000-0000-0000-0000-000000000006'::uuid
   ]) AS u;
 
-  -- BUGSY punched at 09:05, seven minutes BEFORE the alert fired. The job had
-  -- the punch and alerted anyway.
-  INSERT INTO public.attendance_records (tenant_id, user_id, shift_id, branch_id, kind, occurred_at, attendance_date)
+  -- BUGSY punched at 09:05 and the row reached the server at 09:06, six
+  -- minutes BEFORE the alert fired. The job had it and alerted anyway.
+  INSERT INTO public.attendance_records (tenant_id, user_id, shift_id, branch_id, kind, occurred_at, attendance_date, created_at)
   VALUES (t, 'e1000000-0000-0000-0000-000000000001', sh, boys, 'check_in',
-          TIMESTAMPTZ '2026-06-15 09:05:00+05:30', d);
+          TIMESTAMPTZ '2026-06-15 09:05:00+05:30', d, TIMESTAMPTZ '2026-06-15 09:06:00+05:30');
 
   -- LATEY punched at 09:40, AFTER the alert. The alert was true when sent.
-  INSERT INTO public.attendance_records (tenant_id, user_id, shift_id, branch_id, kind, occurred_at, attendance_date)
+  INSERT INTO public.attendance_records (tenant_id, user_id, shift_id, branch_id, kind, occurred_at, attendance_date, created_at)
   VALUES (t, 'e1000000-0000-0000-0000-000000000002', sh, boys, 'check_in',
-          TIMESTAMPTZ '2026-06-15 09:40:00+05:30', d);
+          TIMESTAMPTZ '2026-06-15 09:40:00+05:30', d, TIMESTAMPTZ '2026-06-15 09:40:00+05:30');
 
   -- NOSHOW never punched, but works here — punched the day before and after.
-  INSERT INTO public.attendance_records (tenant_id, user_id, shift_id, branch_id, kind, occurred_at, attendance_date)
+  INSERT INTO public.attendance_records (tenant_id, user_id, shift_id, branch_id, kind, occurred_at, attendance_date, created_at)
   VALUES (t, 'e1000000-0000-0000-0000-000000000003', sh, boys, 'check_in',
-          TIMESTAMPTZ '2026-06-14 09:00:00+05:30', d - 1);
+          TIMESTAMPTZ '2026-06-14 09:00:00+05:30', d - 1, TIMESTAMPTZ '2026-06-14 09:00:00+05:30');
 
   -- LEAVER has no punches anywhere near this date at all.
 
@@ -105,10 +124,31 @@ BEGIN
   -- The punch names a different shift AND a different branch, so it counts for
   -- neither — which is precisely why the Boys shift alerted despite the person
   -- being at work, on time, in the building next door.
-  INSERT INTO public.attendance_records (tenant_id, user_id, shift_id, branch_id, kind, occurred_at, attendance_date)
+  INSERT INTO public.attendance_records (tenant_id, user_id, shift_id, branch_id, kind, occurred_at, attendance_date, created_at)
   VALUES (t, 'e1000000-0000-0000-0000-000000000006',
           'e1000000-cccc-cccc-cccc-000000000003', girls, 'check_in',
-          TIMESTAMPTZ '2026-06-15 08:55:00+05:30', d);
+          TIMESTAMPTZ '2026-06-15 08:55:00+05:30', d, TIMESTAMPTZ '2026-06-15 08:55:00+05:30');
+
+  -- OFFLINE punched at 08:00, before the 09:12 alert — but the phone had no
+  -- signal and the row only reached the server at 19:00. The job could not
+  -- have known. This is the case that was wrongly called a bug.
+  INSERT INTO public.late_alerts (tenant_id, user_id, shift_id, attendance_date, minutes_late, created_at)
+  VALUES (t, 'e1000000-0000-0000-0000-000000000007', sh, d, 2, alert_at);
+  INSERT INTO public.attendance_records (tenant_id, user_id, shift_id, branch_id, kind, occurred_at, attendance_date, created_at)
+  VALUES (t, 'e1000000-0000-0000-0000-000000000007', sh, boys, 'check_in',
+          TIMESTAMPTZ '2026-06-15 08:00:00+05:30', d, TIMESTAMPTZ '2026-06-15 19:00:00+05:30');
+
+  -- THREELEGS is on three branchless shifts and punched once, in the morning,
+  -- naming the morning shift. The afternoon leg alerts because the punch
+  -- counted for a different leg — not a campus problem, there are no campuses.
+  INSERT INTO public.late_alerts (tenant_id, user_id, shift_id, attendance_date, minutes_late, created_at)
+  VALUES (t, 'e1000000-0000-0000-0000-000000000008',
+          'e1000000-cccc-cccc-cccc-000000000004', d, 5,
+          TIMESTAMPTZ '2026-06-15 14:05:00+05:30');
+  INSERT INTO public.attendance_records (tenant_id, user_id, shift_id, branch_id, kind, occurred_at, attendance_date, created_at)
+  VALUES (t, 'e1000000-0000-0000-0000-000000000008',
+          'e1000000-cccc-cccc-cccc-000000000006', boys, 'check_in',
+          TIMESTAMPTZ '2026-06-15 08:42:00+05:30', d, TIMESTAMPTZ '2026-06-15 08:42:00+05:30');
 
   -- An alert belonging to the OTHER company, to prove scoping.
   INSERT INTO public.late_alerts (tenant_id, user_id, shift_id, attendance_date, minutes_late, created_at)
@@ -128,12 +168,14 @@ BEGIN
 
   FOR r IN
     SELECT * FROM (VALUES
-      ('Bugsy',       '🚨 FALSE ALERT — already punched in before the alert fired'),
+      ('Bugsy',       '🚨 FALSE ALERT — the punch was already on the server'),
       ('Latey',       '✅ correct — not in yet when it fired, arrived later'),
       ('Noshow',      '✅ correct — no check-in that day at all'),
       ('Leaver',      '⚠️ dormant record — arithmetic right, person not working here'),
       ('Onleave',     '🚨 FALSE ALERT — on approved leave that day'),
-      ('Wrongcampus', '⚠️ punched at another campus — assignment looks wrong')
+      ('Wrongcampus', '⚠️ punched at another campus — assignment looks wrong'),
+      ('Offline',     '⏳ punched offline — the record arrived after the alert had gone'),
+      ('Threelegs',   '⚠️ at work, but the punch counted for another shift leg')
     ) AS x(who, expect)
   LOOP
     SELECT a.verdict INTO v FROM public.late_alert_audit(t) a WHERE a.full_name = r.who;
@@ -142,7 +184,7 @@ BEGIN
     END IF;
   END LOOP;
   RESET ROLE;
-  RAISE NOTICE 'pass  all 6 verdicts are assigned correctly';
+  RAISE NOTICE 'pass  all 8 verdicts are assigned correctly';
 END $$;
 
 -- ── The distinction the whole thing exists for ─────────────────────────────
@@ -165,6 +207,68 @@ BEGIN
   RAISE NOTICE 'pass  a punch before the alert is a bug; a punch after it is not — told apart by time, not by existence';
 END $$;
 
+-- ── The distinction that was got WRONG the first time ──────────────────────
+-- Bugsy and Offline both punched before the alert fired. Only Bugsy's punch
+-- had reached the server in time for the job to see it. Judging on occurred_at
+-- calls them both bugs; judging on arrival time tells them apart.
+DO $$
+DECLARE v_bug TEXT; v_off TEXT; r RECORD;
+BEGIN
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claim.sub = 'e1000000-0000-0000-0000-00000000000a';
+  SELECT a.verdict INTO v_bug FROM public.late_alert_audit() a WHERE a.full_name = 'Bugsy';
+  SELECT a.verdict INTO v_off FROM public.late_alert_audit() a WHERE a.full_name = 'Offline';
+  SELECT * INTO r FROM public.late_alert_audit() a WHERE a.full_name = 'Offline';
+  RESET ROLE;
+  IF r.punched_at_ist >= TIME '09:12' THEN
+    RAISE EXCEPTION 'FAIL: the fixture does not have Offline punching before the alert';
+  END IF;
+  IF v_bug = v_off THEN
+    RAISE EXCEPTION 'FAIL: both punched before the alert and got the same verdict — arrival time is being ignored';
+  END IF;
+  IF v_off LIKE '🚨%' THEN
+    RAISE EXCEPTION 'FAIL: a punch the job could not possibly have seen was called a bug';
+  END IF;
+  RAISE NOTICE 'pass  a punch the job could see is a bug; one that synced later is not — the whole correction';
+END $$;
+
+-- ── The sync lag is reported, so the reader can check the verdict ──────────
+DO $$
+DECLARE r RECORD;
+BEGIN
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claim.sub = 'e1000000-0000-0000-0000-00000000000a';
+  SELECT * INTO r FROM public.late_alert_audit() a WHERE a.full_name = 'Offline';
+  RESET ROLE;
+  IF r.sync_lag <> INTERVAL '11 hours' THEN
+    RAISE EXCEPTION 'FAIL: sync lag reported as %, expected 11 hours', r.sync_lag;
+  END IF;
+  IF r.reached_server_ist <> TIME '19:00' THEN
+    RAISE EXCEPTION 'FAIL: arrival reported as %, expected 19:00 IST', r.reached_server_ist;
+  END IF;
+  RAISE NOTICE 'pass  both timestamps and the gap between them are reported, so a verdict can be checked';
+END $$;
+
+-- ── A branchless shift is never blamed on a campus ─────────────────────────
+DO $$
+DECLARE r RECORD;
+BEGIN
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claim.sub = 'e1000000-0000-0000-0000-00000000000a';
+  SELECT * INTO r FROM public.late_alert_audit() a WHERE a.full_name = 'Threelegs';
+  RESET ROLE;
+  IF r.verdict LIKE '%campus%' THEN
+    RAISE EXCEPTION 'FAIL: a shift with no campus was blamed on a campus mismatch';
+  END IF;
+  IF r.legs_that_day <> 3 THEN
+    RAISE EXCEPTION 'FAIL: expected 3 shift legs, reported %', r.legs_that_day;
+  END IF;
+  IF r.what_to_do NOT LIKE '%3 shifts%' THEN
+    RAISE EXCEPTION 'FAIL: the advice does not name the real cause: %', r.what_to_do;
+  END IF;
+  RAISE NOTICE 'pass  a branchless multi-leg alert names the shift assignment, not a campus';
+END $$;
+
 -- ── Reported times are IST, not UTC ────────────────────────────────────────
 DO $$
 DECLARE r RECORD;
@@ -176,8 +280,8 @@ BEGIN
   IF r.alerted_at_ist <> TIME '09:12' THEN
     RAISE EXCEPTION 'FAIL: alert time reported as % — expected 09:12 IST', r.alerted_at_ist;
   END IF;
-  IF r.first_punch_ist <> TIME '09:05' THEN
-    RAISE EXCEPTION 'FAIL: punch time reported as % — expected 09:05 IST', r.first_punch_ist;
+  IF r.punched_at_ist <> TIME '09:05' THEN
+    RAISE EXCEPTION 'FAIL: punch time reported as % — expected 09:05 IST', r.punched_at_ist;
   END IF;
   RAISE NOTICE 'pass  times are reported in IST, so an admin reads their own clock';
 END $$;
@@ -207,8 +311,8 @@ BEGIN
   SELECT count(*), string_agg(a.full_name, ',' ORDER BY a.full_name)
     INTO v_n, v_names FROM public.late_alert_audit() a;
   RESET ROLE;
-  IF v_n <> 6 THEN
-    RAISE EXCEPTION 'FAIL: an unscoped audit returned % rows (%), expected this admin''s own 6', v_n, v_names;
+  IF v_n <> 8 THEN
+    RAISE EXCEPTION 'FAIL: an unscoped audit returned % rows (%), expected this admin''s own 8', v_n, v_names;
   END IF;
   IF v_names LIKE '%Outsider%' THEN
     RAISE EXCEPTION 'FAIL: another company''s alert leaked into the audit';
@@ -258,8 +362,8 @@ BEGIN
   SELECT count(*) INTO v_in  FROM public.late_alert_audit(NULL, DATE '2026-06-15', DATE '2026-06-15');
   SELECT count(*) INTO v_out FROM public.late_alert_audit(NULL, DATE '2026-06-16', NULL);
   RESET ROLE;
-  IF v_in <> 6 THEN
-    RAISE EXCEPTION 'FAIL: a single-day window that IS the alert day returned % rows, expected 6', v_in;
+  IF v_in <> 8 THEN
+    RAISE EXCEPTION 'FAIL: a single-day window that IS the alert day returned % rows, expected 8', v_in;
   END IF;
   IF v_out <> 0 THEN
     RAISE EXCEPTION 'FAIL: a window starting after the alert day returned % rows', v_out;
@@ -286,8 +390,8 @@ BEGIN
   IF v_auth <> 0 THEN
     RAISE EXCEPTION 'FAIL: the authorised version returned % rows with no signed-in user', v_auth;
   END IF;
-  IF v_all <> 7 THEN
-    RAISE EXCEPTION 'FAIL: the unauthorised body returned % rows in the SQL editor, expected all 7', v_all;
+  IF v_all <> 9 THEN
+    RAISE EXCEPTION 'FAIL: the unauthorised body returned % rows in the SQL editor, expected all 9', v_all;
   END IF;
   RAISE NOTICE 'pass  late_alert_audit_all() is what works in the SQL editor; the authorised one correctly sees nothing there';
 END $$;

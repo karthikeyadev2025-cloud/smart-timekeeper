@@ -2463,9 +2463,12 @@ export type Database = {
           staff_id: string | null
           shift_name: string
           branch_name: string
+          legs_that_day: number
           alerted_at_ist: string
           alerted_minutes: number
-          first_punch_ist: string | null
+          punched_at_ist: string | null
+          reached_server_ist: string | null
+          sync_lag: string | null
           punch_branch: string
           verdict: string
           what_to_do: string

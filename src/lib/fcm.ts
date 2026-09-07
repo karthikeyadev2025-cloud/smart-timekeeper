@@ -6,10 +6,24 @@
  * does nothing — it does not throw, and it does not mark notifications as
  * failed, so the moment the credentials land the queue drains on its own.
  *
+ * EITHER form works, because the setup guide and the in-app admin screen ask
+ * for different ones and following either should work:
+ *
+ *   FIREBASE_SERVICE_ACCOUNT_JSON — the downloaded service-account file,
+ *                            pasted whole. Preferred: one paste, and the PEM
+ *                            key keeps its newlines inside a JSON string
+ *                            instead of having to survive a dashboard field.
+ *
+ * or the three fields picked out of it by hand:
+ *
  *   FIREBASE_PROJECT_ID    — e.g. "punchly-1234"
  *   FIREBASE_CLIENT_EMAIL  — the service account address
  *   FIREBASE_PRIVATE_KEY   — the PEM key. Escaped newlines (\n) are accepted,
  *                            because most dashboards mangle real ones.
+ *
+ * The separate variables win where both are set, so an operator overriding one
+ * field on top of a pasted JSON gets what they asked for rather than silently
+ * being ignored.
  *
  * See PUSH_SETUP.md for where to get these.
  *
@@ -28,15 +42,70 @@ export type FcmSendResult =
   /** Something transient, or our own bug. Worth retrying. */
   | { ok: false; dead: false; error: string };
 
+type ServiceAccount = { project_id?: string; client_email?: string; private_key?: string };
+
+/**
+ * The pasted service-account JSON, if there is one and it parses.
+ *
+ * A malformed paste returns null rather than throwing: the dispatcher's job is
+ * to drain a queue, and a credential typo must not take the endpoint down. The
+ * missing-credentials report on /api/push-dispatch says the JSON was
+ * unreadable, so it is visible rather than silent.
+ */
+let saCache: { raw: string; parsed: ServiceAccount | null } | null = null;
+function serviceAccount(): ServiceAccount | null {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON ?? "";
+  if (!raw.trim()) return null;
+  if (saCache?.raw === raw) return saCache.parsed;
+  let parsed: ServiceAccount | null = null;
+  try {
+    const v = JSON.parse(raw);
+    parsed = v && typeof v === "object" ? (v as ServiceAccount) : null;
+  } catch {
+    parsed = null;
+  }
+  saCache = { raw, parsed };
+  return parsed;
+}
+
+/** True when FIREBASE_SERVICE_ACCOUNT_JSON is set but is not valid JSON. */
+export function serviceAccountJsonBroken(): boolean {
+  return Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim()) && serviceAccount() === null;
+}
+
+export function projectId(): string {
+  return process.env.FIREBASE_PROJECT_ID || serviceAccount()?.project_id || "";
+}
+
+export function clientEmail(): string {
+  return process.env.FIREBASE_CLIENT_EMAIL || serviceAccount()?.client_email || "";
+}
+
 function privateKey(): string {
-  // Dashboards commonly store the PEM with literal backslash-n.
-  return (process.env.FIREBASE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n");
+  // Dashboards commonly store the PEM with literal backslash-n. Inside the
+  // JSON it is already an escaped newline that JSON.parse has turned real, but
+  // running the replace on both costs nothing and covers a double-escaped
+  // paste.
+  const raw = process.env.FIREBASE_PRIVATE_KEY || serviceAccount()?.private_key || "";
+  return raw.replace(/\\n/g, "\n");
 }
 
 export function fcmConfigured(): boolean {
-  return Boolean(
-    process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && privateKey(),
-  );
+  return missingFirebaseFields().length === 0;
+}
+
+/**
+ * Which Firebase credential fields are still absent, named so an operator can
+ * see that either source would satisfy them. Empty means fully configured.
+ */
+export function missingFirebaseFields(): string[] {
+  return [
+    [projectId(), "FIREBASE_PROJECT_ID (or project_id in the JSON)"],
+    [clientEmail(), "FIREBASE_CLIENT_EMAIL (or client_email in the JSON)"],
+    [privateKey(), "FIREBASE_PRIVATE_KEY (or private_key in the JSON)"],
+  ]
+    .filter(([value]) => !value)
+    .map(([, label]) => label);
 }
 
 const b64url = (input: Buffer | string): string =>
@@ -54,7 +123,7 @@ async function accessToken(): Promise<string> {
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claims = b64url(
     JSON.stringify({
-      iss: process.env.FIREBASE_CLIENT_EMAIL,
+      iss: clientEmail(),
       scope: SCOPE,
       aud: TOKEN_URL,
       iat: now,
@@ -93,7 +162,7 @@ export async function sendPush(
   try {
     const auth = await accessToken();
     const res = await fetch(
-      `https://fcm.googleapis.com/v1/projects/${process.env.FIREBASE_PROJECT_ID}/messages:send`,
+      `https://fcm.googleapis.com/v1/projects/${projectId()}/messages:send`,
       {
         method: "POST",
         headers: { Authorization: `Bearer ${auth}`, "Content-Type": "application/json" },
