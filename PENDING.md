@@ -206,9 +206,11 @@ honoured, or a genuine no-show.
 **Where to look:** the **Late alerts** page in the admin nav. Pick a date range
 and it grades every alert with a count of wrong / worth-a-look / correct.
 
-**In the Supabase SQL editor** use `late_alert_audit_all()` instead —
-`auth.uid()` is NULL there, so the authorised version would correctly return
-nothing and it would read as "no alerts, nothing wrong". Both share one copy of
+**In the Supabase SQL editor** paste `late_alert_audit.sql` — it has the
+headline rollup, the wrong ones on their own, and the ones worth a look. It
+calls `late_alert_audit_all()` rather than the authorised version, because
+`auth.uid()` is NULL there and the authorised version would correctly return
+nothing, which would read as "no alerts, nothing wrong". Both share one copy of
 the logic, and a test asserts they never disagree.
 
 Code: `supabase/migrations/20260907040000_late_alert_audit.sql`,
