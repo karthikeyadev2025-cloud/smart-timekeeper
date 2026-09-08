@@ -54,6 +54,10 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/clients", label: "Client companies", icon: Building2 },
       { to: "/plans", label: "Plans", icon: Package },
       { to: "/admin", label: "Site editor", icon: Paintbrush },
+      // Both of these ask which customer you mean; they were unreachable from
+      // this nav, so the operator could not configure the product they sell.
+      { to: "/company", label: "Company settings", icon: Building2 },
+      { to: "/api-keys", label: "API keys", icon: KeyRound },
       { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
       { to: "/audit", label: "Audit log", icon: ShieldAlert },
     ];
@@ -71,6 +75,9 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
         { to: "/late-alerts", label: "Late alerts", icon: BellRing },
         { to: "/announcements", label: "Announcements", icon: Megaphone },
         { to: "/pin-resets", label: "PIN resets", icon: KeyRound },
+        // A school can have an ERP too; this route always worked, it was just
+        // never linked here.
+        { to: "/api-keys", label: "API keys", icon: KeyRound },
         { to: "/billing", label: "Billing", icon: Receipt },
       ];
     }

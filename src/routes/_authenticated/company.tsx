@@ -14,6 +14,7 @@ import { IdCardTemplateChooser } from "@/components/IdCardTemplateChooser";
 import { SignaturePad } from "@/components/SignaturePad";
 import { Building2, Upload, Trash2 } from "lucide-react";
 import { StatutoryCheck, type RegNumbers } from "@/components/StatutoryCheck";
+import { ClientCompanyPicker } from "@/components/ClientCompanyPicker";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/company")({
@@ -23,7 +24,10 @@ export const Route = createFileRoute("/_authenticated/company")({
 
 function CompanyProfilePage() {
   const { data: user } = useCurrentUser();
-  const tenantId = user?.tenant?.id;
+  const isSuper = user?.roles?.includes("super_admin") ?? false;
+  // A super admin administers every company and owns none, so they choose.
+  const [pickedTenant, setPickedTenant] = useState<string | null>(null);
+  const tenantId = isSuper ? pickedTenant : (user?.tenant?.id ?? null);
   const qc = useQueryClient();
   const updateFn = useServerFn(updateOwnCompanyProfile);
 
@@ -165,7 +169,24 @@ function CompanyProfilePage() {
 
 
   if (!tenantId) {
-    return <AppShell><Card className="p-6">You need a company first.</Card></AppShell>;
+    return (
+      <AppShell>
+        <div className="space-y-6">
+          <header>
+            <h1 className="text-3xl font-bold tracking-tight">Company profile</h1>
+          </header>
+          {isSuper ? (
+            <ClientCompanyPicker
+              value={pickedTenant}
+              onChange={setPickedTenant}
+              what="edit the settings of"
+            />
+          ) : (
+            <Card className="p-6">You need a company first.</Card>
+          )}
+        </div>
+      </AppShell>
+    );
   }
 
   const onPickLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -222,6 +243,7 @@ function CompanyProfilePage() {
           esi_employee_percent: Number(esiPct) || 0,
           esi_wage_threshold: esiThreshold.trim() ? Number(esiThreshold) : null,
           professional_tax_enabled: ptOn,
+          tenant_id: tenantId,
           pf_registration_number: reg.pf,
           esi_registration_number: reg.esi,
           pt_registration_number: reg.pt,

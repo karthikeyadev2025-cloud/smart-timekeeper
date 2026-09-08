@@ -1,38 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { API_SCOPES, generateApiKey } from "@/lib/api-keys";
+import { resolveManagedTenant } from "@/lib/tenant-scope";
 
 /**
  * Minting and revoking tenant API keys.
  *
- * The tenant is NEVER taken from the client. It is resolved from the caller's
- * own client_admin role, so an admin of one company cannot mint a key for
- * another — the same rule the database enforces at read time.
+ * A client admin's tenant is derived from their own role and can never be
+ * overridden by the request, so an admin of one company cannot mint a key for
+ * another. A super admin has no company of their own and must name one. See
+ * resolveManagedTenant for why that is required rather than defaulted.
  */
 
-/** Resolve which tenant this user administers, or refuse. */
-async function adminTenantId(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<string> {
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("tenant_id")
-    .eq("user_id", userId)
-    .eq("role", "client_admin");
-
-  // Fail closed: a lookup that errored is not proof of entitlement.
-  if (error) throw new Error("Could not verify your permissions");
-
-  const tenantId = (data as { tenant_id: string | null }[] | null)
-    ?.find((r) => r.tenant_id)?.tenant_id;
-  if (!tenantId) throw new Error("Only a company admin can manage API keys");
-  return tenantId;
-}
-
 const createInput = z.object({
+  // Only a super admin may set this; for a client admin it is either absent or
+  // their own, and anything else is refused.
+  tenant_id: z.string().uuid().nullable().optional(),
   name: z.string().trim().min(1).max(100),
   scopes: z.array(z.enum(API_SCOPES)).min(1, "Pick at least one scope"),
   // Days until expiry. Null = never, which the UI warns about.
@@ -45,7 +29,9 @@ export const createApiKey = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => createInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const tenantId = await adminTenantId(supabase, userId);
+    const tenantId = await resolveManagedTenant(
+      supabase, userId, data.tenant_id, "create an API key",
+    );
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -83,10 +69,16 @@ export const createApiKey = createServerFn({ method: "POST" })
 
 export const revokeApiKey = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) =>
+    z.object({
+      id: z.string().uuid(),
+      tenant_id: z.string().uuid().nullable().optional(),
+    }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const tenantId = await adminTenantId(supabase, userId);
+    const tenantId = await resolveManagedTenant(
+      supabase, userId, data.tenant_id, "revoke an API key",
+    );
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

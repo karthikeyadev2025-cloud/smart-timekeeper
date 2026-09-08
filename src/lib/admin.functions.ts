@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { planExpiresAt } from "@/lib/billing-period";
+import { resolveManagedTenant } from "@/lib/tenant-scope";
 
 async function assertSuper(supabase: any, userId: string) {
   const { data: isSuper } = await supabase.rpc("has_role", { _user_id: userId, _role: "super_admin" as any });
@@ -334,17 +335,17 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     esi_registration_number?: string | null;
     pt_registration_number?: string | null;
     staff_work_one_shift_per_day?: boolean;
+    // Super admins only; a client admin's own tenant always wins.
+    tenant_id?: string | null;
   }) => data)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    // Resolve the user's tenant
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("tenant_id, role")
-      .eq("user_id", userId);
-    const tenantId = roles?.find((r: any) => r.role === "client_admin" && r.tenant_id)?.tenant_id;
-    if (!tenantId) throw new Error("You must be a client admin to edit company profile");
+    // A client admin edits their own company; a super admin has none of their
+    // own and must say which. See resolveManagedTenant.
+    const tenantId = await resolveManagedTenant(
+      supabase, userId, data.tenant_id, "edit a company profile",
+    );
 
     const update: Database["public"]["Tables"]["tenants"]["Update"] = {};
     if (data.name !== undefined) {

@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { KeyRound, Copy, Check, ShieldAlert, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { ClientCompanyPicker } from "@/components/ClientCompanyPicker";
 import { createApiKey, revokeApiKey } from "@/lib/api-keys.functions";
 import { API_SCOPES, SCOPE_LABELS, type ApiScope } from "@/lib/api-keys";
 import { toast } from "sonner";
@@ -23,7 +24,12 @@ export const Route = createFileRoute("/_authenticated/api-keys")({
 
 function ApiKeysPage() {
   const { data: user } = useCurrentUser();
-  const tenantId = user?.tenant?.id;
+  const isSuper = user?.roles?.includes("super_admin") ?? false;
+  // A super admin has no company of their own, so they pick one. A client
+  // admin's own company is the only one they can act on, and the server
+  // enforces that regardless of what this page sends.
+  const [pickedTenant, setPickedTenant] = useState<string | null>(null);
+  const tenantId = isSuper ? pickedTenant : (user?.tenant?.id ?? null);
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
   // Shown once, then gone forever — there is no way to recover it later.
@@ -62,7 +68,7 @@ function ApiKeysPage() {
   const revoke = async (id: string, name: string) => {
     if (!confirm(`Revoke "${name}"? Any integration using it stops working immediately.`)) return;
     try {
-      await revokeFn({ data: { id } });
+      await revokeFn({ data: { id, tenant_id: tenantId } });
       toast.success("Key revoked");
       qc.invalidateQueries({ queryKey: ["api-keys", tenantId] });
     } catch (e) {
@@ -72,11 +78,43 @@ function ApiKeysPage() {
 
   const live = (keys ?? []).filter((k) => !k.revoked_at);
 
-  if (!tenantId) return <AppShell><Card className="p-6">Need a company.</Card></AppShell>;
+  // A super admin with nothing picked yet gets the picker rather than an
+  // error: there is nothing wrong, they just have not said which company.
+  if (!tenantId) {
+    return (
+      <AppShell>
+        <div className="space-y-6">
+          <header>
+            <h1 className="text-3xl font-bold tracking-tight">API keys</h1>
+            <p className="text-muted-foreground">
+              Let another system read this company&apos;s attendance and staff records.
+            </p>
+          </header>
+          {isSuper ? (
+            <ClientCompanyPicker
+              value={pickedTenant}
+              onChange={setPickedTenant}
+              what="issue API keys for"
+            />
+          ) : (
+            <Card className="p-6">You need a company before you can issue API keys.</Card>
+          )}
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
       <div className="space-y-6">
+        {isSuper && (
+          <ClientCompanyPicker
+            value={pickedTenant}
+            onChange={setPickedTenant}
+            what="issue API keys for"
+          />
+        )}
+
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -202,6 +240,7 @@ function ApiKeysPage() {
       <CreateKeyDialog
         open={creating}
         onClose={() => setCreating(false)}
+        tenantId={tenantId}
         onCreated={(key) => {
           setCreating(false);
           setFreshKey(key);
@@ -214,8 +253,13 @@ function ApiKeysPage() {
 }
 
 function CreateKeyDialog({
-  open, onClose, onCreated,
-}: { open: boolean; onClose: () => void; onCreated: (key: string) => void }) {
+  open, onClose, onCreated, tenantId,
+}: {
+  open: boolean; onClose: () => void; onCreated: (key: string) => void;
+  /** Which company the key is for. Only a super admin can make this differ
+   *  from their own; the server refuses anything else. */
+  tenantId: string | null;
+}) {
   const createFn = useServerFn(createApiKey);
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<ApiScope[]>(["attendance:read"]);
@@ -232,6 +276,7 @@ function CreateKeyDialog({
           name: name.trim(),
           scopes,
           expires_in_days: expiryDays.trim() ? Number(expiryDays) : null,
+          tenant_id: tenantId,
         },
       });
       setName("");
