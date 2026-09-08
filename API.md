@@ -102,6 +102,90 @@ something handed over by default.
 
 ---
 
+## Dates and times
+
+Read this before writing the code that groups punches into days. It is the one
+thing here that is easy to get wrong and hard to notice, because it fails
+silently and only for some of the staff.
+
+Every attendance row carries two different things:
+
+| Field | Zone | What it is |
+| ----- | ---- | ---------- |
+| `occurred_at` | **UTC** | The instant the person pressed the button. Convert to `Asia/Kolkata` to show a time. |
+| `attendance_date` | **IST** | The working day the punch belongs to, already converted. Group by this. |
+
+The same punch in both fields:
+
+```
+"occurred_at":      "2026-09-04T03:32:11.000Z"   // 03:32 UTC
+"attendance_date":  "2026-09-04"                 // 09:02 IST, Thursday
+```
+
+**Group by `attendance_date`. Never by the date part of `occurred_at`.** India
+is UTC+5:30, so every punch after 05:30 IST already falls on the next UTC day.
+Group by the UTC date and a 21:00 night-shift punch is filed under tomorrow —
+the day sheet is then wrong for exactly the people who work nights, and looks
+perfectly correct for everybody on days, which is why it survives testing.
+
+```js
+// Right: the server already decided which working day this belongs to.
+const byDay = Map.groupBy(rows, (r) => r.attendance_date);
+
+// Wrong: silently shifts every punch after 05:30 IST onto the next day.
+// const byDay = Map.groupBy(rows, (r) => r.occurred_at.slice(0, 10));
+```
+
+`from` and `to` are both matched against `attendance_date`, so a range is in
+working days and both ends are inclusive.
+
+---
+
+## Loading history
+
+All of it is available, but **not in one request** — a range wider than 366 days
+is refused with `range_too_wide`. A backfill walks the history in yearly
+windows, paging inside each.
+
+```js
+const iso = (d) => d.toISOString().slice(0, 10);
+
+async function* attendanceHistory(from, to) {
+  let start = new Date(from + "T00:00:00Z");
+  const end = new Date(to + "T00:00:00Z");
+
+  while (start <= end) {
+    // 364 days added = 365 inclusive, comfortably inside the 366 limit.
+    const stop = new Date(start);
+    stop.setUTCDate(stop.getUTCDate() + 364);
+    if (stop > end) stop.setTime(end.getTime());
+
+    let offset = 0;
+    for (;;) {
+      const rows = await punchly(
+        `/attendance?from=${iso(start)}&to=${iso(stop)}&limit=1000&offset=${offset}`
+      );
+      yield* rows;
+      if (rows.length < 1000) break;   // a short page is the last one
+      offset += 1000;
+    }
+
+    // Next window starts the day after this one ended: no gap, no overlap.
+    start = new Date(stop);
+    start.setUTCDate(start.getUTCDate() + 1);
+  }
+}
+```
+
+Fifty staff punching in and out on 300 working days is about 30,000 rows a year,
+so 30 pages at `limit=1000`. Three years of history is roughly **90 requests**
+against an allowance of 1000 an hour — a backfill finishes in minutes and needs
+no rate-limit strategy of its own.
+
+Do it once and store the result. A finished day never changes.
+
+---
+
 ## Errors
 
 Every failure is JSON with an `error` and a machine-readable `code`.
@@ -132,6 +216,10 @@ per-key setting.
 
 Fetch a date range once and cache it. Attendance for a past day does not
 change, so re-downloading last month every hour wastes your limit and ours.
+
+Poll **today and yesterday** — not today alone. Punches are made on phones that
+are often out of signal, and one made at 08:42 can reach the server at 19:00.
+Re-reading yesterday is what catches those.
 
 ---
 
