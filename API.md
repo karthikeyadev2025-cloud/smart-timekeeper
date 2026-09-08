@@ -3,6 +3,11 @@
 Read your company's attendance and staff data from your own systems.
 
 Base URL: `https://punchly.online/api/v1`
+Support: support@nikkitechnologies.com
+
+A formatted version of this document, suitable for sending to an outside
+developer, is published as a shareable page. Keep the two in step: this file is
+the source of truth, because it sits next to the code it describes.
 
 ---
 
@@ -92,7 +97,8 @@ Requires the `staff:read` scope. No parameters.
 
 **Not returned, deliberately:** phone numbers, salaries, bank details, PF/ESI
 numbers, ID proofs and selfies. If an integration genuinely needs one of those,
-ask — it should be a scope of its own, not something handed over by default.
+write to support@nikkitechnologies.com — it should be a scope of its own, not
+something handed over by default.
 
 ---
 
@@ -119,7 +125,8 @@ nobody can probe for which keys are real.
 1000 requests per hour per key by default. A `429` carries a `Retry-After`
 header in seconds. The window is a clock hour, so it resets on the hour.
 
-If you need a higher limit, ask — it is a per-key setting.
+If you need a higher limit, write to support@nikkitechnologies.com — it is a
+per-key setting.
 
 ## Paging politely
 
