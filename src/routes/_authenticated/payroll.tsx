@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
+import { computeLateDays, summariseLate } from "@/lib/late-fine";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -302,76 +303,19 @@ function Payroll() {
 
         // Late-fine deduction, using the staff's assigned shift rules (if any).
         // Check-in is NEVER blocked by these rules — this is payroll-only math.
-        let lateFine = 0;
-        let lateDaysCount = 0;
-        const toMin = (t: string) => {
-          const [h, m] = String(t).slice(0, 5).split(":").map(Number);
-          return h * 60 + m;
-        };
-        if (legs.length > 0) {
-          // Resolve each punch's leg FIRST, then collapse to one judged punch
-          // per (day, leg). Two things could otherwise double- (or triple-)
-          // charge the same lateness: a double-tap / flaky-network retry /
-          // kiosk-and-app both firing produces more than one check_in row for
-          // the same leg on the same day, and the old code fined EVERY row
-          // instead of the one real arrival. The EARLIEST punch for that leg
-          // is what's judged, since that's when they actually showed up.
-          const judged = new Map<string, { leg: any; minutesIn: number; occurredAt: string }>();
-          for (const ci of checkIns as any[]) {
-            const d = Number(String(ci.attendance_date).slice(8, 10));
-            // Never fine a punch on a day that isn't even a scheduled work
-            // day (or falls outside the employed/elapsed window) — that day
-            // earns zero attendance credit already, so it must not cost a
-            // fine too. Without this, an off-day check-in (e.g. a Mon-Fri
-            // staffer coming in on a Saturday) could get charged "late"
-            // against a shift start time that day was never scheduled for.
-            if (d < firstDay || d > lastCountedDay || !countsAsWorkDay(d)) continue;
-
-            // Explicit IST. shift start_time is IST wall-clock; reading the
-            // timestamp with the ADMIN's browser timezone happened to work
-            // only because admins are in India — it silently produced wrong
-            // fines for anyone running payroll from another timezone.
-            const ist = new Date(new Date(ci.occurred_at).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-            const minutesIn = ist.getHours() * 60 + ist.getMinutes();
-
-            // Judge this punch against the leg it actually belongs to:
-            // prefer the leg whose branch matches, then the one whose start
-            // time is nearest. Otherwise a Branch B 2 PM check-in gets
-            // measured against Branch A's 9 AM start.
-            const branchLegs = ci.branch_id
-              ? legs.filter((l) => !l.branch_id || l.branch_id === ci.branch_id)
-              : legs;
-            const pool = branchLegs.length ? branchLegs : legs;
-            const leg = pool.reduce((best, l) =>
-              Math.abs(minutesIn - toMin(l.start_time)) < Math.abs(minutesIn - toMin(best.start_time)) ? l : best
-            );
-            if (!leg) continue;
-
-            const key = `${ci.attendance_date}|${leg.id}`;
-            const existing = judged.get(key);
-            if (!existing || ci.occurred_at < existing.occurredAt) {
-              judged.set(key, { leg, minutesIn, occurredAt: ci.occurred_at });
-            }
-          }
-
-          for (const { leg, minutesIn } of judged.values()) {
-            if (leg.late_fine_type === "none" || !leg.start_time) continue;
-            const grace = leg.grace_minutes ?? 10;
-            const lateBy = minutesIn - (toMin(leg.start_time) + grace);
-            if (lateBy > 0) {
-              lateDaysCount++;
-              if (leg.late_fine_type === "fixed_per_occurrence") {
-                lateFine += Number(leg.late_fine_amount ?? 0);
-              } else if (leg.late_fine_type === "per_minute") {
-                lateFine += lateBy * Number(leg.late_fine_amount ?? 0);
-              } else if (leg.late_fine_type === "half_day_after_minutes") {
-                if (lateBy >= (leg.half_day_after_minutes ?? 120)) {
-                  lateFine += perDay / 2;
-                }
-              }
-            }
-          }
-        }
+        //
+        // The judgement logic lives in lib/late-fine.ts so that the Late Entry
+        // report produces byte-identical numbers. A report disagreeing with the
+        // payslip is worse than no report: staff stop trusting both.
+        const lateDetail = computeLateDays({
+          checkIns: checkIns as any[],
+          legs: legs as any[],
+          perDayPay: perDay,
+          firstDay,
+          lastCountedDay,
+          countsAsWorkDay,
+        });
+        const { lateDays: lateDaysCount, lateFine } = summariseLate(lateDetail);
 
         const deductions = absenceDeduction + lateFine;
         const net = Math.max(0, base - deductions);

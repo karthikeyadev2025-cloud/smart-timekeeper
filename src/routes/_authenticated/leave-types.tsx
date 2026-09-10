@@ -142,10 +142,25 @@ function LeaveTypeForm({
       <DialogHeader><DialogTitle>{isEdit ? "Edit leave type" : "New leave type"}</DialogTitle></DialogHeader>
       <div className="space-y-1"><Label>Name</Label><Input value={name} onChange={e => setName(e.target.value)} required placeholder="Sick leave, Casual leave…" /></div>
       <div className="space-y-1"><Label>Annual quota (days)</Label><Input type="number" min={0} max={365} value={quota} onChange={e => setQuota(e.target.value)} /></div>
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input type="checkbox" checked={isPaid} onChange={e => setIsPaid(e.target.checked)} className="h-4 w-4" />
-        <span>Paid leave (counts toward salary)</span>
+      <label className="flex items-start gap-2 text-sm cursor-pointer">
+        <input type="checkbox" checked={isPaid} onChange={e => setIsPaid(e.target.checked)} className="h-4 w-4 mt-0.5" />
+        <span>
+          <span className="block font-medium">Paid leave</span>
+          {/* This defaults ON (leave_types.is_paid DEFAULT true) and admins
+              were creating CL/SL without realising, then asking why approved
+              leave wasn't deducted. Spell out the salary consequence at the
+              point of the decision instead. */}
+          <span className="block text-xs text-muted-foreground">
+            {isPaid
+              ? "Approved days are paid in full — no salary deduction. Normal for Casual, Sick and Earned leave."
+              : "Approved days are deducted from salary at one day's pay each. Use for Loss of Pay."}
+          </span>
+        </span>
       </label>
+      <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
+        Changing this does not alter payslips that have already been generated.
+        Regenerate the affected month in Payroll if you need it applied retrospectively.
+      </p>
       <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Saving…" : isEdit ? "Save changes" : "Create"}</Button></DialogFooter>
     </form>
   );
