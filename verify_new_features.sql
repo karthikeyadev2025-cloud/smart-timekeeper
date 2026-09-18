@@ -271,6 +271,48 @@ WITH checks(ord, feature, object, ok) AS (VALUES
          AND column_name='staff_work_one_shift_per_day'
          AND column_default IS DISTINCT FROM 'false')$$)),
 
+  -- ── 11. MISSING CHECK-OUTS ────────────────────────────────────────────────
+  (83, 'Check-outs', 'attendance_records.is_auto', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='attendance_records' AND column_name='is_auto')$$)),
+  (84, 'Check-outs', 'a punch is real unless proved otherwise (is_auto defaults false)', pg_temp.chk(
+     $$SELECT NOT EXISTS(SELECT 1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='attendance_records'
+         AND column_name='is_auto' AND column_default IS DISTINCT FROM 'false')$$)),
+  (85, 'Check-outs', 'open_sessions() report', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='open_sessions')$$)),
+  (86, 'Check-outs', 'the report is admin-only', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) LIKE '%42501%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='open_sessions'$$)),
+  (87, 'Check-outs', 'tenants.auto_checkout_enabled + _after_hours', pg_temp.chk(
+     $$SELECT count(*) = 2 FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='tenants'
+       AND column_name IN ('auto_checkout_enabled','auto_checkout_after_hours')$$)),
+  (88, 'Check-outs', 'guessing is OFF until somebody asks for it', pg_temp.chk(
+     $$SELECT NOT EXISTS(SELECT 1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='tenants'
+         AND column_name='auto_checkout_enabled'
+         AND column_default IS DISTINCT FROM 'false')$$)),
+  (89, 'Check-outs', 'cron_auto_checkout() job', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='cron_auto_checkout')$$)),
+  (90, 'Check-outs', 'it is scheduled to actually run', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM cron.job WHERE command LIKE '%cron_auto_checkout%')$$)),
+  (91, 'Check-outs', 'no shift means no guess (it joins shifts, never outer)', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) ~* 'join\s+public\.shifts'
+        AND pg_get_functiondef(p.oid) !~* 'left\s+join\s+public\.shifts'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='cron_auto_checkout'$$)),
+  (92, 'Check-outs', 'the API tells integrators a guess is a guess (is_estimated)', pg_temp.chk(
+     $$SELECT pg_get_function_result(p.oid) LIKE '%is_estimated%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='api_attendance'$$)),
+  (93, 'Check-outs', 'scheduled_end_at() rolls an overnight shift to the next day', pg_temp.chk(
+     $$SELECT public.scheduled_end_at(DATE '2026-09-04','22:00'::time,'06:00'::time)
+              = (DATE '2026-09-05' + TIME '06:00') AT TIME ZONE 'Asia/Kolkata'$$)),
+
   (44, 'Semantics', 'Late-alert threshold within 0-240 min', pg_temp.chk(
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants
        WHERE late_alert_after_minutes < 0 OR late_alert_after_minutes > 240)$$))

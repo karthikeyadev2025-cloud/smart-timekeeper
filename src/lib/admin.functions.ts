@@ -335,6 +335,8 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     esi_registration_number?: string | null;
     pt_registration_number?: string | null;
     staff_work_one_shift_per_day?: boolean;
+    auto_checkout_enabled?: boolean;
+    auto_checkout_after_hours?: number;
     // Super admins only; a client admin's own tenant always wins.
     tenant_id?: string | null;
   }) => data)
@@ -465,6 +467,13 @@ export const updateOwnCompanyProfile = createServerFn({ method: "POST" })
     }
     if (data.staff_work_one_shift_per_day !== undefined) {
       update.staff_work_one_shift_per_day = data.staff_work_one_shift_per_day;
+    }
+    if (data.auto_checkout_enabled !== undefined) {
+      update.auto_checkout_enabled = data.auto_checkout_enabled;
+    }
+    if (data.auto_checkout_after_hours !== undefined) {
+      update.auto_checkout_after_hours =
+        intRange(data.auto_checkout_after_hours, 1, 24, "Automatic check-out delay (hours)");
     }
 
     if (data.id_card_accent !== undefined) {

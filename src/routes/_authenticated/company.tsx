@@ -73,6 +73,8 @@ function CompanyProfilePage() {
   const [trackRetention, setTrackRetention] = useState("7");
   const [lateAfter, setLateAfter] = useState("2");
   const [rotaShifts, setRotaShifts] = useState(false);
+  const [autoOut, setAutoOut] = useState(false);
+  const [autoOutHours, setAutoOutHours] = useState("4");
   const [pfOn, setPfOn] = useState(false);
   const [pfPct, setPfPct] = useState("12");
   const [pfCeiling, setPfCeiling] = useState("15000");
@@ -107,6 +109,8 @@ function CompanyProfilePage() {
     setTrackRetention(String(t.live_tracking_retention_days ?? 7));
     setLateAfter(String(t.late_alert_after_minutes ?? 2));
     setRotaShifts(t.staff_work_one_shift_per_day ?? false);
+    setAutoOut(t.auto_checkout_enabled ?? false);
+    setAutoOutHours(String(t.auto_checkout_after_hours ?? 4));
     setPfOn(t.pf_enabled ?? false);
     setPfPct(String(t.pf_employee_percent ?? 12));
     // Empty input means "no ceiling", so a null must not become the string "null".
@@ -235,6 +239,8 @@ function CompanyProfilePage() {
           live_tracking_retention_days: Number(trackRetention) || 7,
           late_alert_after_minutes: Number(lateAfter) || 0,
           staff_work_one_shift_per_day: rotaShifts,
+          auto_checkout_enabled: autoOut,
+          auto_checkout_after_hours: Number(autoOutHours) || 4,
           pf_enabled: pfOn,
           pf_employee_percent: Number(pfPct) || 0,
           // Blank = no ceiling, deduct on the whole wage.
@@ -450,6 +456,38 @@ function CompanyProfilePage() {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* ─── Missing check-outs ─── */}
+          <div className="space-y-2 border-t pt-5">
+            <Label className="text-base">Missing check-outs</Label>
+            <p className="text-xs text-muted-foreground">
+              Somebody punches in and goes home without punching out. This never affects their pay —
+              a day counts as present from the check-in alone — so it only matters if you care about
+              hours worked. Either way the day is listed under{" "}
+              <strong>Missing check-outs</strong> in the menu.
+            </p>
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" checked={autoOut} onChange={(e) => setAutoOut(e.target.checked)}
+                className="h-4 w-4 rounded border-input" />
+              Close the day automatically at the shift end time
+            </label>
+            {autoOut && (
+              <div className="flex flex-wrap items-center gap-2 pl-6">
+                <span className="text-sm text-muted-foreground">Wait</span>
+                <Input type="number" min={1} max={24} value={autoOutHours}
+                  onChange={(e) => setAutoOutHours(e.target.value)} className="w-20" />
+                <span className="text-sm text-muted-foreground">
+                  hours after the shift ends before assuming nobody will punch out
+                </span>
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              An automatic check-out is an <strong>estimate</strong>, not a measurement — nobody
+              recorded that time. It is marked as estimated wherever it appears, including to any
+              system reading your data through the API, and it can be corrected. Days where the
+              punch names no shift are never guessed at, because there is no end time to work from.
+            </p>
           </div>
 
           {/* ─── Live location tracking ─── */}

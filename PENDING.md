@@ -4,7 +4,7 @@ Everything here is **deliberately deferred**, not forgotten. The code is
 finished and merged-ready; these items are blocked on information or
 credentials that only the owner has.
 
-Last reviewed: 2026-09-07
+Last reviewed: 2026-09-18
 
 ---
 
@@ -298,6 +298,64 @@ pass while proving nothing:
   NULL`), so a branchless fixture showed no difference. Real punches record the
   campus while these shifts do not, and that asymmetry is what breaks the
   match — recording the campus makes alerts *more* likely, not less.
+
+---
+
+## 5e. Missing check-outs — BUILT 2026-09-18
+
+**The question:** somebody punches in at 9am and goes home without punching
+out. What happens?
+
+**What already happened, and still does:** nothing bad. Payroll counts a day as
+present from the **check-in alone** — it has never read a check-out — so the
+person is paid in full. That was true before this work and is unchanged by it.
+The only thing lost is *hours worked*, which matters to the companies that
+bill by the hour and to nobody else.
+
+**What was missing:** visibility. There was no screen, no report and no count.
+An admin could not have found these days if they had wanted to.
+
+**What was built, in two halves:**
+
+1. **A report — Missing check-outs in the menu** (`open_sessions()`,
+   admin-only, read-only). Every day with a check-in and no human check-out,
+   with the shift, the in time, the hours if they can be worked out, and a
+   line saying what to do about it. This half is always on, because a list of
+   facts changes nothing.
+2. **An optional automatic close**, off by default, under *Company profile →
+   Missing check-outs*. Closes the day at the shift's end time once the shift
+   has been over for N hours (default 4, adjustable 1–24).
+
+**Why the second half is off by default, and stays off until asked for:**
+
+An automatic check-out is a time **nobody recorded**. It is a guess. Writing
+guesses into an attendance ledger that a payroll dispute or a labour
+inspection may later be argued from is not something to switch on for somebody
+without asking them. So:
+
+* every generated row carries `is_auto = true` and a note saying where the
+  time came from;
+* the API exposes it as `is_estimated`, so an integrator building a timesheet
+  or an invoice can never mistake a guess for a measurement (documented in
+  `API.md`);
+* generated rows stay on the report, labelled as guesses, so an admin can
+  correct one;
+* **a punch that names no shift is never guessed at.** There is no end time to
+  work from, so the day stays open rather than being invented. The job inner-
+  joins `shifts` deliberately;
+* a day somebody really closed is never touched, and the job is idempotent —
+  an hourly schedule cannot pile up duplicates.
+
+Overnight shifts are handled: a 22:00–06:00 shift ends the following morning,
+and `scheduled_end_at()` rolls the date accordingly.
+
+**Verified:** 11 assertions in `supabase/tests/missing_checkouts_test.sql`,
+including a control that proves the job actually closed something before the
+assertions about *how* it closed it mean anything. 11 new checks in
+`verify_new_features.sql`.
+
+**Nothing is pending here** — it works with the setting off, which is how every
+company starts. Turn it on only if you care about hours worked.
 
 ---
 

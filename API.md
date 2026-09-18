@@ -65,7 +65,8 @@ curl "https://punchly.online/api/v1/attendance?from=2026-09-01&to=2026-09-30&lim
       "shift_name": "MORNING",
       "latitude": 17.385,
       "longitude": 78.4867,
-      "enforcement_status": "ok"
+      "enforcement_status": "ok",
+      "is_estimated": false
     }
   ],
   "count": 1
@@ -73,6 +74,25 @@ curl "https://punchly.online/api/v1/attendance?from=2026-09-01&to=2026-09-30&lim
 ```
 
 Newest first. Page with `offset` until `count` is less than your `limit`.
+
+### `is_estimated`
+
+Almost always `false`: somebody stood somewhere and pressed a button, and that
+is what the row says.
+
+It is `true` when the row is a **check-out nobody made**. Some companies ask
+Punchly to close a day automatically when a person punches in, works, and goes
+home without punching out — the row is then generated from the shift's end
+time, hours after the fact. Nobody recorded that moment. It is Punchly's best
+guess at it.
+
+Treat a `true` row as an estimate everywhere it reaches a human: an hours
+report, a timesheet, an invoice line. Do not present it as a measurement, and
+do not use it as evidence of anything. It can also be corrected later by an
+admin, so a figure you derived from it may change.
+
+Rows are never estimated unless the company turned that setting on, and a
+check-in is never estimated.
 
 ## `GET /api/v1/staff`
 

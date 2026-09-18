@@ -88,6 +88,7 @@ export type Database = {
           face_verified: boolean
           id: string
           is_mock_location: boolean
+          is_auto: boolean
           kind: Database["public"]["Enums"]["attendance_kind"]
           latitude: number | null
           longitude: number | null
@@ -110,6 +111,7 @@ export type Database = {
           face_verified?: boolean
           id?: string
           is_mock_location?: boolean
+          is_auto?: boolean
           kind: Database["public"]["Enums"]["attendance_kind"]
           latitude?: number | null
           longitude?: number | null
@@ -132,6 +134,7 @@ export type Database = {
           face_verified?: boolean
           id?: string
           is_mock_location?: boolean
+          is_auto?: boolean
           kind?: Database["public"]["Enums"]["attendance_kind"]
           latitude?: number | null
           longitude?: number | null
@@ -2109,6 +2112,8 @@ export type Database = {
         Row: {
           late_alert_dormant_days: number
           professional_tax_enabled: boolean
+          auto_checkout_enabled: boolean
+          auto_checkout_after_hours: number
           staff_work_one_shift_per_day: boolean
           pf_registration_number: string | null
           esi_registration_number: string | null
@@ -2149,6 +2154,8 @@ export type Database = {
         Insert: {
           late_alert_dormant_days?: number
           professional_tax_enabled?: boolean
+          auto_checkout_enabled?: boolean
+          auto_checkout_after_hours?: number
           staff_work_one_shift_per_day?: boolean
           pf_registration_number?: string | null
           esi_registration_number?: string | null
@@ -2189,6 +2196,8 @@ export type Database = {
         Update: {
           late_alert_dormant_days?: number
           professional_tax_enabled?: boolean
+          auto_checkout_enabled?: boolean
+          auto_checkout_after_hours?: number
           staff_work_one_shift_per_day?: boolean
           pf_registration_number?: string | null
           esi_registration_number?: string | null
@@ -2413,6 +2422,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           enforcement_status: string | null
+          is_estimated: boolean | null
         }[]
       }
       api_staff: {
@@ -2439,6 +2449,22 @@ export type Database = {
           profile_age_days: number
           last_punch: string | null
           reason: string
+        }[]
+      }
+      open_sessions: {
+        Args: { _tenant_id: string; _from?: string | null; _to?: string | null }
+        Returns: {
+          attendance_date: string
+          user_id: string
+          full_name: string | null
+          staff_id: string | null
+          shift_name: string
+          branch_name: string
+          checked_in_ist: string
+          status: string
+          closed_at_ist: string | null
+          hours: number | null
+          what_to_do: string
         }[]
       }
       statutory_status: {
