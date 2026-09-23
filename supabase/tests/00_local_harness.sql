@@ -32,7 +32,10 @@ CREATE TABLE IF NOT EXISTS auth.users (
   encrypted_password TEXT,
   email_confirmed_at TIMESTAMPTZ,
   raw_user_meta_data JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Real Supabase records this; the stub needs it so queries that look for
+  -- accounts that have never once signed in can be tested here.
+  last_sign_in_at TIMESTAMPTZ
 );
 
 -- request.jwt.claim.sub is how Supabase threads the current user id through.
