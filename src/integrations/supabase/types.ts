@@ -2451,6 +2451,43 @@ export type Database = {
           reason: string
         }[]
       }
+      staff_removal_check: {
+        Args: { _tenant_id: string; _user_id: string }
+        Returns: {
+          full_name: string | null
+          attendance_count: number
+          payslip_count: number
+          leave_count: number
+          first_punch: string | null
+          last_punch: string | null
+          is_active: boolean | null
+          can_delete: boolean
+          recommendation: string
+        }[]
+      }
+      tenants_over_limit: {
+        Args: Record<string, never>
+        Returns: {
+          tenant_id: string
+          tenant_name: string
+          seats_used: number
+          employee_limit: number
+          over_by: number
+        }[]
+      }
+      phantom_tenants: {
+        Args: Record<string, never>
+        Returns: {
+          tenant_id: string
+          tenant_name: string
+          created_at: string
+          member_count: number
+          sole_member: string | null
+          also_works_at: string | null
+          punches: number
+          verdict: string
+        }[]
+      }
       open_sessions: {
         Args: { _tenant_id: string; _from?: string | null; _to?: string | null }
         Returns: {

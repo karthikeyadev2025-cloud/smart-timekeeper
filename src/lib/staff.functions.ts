@@ -65,6 +65,18 @@ export const createStaff = createServerFn({ method: "POST" })
     if (createErr || !created.user) throw new Error(createErr?.message ?? "Could not create staff account");
     const newUserId = created.user.id;
 
+    // The role goes in BEFORE the profile is attached to the company, not
+    // after. handle_new_user() has just created a profile with no tenant; the
+    // update below is what attaches it, and that update is where the plan's
+    // employee limit is enforced. Admins and managers do not count against
+    // that limit — but the limit trigger can only know that if the role is
+    // already on file. Written afterwards, a manager hired by a company that
+    // is at its limit would be refused a seat they never needed.
+    const { error: roleErr } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: newUserId, role: data.role, tenant_id: data.tenant_id });
+    if (roleErr) throw new Error(roleErr.message);
+
     const { error: profErr } = await supabaseAdmin
       .from("profiles")
       .update({
@@ -77,12 +89,13 @@ export const createStaff = createServerFn({ method: "POST" })
         branch_id: data.branch_id ?? null,
       })
       .eq("id", newUserId);
-    if (profErr) throw new Error(profErr.message);
-
-    const { error: roleErr } = await supabaseAdmin
-      .from("user_roles")
-      .insert({ user_id: newUserId, role: data.role, tenant_id: data.tenant_id });
-    if (roleErr) throw new Error(roleErr.message);
+    // A refusal here is the plan limit, which arrives as a raw check_violation.
+    // The account and its role already exist at this point, so leaving them
+    // behind would strand an unattached user on every refused hire.
+    if (profErr) {
+      await supabaseAdmin.auth.admin.deleteUser(newUserId);
+      throw new Error(profErr.message);
+    }
 
     // If branch_manager, also mark them as the branch's manager
     if (data.role === "branch_manager" && data.branch_id) {
@@ -329,6 +342,34 @@ export const deleteStaff = createServerFn({ method: "POST" })
       .eq("tenant_id", data.tenant_id);
     if ((targetRoles ?? []).some((r) => r.role === "client_admin")) {
       throw new Error("Company admins can't be removed from the staff page");
+    }
+
+    // Refuse to destroy a work history. attendance_records.user_id and
+    // payslips.user_id both cascade from auth.users, so this delete would take
+    // every punch and every payslip with it — permanently, with no export and
+    // no undo. That is the evidence an employer needs for a wage claim or a
+    // PF/ESI inspection, and it is not something to lose to a misclick.
+    //
+    // trg_guard_staff_delete in the database is the actual guard and refuses
+    // this regardless of which code path asks. Checking here as well is what
+    // turns a raw Postgres error into a sentence an admin can act on.
+    const [{ count: attendanceCount }, { count: payslipCount }] = await Promise.all([
+      supabaseAdmin
+        .from("attendance_records")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", data.user_id),
+      supabaseAdmin
+        .from("payslips")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", data.user_id),
+    ]);
+
+    if ((attendanceCount ?? 0) > 0 || (payslipCount ?? 0) > 0) {
+      throw new Error(
+        `This person has ${attendanceCount ?? 0} attendance record(s) and ${payslipCount ?? 0} payslip(s). ` +
+          `Deleting would destroy them permanently. Disable them instead — they keep their history, ` +
+          `they cannot log in or punch, and their seat is freed for a replacement.`,
+      );
     }
 
     // Delete the auth user — CASCADE removes profile, user_roles, staff_shifts, etc.

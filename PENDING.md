@@ -4,7 +4,7 @@ Everything here is **deliberately deferred**, not forgotten. The code is
 finished and merged-ready; these items are blocked on information or
 credentials that only the owner has.
 
-Last reviewed: 2026-09-18
+Last reviewed: 2026-09-23
 
 ---
 
@@ -356,6 +356,76 @@ assertions about *how* it closed it mean anything. 11 new checks in
 
 **Nothing is pending here** — it works with the setting off, which is how every
 company starts. Turn it on only if you care about hours worked.
+
+---
+
+## 5f. Deleting staff, and three things it uncovered — BUILT 2026-09-23
+
+**The question:** a client wants a staff member deleted. What should they do?
+
+**The answer: disable, not delete.** Disable already does everything they
+actually want — the person cannot log in or punch, they drop off the active
+roster, and *the seat is freed for a replacement*. Delete adds only one thing:
+it destroys the evidence.
+
+**What Delete used to do.** `attendance_records.user_id` and
+`payslips.user_id` both cascade from `auth.users`, so one click on the Team
+page permanently erased every punch that person ever made and every payslip
+they were ever issued. No undo, no export. That is the record an employer needs
+for a wage claim or a PF/ESI inspection, and the safe action was the button
+right next to it.
+
+**What was built:**
+
+* **The database refuses it.** `trg_guard_staff_delete` blocks any profile
+  delete that would take attendance or payslips with it, naming the counts and
+  pointing at Disable. In the database rather than the server function, because
+  the cascade is reachable from more than one path — and the test proves the
+  `auth.users` route hits it too.
+* **The screen explains first.** `staff_removal_check()` tells the admin what
+  would be lost *before* they commit, with the punch count and the dates it
+  covers, and offers a **Disable instead** button.
+* **Delete still works where it should** — a duplicate or test entry with no
+  records. Deliberately kept, and covered by a control assertion so the guard
+  can't pass by simply blocking everything.
+
+### Three holes this uncovered, all fixed
+
+1. **Re-enabling bypassed the plan limit.** The cap trigger was `BEFORE INSERT`
+   only, so toggling somebody back to Active never re-checked it.
+2. **So did adding staff — the ordinary path.** `createStaff()` calls
+   `auth.admin.createUser`; the signup trigger inserts a profile with
+   `tenant_id` NULL; the cap reads the limit from that NULL tenant, finds
+   nothing, and waves it through. The app *then* attaches the company in an
+   UPDATE, which the trigger didn't watch. **Every plan limit in the product
+   was decorative.**
+3. **The signup trigger was inventing a company per staff member.** The promo
+   migrations rewrote `handle_new_user` to `COALESCE(company_name, 'My
+   Company')` — unconditional — so every staff account created from the Team
+   page got a junk tenant *and a `client_admin` role on it*. Not an escalation
+   at their real employer (roles are checked per tenant), but it also made
+   `tenant_staff_count()` read **0 for a company of 200**, because that
+   function asked "does this person hold client_admin *anywhere*" with no
+   tenant filter. So even fixes 1 and 2 would not have worked.
+
+   Fixed by **splitting the trigger** rather than rewriting it: the promo logic
+   is long, live and has money attached, so it is left byte-for-byte alone and
+   simply stops firing for signups with no company name. Those get a bare
+   profile, which is all `createStaff()` needs. A test asserts a real signup
+   still gets its company, its admin role and the promo path.
+
+**Verified:** 19 assertions in `supabase/tests/staff_removal_guard_test.sql`,
+11 new checks in `verify_new_features.sql`. Full suite 175 assertions across 16
+suites, all passing.
+
+### ⚠️ Before applying this one
+
+Run **`check_before_seat_enforcement.sql`** first. The cap is about to be
+enforced for the first time, so some companies may already be over it. Nobody
+is evicted and nobody stops punching — it only bites on the next addition or
+re-enable — but you want to find that out from the report, not from their phone
+call. The same file lists the junk "My Company" tenants and carries a
+commented-out cleanup to run **after** you have looked at the list.
 
 ---
 

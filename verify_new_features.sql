@@ -313,6 +313,45 @@ WITH checks(ord, feature, object, ok) AS (VALUES
      $$SELECT public.scheduled_end_at(DATE '2026-09-04','22:00'::time,'06:00'::time)
               = (DATE '2026-09-05' + TIME '06:00') AT TIME ZONE 'Asia/Kolkata'$$)),
 
+  -- ── 12. STAFF REMOVAL + SEAT ENFORCEMENT ─────────────────────────────────
+  (94, 'Removal', 'delete guard trigger on profiles', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='trg_guard_staff_delete'
+       AND tgrelid='public.profiles'::regclass AND NOT tgisinternal)$$)),
+  (95, 'Removal', 'it fires BEFORE DELETE (too late is no guard at all)', pg_temp.chk(
+     $$SELECT (tgtype & 2) > 0 AND (tgtype & 8) > 0 FROM pg_trigger
+       WHERE tgname='trg_guard_staff_delete' AND tgrelid='public.profiles'::regclass$$)),
+  (96, 'Removal', 'staff_removal_check() preview', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='staff_removal_check')$$)),
+  (97, 'Removal', 'the preview is admin-only', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) LIKE '%42501%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='staff_removal_check'$$)),
+  (98, 'Seats', 'the cap re-checks on UPDATE, not only INSERT', pg_temp.chk(
+     $$SELECT (tgtype & 4) > 0 AND (tgtype & 16) > 0 FROM pg_trigger
+       WHERE tgname='trg_enforce_employee_limit' AND tgrelid='public.profiles'::regclass$$)),
+  (99, 'Seats', 'a role at another company no longer buys a free seat', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) LIKE '%ur.tenant_id = _tenant_id%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='tenant_staff_count'$$)),
+  (100, 'Seats', 'a staff signup no longer invents a company', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_trigger
+       WHERE tgname='on_auth_user_created_no_company' AND NOT tgisinternal)$$)),
+  (101, 'Seats', 'and the real signup trigger is now conditional', pg_temp.chk(
+     $$SELECT pg_get_triggerdef(oid) LIKE '%WHEN%company_name%'
+       FROM pg_trigger WHERE tgname='on_auth_user_created' AND NOT tgisinternal$$)),
+  (102, 'Seats', 'tenants_over_limit() report', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='tenants_over_limit')$$)),
+  (103, 'Seats', 'phantom_tenants() report', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='phantom_tenants')$$)),
+  (104, 'Seats', 'neither cross-tenant report is reachable from the app', pg_temp.chk(
+     $$SELECT NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname IN ('tenants_over_limit','phantom_tenants')
+       LIMIT 1$$)),
+
   (44, 'Semantics', 'Late-alert threshold within 0-240 min', pg_temp.chk(
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants
        WHERE late_alert_after_minutes < 0 OR late_alert_after_minutes > 240)$$))

@@ -42,14 +42,49 @@ function TeamPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "disabled" | "field">("all");
   const deleteStaffFn = useServerFn(deleteStaff);
 
+  // Somebody with a work history cannot be deleted — attendance and payslips
+  // cascade from the account, so it would destroy the record an employer needs
+  // for a wage claim or a PF/ESI inspection. The database refuses it outright.
+  // What this screen adds is the explanation *before* the click, plus the
+  // button for what the admin almost always actually meant.
+  const [removalCheck, setRemovalCheck] = useState<any | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const setActive = async (s: any, next: boolean) => {
+    const { error } = await supabase.from("profiles").update({ is_active: next }).eq("id", s.id);
+    if (error) { toast.error(error.message); return false; }
+    toast.success(next ? "Staff re-enabled" : "Staff disabled");
+    qc.invalidateQueries({ queryKey: ["staff"] });
+    return true;
+  };
+
   const handleDelete = async (s: any) => {
-    if (!confirm(`Delete ${s.full_name ?? "this staff member"}? This cannot be undone — their attendance history will also be removed.`)) return;
+    setChecking(true);
     try {
+      const { data, error } = await supabase.rpc("staff_removal_check", {
+        _tenant_id: tenantId!,
+        _user_id: s.id,
+      });
+      if (error) throw error;
+      const info = Array.isArray(data) ? data[0] : data;
+
+      if (info && !info.can_delete) {
+        setRemovalCheck({ ...info, staff: s });
+        return;
+      }
+
+      const what = (info?.leave_count ?? 0) > 0
+        ? `Delete ${s.full_name ?? "this staff member"}? They have no attendance and no payslips, but ${info.leave_count} leave request(s) will go with them.`
+        : `Delete ${s.full_name ?? "this staff member"}? They have no records at all, so nothing is lost.`;
+      if (!confirm(what)) return;
+
       await deleteStaffFn({ data: { tenant_id: tenantId!, user_id: s.id } });
       toast.success("Staff removed");
       qc.invalidateQueries({ queryKey: ["staff"] });
     } catch (e: any) {
       toast.error(e?.message ?? "Could not delete");
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -305,9 +340,7 @@ function TeamPage() {
                       onClick={async () => {
                         const next = !s.is_active;
                         if (!confirm(next ? `Re-enable ${s.full_name}?` : `Disable ${s.full_name}? They won't be able to log in or check in, but all their records stay intact.`)) return;
-                        const { error } = await supabase.from("profiles").update({ is_active: next }).eq("id", s.id);
-                        if (error) toast.error(error.message);
-                        else { toast.success(next ? "Staff re-enabled" : "Staff disabled"); qc.invalidateQueries({ queryKey: ["staff"] }); }
+                        await setActive(s, next);
                       }}
                       className="group"
                       title={s.is_active ? "Click to disable" : "Click to re-enable"}
@@ -343,7 +376,7 @@ function TeamPage() {
                       <Button size="sm" variant="ghost" onClick={() => setEditStaff(s)} title="Edit">
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleDelete(s)} title="Delete">
+                      <Button size="sm" variant="ghost" onClick={() => handleDelete(s)} disabled={checking} title="Delete">
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -376,6 +409,70 @@ function TeamPage() {
                 branchLabel={branchLabel}
                 onDone={() => { setEditStaff(null); qc.invalidateQueries({ queryKey: ["staff"] }); }}
               />
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete refused: say what would have been lost, then offer the thing
+            they almost certainly meant. */}
+        <Dialog open={!!removalCheck} onOpenChange={(o) => !o && setRemovalCheck(null)}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-destructive" />
+                {removalCheck?.full_name ?? "This staff member"} cannot be deleted
+              </DialogTitle>
+            </DialogHeader>
+
+            {removalCheck && (
+              <div className="space-y-4 text-sm">
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                  <p className="font-medium text-destructive">Deleting would permanently destroy:</p>
+                  <ul className="mt-2 space-y-1 text-muted-foreground">
+                    {removalCheck.attendance_count > 0 && (
+                      <li>
+                        <strong className="text-foreground tabular-nums">
+                          {removalCheck.attendance_count}
+                        </strong>{" "}
+                        attendance record(s)
+                        {removalCheck.first_punch && (
+                          <> — {removalCheck.first_punch} to {removalCheck.last_punch}</>
+                        )}
+                      </li>
+                    )}
+                    {removalCheck.payslip_count > 0 && (
+                      <li>
+                        <strong className="text-foreground tabular-nums">
+                          {removalCheck.payslip_count}
+                        </strong>{" "}
+                        payslip(s)
+                      </li>
+                    )}
+                  </ul>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    There is no undo and no export. This is the record you would need if this
+                    person ever claims unpaid wages, or if a PF/ESI inspection asks for it.
+                  </p>
+                </div>
+
+                <p className="text-muted-foreground">{removalCheck.recommendation}</p>
+
+                <DialogFooter className="gap-2 sm:justify-between">
+                  <Button variant="ghost" onClick={() => setRemovalCheck(null)}>
+                    Leave them as they are
+                  </Button>
+                  {removalCheck.is_active && (
+                    <Button
+                      onClick={async () => {
+                        const ok = await setActive(removalCheck.staff, false);
+                        if (ok) setRemovalCheck(null);
+                      }}
+                    >
+                      Disable instead
+                    </Button>
+                  )}
+                </DialogFooter>
+              </div>
             )}
           </DialogContent>
         </Dialog>
