@@ -65,7 +65,13 @@ export const createStaff = createServerFn({ method: "POST" })
       email_confirm: true,
       user_metadata: { full_name: data.full_name, phone: data.phone },
     });
-    if (createErr || !created.user) throw new Error(createErr?.message ?? "Could not create staff account");
+    if (createErr || !created.user) {
+      throw new Error(
+        createErr
+          ? `Could not create staff account. ${describeAuthPasswordError(createErr.message)}`
+          : "Could not create staff account",
+      );
+    }
     const newUserId = created.user.id;
 
     // The role goes in BEFORE the profile is attached to the company, not
@@ -128,6 +134,31 @@ export const createStaff = createServerFn({ method: "POST" })
 
     return { user_id: newUserId, phone: data.phone };
   });
+
+/**
+ * Supabase Auth enforces its own minimum password length, set per project and
+ * defaulting to 6. A staff PIN is 4 digits, because the staff login screen is
+ * a keypad that cannot send anything else. When the project minimum is above
+ * 4 the two rules are mutually exclusive: no value satisfies both, so setting
+ * or resetting any staff PIN fails.
+ *
+ * Supabase reports this as "Password should be at least 6 characters", which
+ * reads like the admin typed something wrong. They did not — the setting is
+ * the problem, and it is one they can change.
+ */
+function describeAuthPasswordError(message: string): string {
+  if (/at least \d+ characters|password.*too short|weak.?password/i.test(message)) {
+    return (
+      "Supabase is refusing a 4-digit PIN because this project's minimum password " +
+      "length is set higher than 4. Staff sign in on a number keypad that can only " +
+      "send 4 digits, so nothing will work until that setting matches. " +
+      "Fix it in the Supabase dashboard: Authentication → Sign In / Providers → " +
+      "Email → Minimum password length → 4. " +
+      `(Supabase said: ${message})`
+    );
+  }
+  return message;
+}
 
 /* ─────────────── UPDATE STAFF ─────────────── */
 
@@ -298,7 +329,7 @@ export const updateStaff = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
         password: data.new_password,
       });
-      if (error) throw new Error(`Password reset failed: ${error.message}`);
+      if (error) throw new Error(`Could not set the PIN. ${describeAuthPasswordError(error.message)}`);
     }
 
     return { ok: true };

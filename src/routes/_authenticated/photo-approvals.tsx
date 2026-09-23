@@ -35,7 +35,7 @@ function PhotoApprovalsPage() {
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("pending_photo_changes")
-        .select("id, user_id, photo_path, status, created_at, profiles!pending_photo_changes_user_id_fkey(full_name, staff_id, avatar_url, phone, designation)")
+        .select("id, user_id, photo_path, status, created_at, profiles!pending_photo_changes_user_id_fkey_profiles(full_name, staff_id, avatar_url, phone, designation)")
         .eq("tenant_id", tenantId)
         .eq("status", "pending")
         .order("created_at", { ascending: false });
