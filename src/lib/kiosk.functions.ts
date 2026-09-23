@@ -29,6 +29,7 @@ import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { STAFF_EMAIL_DOMAIN } from "@/lib/staff.functions";
+import { passwordCandidates, pinToPassword } from "@/lib/staff-pin";
 
 function anonClient() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -47,15 +48,36 @@ async function verifyStaffCredentials(hostUserId: string, phone: string, pin: st
     .from("profiles").select("tenant_id").eq("id", hostUserId).maybeSingle();
   if (!hostProfile?.tenant_id) throw new Error("Kiosk host has no tenant");
 
-  // Real sign-in attempt = PIN verification (session discarded immediately)
+  // Real sign-in attempt = PIN verification (session discarded immediately).
+  // The stored password is the PIN plus a suffix, because Supabase will not
+  // store anything under 6 characters; accounts predating that hold the bare
+  // PIN. Both are tried, so a kiosk keeps working through the transition.
   const probe = anonClient();
-  const { data: signIn, error: signErr } = await probe.auth.signInWithPassword({
-    email: `${phone}@${STAFF_EMAIL_DOMAIN}`,
-    password: pin,
-  });
-  if (signErr || !signIn.user) throw new Error("Phone number or PIN is incorrect");
+  const email = `${phone}@${STAFF_EMAIL_DOMAIN}`;
+  let staffUserId: string | null = null;
+  let usedLegacy = false;
+  for (const candidate of passwordCandidates(pin)) {
+    const { data: signIn, error: signErr } = await probe.auth.signInWithPassword({
+      email,
+      password: candidate,
+    });
+    if (!signErr && signIn.user) {
+      staffUserId = signIn.user.id;
+      usedLegacy = candidate === pin;
+      break;
+    }
+  }
   await probe.auth.signOut().catch(() => {});
-  const staffUserId = signIn.user.id;
+  if (!staffUserId) throw new Error("Phone number or PIN is incorrect");
+
+  // Matched on the old bare-PIN password: move the account onto the stored
+  // form so the fallback retires itself. The employee's PIN is unchanged.
+  // Never let this fail a punch — the credential was already verified.
+  if (usedLegacy) {
+    await supabaseAdmin.auth.admin
+      .updateUserById(staffUserId, { password: pinToPassword(pin) })
+      .catch(() => {});
+  }
 
   // Staff must belong to the SAME tenant as the kiosk host
   const { data: staffProfile } = await supabaseAdmin

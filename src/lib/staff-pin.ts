@@ -75,3 +75,49 @@ export function generateStaffPin(): string {
   // resist an offline attack.
   return String(Math.floor(Math.random() * 10000)).padStart(STAFF_PIN_LENGTH, "0");
 }
+
+/* ───────────────────────── PIN → stored password ─────────────────────────
+ *
+ * Supabase Auth will not store a password shorter than 6 characters. That is
+ * a floor, not a default: the dashboard's "Minimum password length" refuses
+ * anything lower, and a 2023 request to allow 4 on the hosted service was
+ * never taken up. A staff PIN is 4 digits because the login screen is a
+ * keypad that cannot send a fifth. The two constraints have no overlap, so
+ * the PIN cannot be the password.
+ *
+ * So it stops being the password. The PIN the employee types is unchanged;
+ * what gets stored is the PIN plus a fixed suffix, applied on every write and
+ * on every verification. Nothing an employee sees or types is different.
+ *
+ * Be clear about what this is: a way around a length check, NOT a security
+ * improvement. The suffix ships in the client bundle, so it is public, and
+ * the real entropy is still 4 digits — exactly what it was when the PIN was
+ * the password. It is no weaker than before and no stronger. What actually
+ * defends these accounts is unchanged too: Supabase's own rate limiting on
+ * failed sign-ins, and an admin who can reset a PIN.
+ *
+ * If you want them genuinely harder to guess, the answer is a longer PIN,
+ * which means widening the keypad and re-issuing a PIN to every employee.
+ * That is a product decision, not something to slip in behind a bug fix.
+ */
+
+const PIN_PASSWORD_SUFFIX = ".pnchly";
+
+/** What actually gets stored in Supabase Auth for a given PIN. */
+export function pinToPassword(pin: string): string {
+  return `${pin}${PIN_PASSWORD_SUFFIX}`;
+}
+
+/**
+ * What to try when verifying a typed PIN, in order.
+ *
+ * Accounts created before this change hold the bare 4-digit PIN, and those
+ * passwords still verify perfectly well — it is only WRITING a short one that
+ * Supabase refuses. So the second candidate is not dead code to tidy away: it
+ * is the only thing keeping every existing employee able to sign in. Callers
+ * that can write should upgrade the account after a legacy match, which
+ * retires that path one employee at a time.
+ */
+export function passwordCandidates(pin: string): string[] {
+  return [pinToPassword(pin), pin];
+}

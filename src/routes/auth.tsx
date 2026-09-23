@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Phone, Mail } from "lucide-react";
 import { phoneToStaffEmail, isValidPhone, canonicalPhone } from "@/lib/phone-auth";
+import { passwordCandidates, pinToPassword } from "@/lib/staff-pin";
 import { requestPinReset } from "@/lib/pin-reset.functions";
 
 export const Route = createFileRoute("/auth")({
@@ -73,13 +74,41 @@ function AuthPage() {
     // form — otherwise a correct PIN "doesn't work" for no visible reason.
     const rawEmail = phoneToStaffEmail(phone);
     const canonEmail = phoneToStaffEmail(canonicalPhone(phone));
+    const emails = canonEmail === rawEmail ? [rawEmail] : [rawEmail, canonEmail];
+    // The stored password is the PIN plus a suffix (Supabase refuses to store
+    // anything under 6 characters). Accounts created before that still hold
+    // the bare PIN and must keep working, so both forms are tried.
+    const candidates = passwordCandidates(password);
     setLoading(true);
     try {
-      let { error } = await supabase.auth.signInWithPassword({ email: rawEmail, password });
-      if (error && canonEmail !== rawEmail) {
-        ({ error } = await supabase.auth.signInWithPassword({ email: canonEmail, password }));
+      let error: unknown = new Error("Invalid login credentials");
+      let usedLegacy = false;
+      outer: for (const candidate of candidates) {
+        for (const email of emails) {
+          const res = await supabase.auth.signInWithPassword({ email, password: candidate });
+          if (!res.error) {
+            error = null;
+            usedLegacy = candidate === password;
+            break outer;
+          }
+          error = res.error;
+        }
       }
       if (error) throw error;
+
+      // Signed in on the old bare-PIN password. Move this account onto the
+      // stored form now, while we hold a session that is allowed to change it,
+      // so the fallback above retires itself one person at a time. Their PIN
+      // does not change; only what is stored does. A failure here must never
+      // block the login that already succeeded.
+      if (usedLegacy) {
+        try {
+          await supabase.auth.updateUser({ password: pinToPassword(password) });
+        } catch {
+          /* they are signed in; the fallback will catch them again next time */
+        }
+      }
+
       window.location.href = "/app";
     } catch (e: any) {
       toast.error(e.message === "Invalid login credentials" ? "Phone number or PIN is incorrect" : (e.message ?? "Sign in failed"));

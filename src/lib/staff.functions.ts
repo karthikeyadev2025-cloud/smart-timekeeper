@@ -6,7 +6,7 @@ import { requireTenantPermission } from "@/lib/permissions";
 import { requireActiveSubscription } from "@/lib/subscription-gate";
 
 import { canonicalPhone } from "@/lib/phone-auth";
-import { STAFF_PIN_PATTERN, STAFF_PIN_MESSAGE } from "@/lib/staff-pin";
+import { STAFF_PIN_PATTERN, STAFF_PIN_MESSAGE, pinToPassword } from "@/lib/staff-pin";
 
 export const STAFF_EMAIL_DOMAIN = "punchly.app";
 
@@ -61,7 +61,9 @@ export const createStaff = createServerFn({ method: "POST" })
 
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: data.password,
+      // The PIN is 4 digits; Supabase will not store a password under 6. See
+      // pinToPassword — the employee still types the 4 digits.
+      password: pinToPassword(data.password),
       email_confirm: true,
       user_metadata: { full_name: data.full_name, phone: data.phone },
     });
@@ -327,7 +329,7 @@ export const updateStaff = createServerFn({ method: "POST" })
     // Password reset
     if (data.new_password) {
       const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
-        password: data.new_password,
+        password: pinToPassword(data.new_password),
       });
       if (error) throw new Error(`Could not set the PIN. ${describeAuthPasswordError(error.message)}`);
     }
@@ -519,11 +521,11 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
       try {
         const email = `${row.phone}@${STAFF_EMAIL_DOMAIN}`;
         const generatedPin = row.pin ? undefined : generatePin();
-        const password = row.pin ?? generatedPin!;
+        const password = row.pin ?? generatedPin!;   // the PIN itself; stored via pinToPassword
 
         const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
           email,
-          password,
+          password: pinToPassword(password),
           email_confirm: true,
           user_metadata: { full_name: row.full_name, phone: row.phone },
         });

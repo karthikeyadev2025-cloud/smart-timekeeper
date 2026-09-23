@@ -12,6 +12,8 @@ import {
   isValidStaffPin,
   staffPinProblem,
   generateStaffPin,
+  pinToPassword,
+  passwordCandidates,
 } from "@/lib/staff-pin";
 
 let pass = 0;
@@ -87,6 +89,46 @@ ok(
   STAFF_PIN_PATTERN.test("9".repeat(STAFF_PIN_LENGTH)) &&
     !STAFF_PIN_PATTERN.test("9".repeat(STAFF_PIN_LENGTH + 1)),
   "the pattern and the length describe the same rule",
+);
+
+// ── The stored password ─────────────────────────────────────────────────────
+// Supabase refuses to STORE a password under 6 characters, so the 4-digit PIN
+// cannot be the password. It is stored with a suffix; the employee still types
+// four digits.
+ok(
+  pinToPassword("1234").length >= 6,
+  `a stored PIN clears Supabase's 6-character floor (${pinToPassword("1234").length} chars)`,
+);
+ok(
+  pinToPassword("0000").length >= 6,
+  "  including the shortest-looking PIN there is",
+);
+ok(pinToPassword("1234").startsWith("1234"), "the PIN is still the start of it");
+ok(
+  pinToPassword("1234") !== pinToPassword("1235"),
+  "different PINs give different passwords",
+);
+ok(
+  pinToPassword("1234") === pinToPassword("1234"),
+  "the same PIN always gives the same password, or nobody could sign in twice",
+);
+
+// Every PIN the generator can emit must clear the floor, not just the ones
+// picked by hand above.
+let shortest = Infinity;
+for (let i = 0; i < 2000; i++) shortest = Math.min(shortest, pinToPassword(generateStaffPin()).length);
+ok(shortest >= 6, `2000 generated PINs all clear the floor (shortest ${shortest})`);
+
+// ── The legacy fallback ─────────────────────────────────────────────────────
+// Accounts made before this change hold the bare PIN. Dropping the second
+// candidate would lock out every existing employee at once.
+const cands = passwordCandidates("1234");
+ok(cands.length === 2, "two candidates are tried");
+ok(cands[0] === pinToPassword("1234"), "the stored form is tried first");
+ok(cands[1] === "1234", "the bare PIN is tried second, for accounts made before the change");
+ok(
+  cands[0] !== cands[1],
+  "the two candidates really differ, so the fallback is not a duplicate attempt",
 );
 
 console.log(`\nall ${pass} staff-PIN cases pass`);
