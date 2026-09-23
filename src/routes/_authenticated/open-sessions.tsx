@@ -27,6 +27,17 @@ export const Route = createFileRoute("/_authenticated/open-sessions")({
 
 const dateStr = (d: Date) => d.toISOString().slice(0, 10);
 
+/**
+ * The database function this page needs is not there.
+ *
+ * PostgREST answers 404 (PGRST202) both when a migration has not been applied
+ * and when it has but the schema cache has not been reloaded. An admin reading
+ * "Not Found" can act on neither, so say which two things to check.
+ */
+const isMissingFunction = (err: any) =>
+  err?.code === "PGRST202" ||
+  /open_sessions|schema cache|function .* does not exist/i.test(err?.message ?? "");
+
 function OpenSessionsPage() {
   const { data: user } = useCurrentUser();
   const tenantId = user?.tenant?.id ?? null;
@@ -41,6 +52,9 @@ function OpenSessionsPage() {
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["open-sessions", tenantId, from, to],
     enabled: Boolean(tenantId),
+    // A missing function never starts working on its own, so retrying it just
+    // fills the console with 404s and delays the message explaining why.
+    retry: (count, err: any) => !isMissingFunction(err) && count < 2,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("open_sessions", {
         _tenant_id: tenantId!,
@@ -89,9 +103,28 @@ function OpenSessionsPage() {
         </Card>
 
         {error && (
-          <Card className="border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-            {(error as Error).message}
-          </Card>
+          isMissingFunction(error) ? (
+            <Card className="border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+              <p className="font-medium text-amber-700">This report is not switched on yet.</p>
+              <p className="mt-1 text-muted-foreground">
+                The screen is deployed but the database has not been updated, so there is nothing
+                for it to read. Nobody's attendance is affected — this page is read-only.
+              </p>
+              <p className="mt-2 text-muted-foreground">
+                To finish it: run{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                  supabase/migrations/20260918000000_missing_checkouts.sql
+                </code>{" "}
+                in the Supabase SQL editor. If it has already been run, the schema cache is stale —
+                run <code className="rounded bg-muted px-1 py-0.5 text-xs">NOTIFY pgrst, 'reload schema';</code>{" "}
+                and reload this page.
+              </p>
+            </Card>
+          ) : (
+            <Card className="border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+              {(error as Error).message}
+            </Card>
+          )
         )}
 
         {rows.length > 0 && (
@@ -162,7 +195,9 @@ function OpenSessionsPage() {
                   </TableRow>
                 );
               })}
-              {!isLoading && rows.length === 0 && (
+              {/* Only when the query actually succeeded. "Nothing to fix" on top
+                  of a failed request is a reassurance nobody has earned. */}
+              {!isLoading && !error && rows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
                     <DoorOpen className="mx-auto mb-2 h-6 w-6" />
