@@ -20,6 +20,7 @@ import { useBranchFilter } from "@/hooks/useBranchFilter";
 import { toast } from "sonner";
 import { createStaff, updateStaff, deleteStaff } from "@/lib/staff.functions";
 import { isValidPhone } from "@/lib/phone-auth";
+import { STAFF_PIN_LENGTH, staffPinProblem, generateStaffPin } from "@/lib/staff-pin";
 import { StaffImportExportDialog } from "@/components/StaffImportExportDialog";
 import { formatTime12h } from "@/components/ui/time-input";
 
@@ -496,12 +497,15 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
   const [branchIdSel, setBranchIdSel] = useState<string>(defaultBranchId ?? "");
   const [loading, setLoading] = useState(false);
 
-  const genPassword = () => setPassword(String(Math.floor(1000 + Math.random() * 9000)));
+  const genPassword = () => setPassword(generateStaffPin());
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValidPhone(phone)) { toast.error("Enter a 10-digit phone number"); return; }
-    if (password.length < 4) { toast.error("Password must be at least 4 characters"); return; }
+    // The staff login is a 4-digit keypad. Anything else creates somebody who
+    // cannot sign in, and nothing would have said so until they tried.
+    const pinProblem = staffPinProblem(password);
+    if (pinProblem) { toast.error(pinProblem); return; }
     if (mode === "branch_manager" && !branchIdSel) { toast.error(`Pick a ${branchLabel.toLowerCase()} to manage`); return; }
     setLoading(true);
     try {
@@ -559,7 +563,20 @@ function AddStaffForm({ tenantId, shifts, branches, branchLabel, mode, defaultBr
           <Label>Password / PIN</Label>
           <button type="button" onClick={genPassword} className="text-xs text-primary hover:underline">Generate 4-digit PIN</button>
         </div>
-        <Input type="text" value={password} onChange={e => setPassword(e.target.value)} required minLength={4} placeholder="Share with staff" className="font-mono" />
+        <Input
+          type="text"
+          inputMode="numeric"
+          value={password}
+          onChange={e => setPassword(e.target.value.replace(/[^0-9]/g, "").slice(0, STAFF_PIN_LENGTH))}
+          required
+          minLength={STAFF_PIN_LENGTH}
+          maxLength={STAFF_PIN_LENGTH}
+          placeholder="4 digits, e.g. 4821"
+          className="font-mono tracking-[0.4em]"
+        />
+        <p className="text-xs text-muted-foreground">
+          Exactly 4 digits. Staff sign in on a number keypad that accepts no more than that.
+        </p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1"><Label>Designation</Label><Input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="Cashier" /></div>
@@ -679,6 +696,10 @@ function EditStaffForm({
     e.preventDefault();
     if (!name.trim()) { toast.error("Name is required"); return; }
     setLoading(true);
+    // The staff keypad sends exactly 4 digits. A longer "PIN" saves fine and
+    // then never works, with nothing to say why.
+    const pinProblem = newPin.trim() ? staffPinProblem(newPin.trim()) : null;
+    if (pinProblem) { toast.error(pinProblem); return; }
     try {
       await updateStaffFn({
         data: {
@@ -764,7 +785,14 @@ function EditStaffForm({
       <div className="space-y-1 border-t pt-3">
         <Label className="text-xs text-muted-foreground">Reset PIN (optional)</Label>
         <div className="flex gap-2">
-          <Input value={newPin} onChange={e => setNewPin(e.target.value)} placeholder="Leave blank to keep current PIN" className="font-mono" />
+          <Input
+            value={newPin}
+            inputMode="numeric"
+            maxLength={STAFF_PIN_LENGTH}
+            onChange={e => setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, STAFF_PIN_LENGTH))}
+            placeholder="Leave blank to keep current PIN"
+            className="font-mono tracking-[0.4em]"
+          />
           <Button type="button" size="sm" variant="outline" onClick={() => setNewPin(String(Math.floor(1000 + Math.random() * 9000)))}>Generate</Button>
         </div>
       </div>

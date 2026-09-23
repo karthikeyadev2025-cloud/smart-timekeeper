@@ -19,15 +19,12 @@ import {
 import { listPinResetRequests, resolvePinReset, denyPinReset } from "@/lib/pin-reset.functions";
 import { KeyRound, Phone, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { STAFF_PIN_LENGTH, generateStaffPin } from "@/lib/staff-pin";
 
 export const Route = createFileRoute("/_authenticated/pin-resets")({
   head: () => ({ meta: [{ title: "PIN reset requests — Punchly" }] }),
   component: PinResetsPage,
 });
-
-function generatePin() {
-  return String(Math.floor(1000 + Math.random() * 9000));
-}
 
 function PinResetsPage() {
   const list = useServerFn(listPinResetRequests);
@@ -115,7 +112,7 @@ function PinResetsPage() {
                     Deny
                   </Button>
                   <Button
-                    onClick={() => { setActive(r); setNewPin(generatePin()); }}
+                    onClick={() => { setActive(r); setNewPin(generateStaffPin()); }}
                   >
                     Reset PIN
                   </Button>
@@ -162,18 +159,18 @@ function PinResetsPage() {
               id="np"
               inputMode="numeric"
               value={newPin}
-              onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 8))}
+              onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, STAFF_PIN_LENGTH))}
               className="h-14 text-center text-2xl tracking-[0.5em] font-bold"
-              maxLength={8}
+              maxLength={STAFF_PIN_LENGTH}
             />
-            <Button variant="ghost" size="sm" type="button" onClick={() => setNewPin(generatePin())}>
+            <Button variant="ghost" size="sm" type="button" onClick={() => setNewPin(generateStaffPin())}>
               Generate again
             </Button>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setActive(null)}>Cancel</Button>
             <Button
-              disabled={newPin.length < 4 || mutate.isPending}
+              disabled={newPin.length !== STAFF_PIN_LENGTH || mutate.isPending}
               onClick={() => mutate.mutate()}
             >
               {mutate.isPending ? "Saving…" : "Set new PIN"}

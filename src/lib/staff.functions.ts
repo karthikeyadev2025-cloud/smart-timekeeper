@@ -6,6 +6,7 @@ import { requireTenantPermission } from "@/lib/permissions";
 import { requireActiveSubscription } from "@/lib/subscription-gate";
 
 import { canonicalPhone } from "@/lib/phone-auth";
+import { STAFF_PIN_PATTERN, STAFF_PIN_MESSAGE } from "@/lib/staff-pin";
 
 export const STAFF_EMAIL_DOMAIN = "punchly.app";
 
@@ -18,11 +19,13 @@ const phoneSchema = z.string().trim()
   .transform((v) => canonicalPhone(v))
   .refine((v) => /^[0-9]{10}$/.test(v), "Enter a 10-digit phone number");
 
+const staffPinSchema = z.string().trim().regex(STAFF_PIN_PATTERN, STAFF_PIN_MESSAGE);
+
 const input = z.object({
   tenant_id: z.string().uuid(),
   phone: phoneSchema,
   full_name: z.string().trim().min(1).max(100),
-  password: z.string().min(4).max(72),
+  password: staffPinSchema,
   designation: z.string().trim().max(100).optional().default(""),
   monthly_salary: z.number().min(0).default(0),
   shift_id: z.string().uuid().optional().nullable(),
@@ -145,7 +148,7 @@ const updateInput = z.object({
   shift_ids: z.array(z.string().uuid()).optional(),
   branch_id: z.string().uuid().nullable().optional(),
   is_field_staff: z.boolean().optional(),
-  new_password: z.string().min(4).max(72).optional().nullable(),
+  new_password: staffPinSchema.optional().nullable(),
   // Personal details
   date_of_birth: z.string().trim().max(10).nullable().optional(),
   gender: z.enum(["male", "female", "other"]).nullable().optional(),
@@ -431,7 +434,7 @@ const bulkRowSchema = z.object({
   monthly_salary: z.coerce.number().min(0).default(0),
   branch_name: z.string().trim().optional().default(""),
   shift_name: z.string().trim().optional().default(""),
-  pin: z.string().trim().regex(/^[0-9]{4,8}$/, "PIN must be 4-8 digits").optional(),
+  pin: staffPinSchema.optional(),
 });
 
 const bulkInput = z.object({
@@ -468,7 +471,7 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
     // never returned anywhere, which left those accounts permanently
     // unreachable — nobody, including the admin, knew the password.
     const { randomInt } = await import("crypto");
-    const generatePin = () => String(randomInt(1000, 10000));
+    const generatePin = () => String(randomInt(1000, 10000));  // exactly 4 digits, same as STAFF_PIN_LENGTH
 
     const results: {
       row: number;
