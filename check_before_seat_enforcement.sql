@@ -112,3 +112,62 @@ WHERE ur.role = 'client_admin'
 -- at one of these shells would be detached rather than deleted -- but by the
 -- time you run this they should all point at their real employer already.
 -- ============================================================================
+
+-- ============================================================================
+-- ADDED 2026-09-23 — two things the verifier flagged
+-- ============================================================================
+
+-- ─── 4. Who switched professional tax on, and have the rates been checked? ──
+--
+-- The verifier row "no silent deductions" goes red when a company has PT
+-- enabled. That is not a fault — a company is entitled to switch it on. What
+-- matters is whether anybody has checked the bands against the state's actual
+-- notification before money starts coming out of wages.
+SELECT
+  t.name                                   AS company,
+  t.professional_tax_enabled               AS pt_on,
+  t.pt_registration_number                 AS pt_registration,
+  (SELECT count(*) FROM public.professional_tax_slabs s WHERE s.tenant_id = t.id) AS bands_entered,
+  t.statutory_confirmed_at::date           AS rates_confirmed_on,
+  CASE
+    WHEN NOT t.professional_tax_enabled THEN 'Off. Nothing deducted.'
+    WHEN t.statutory_confirmed_fingerprint IS NULL THEN
+      'ON, NEVER CONFIRMED. Check the bands against your state notification and press confirm in Company profile BEFORE the next payroll.'
+    WHEN t.statutory_confirmed_fingerprint IS DISTINCT FROM public.statutory_fingerprint(t.id) THEN
+      'ON, but the rates changed since it was confirmed. Re-confirm before the next payroll.'
+    ELSE 'ON and confirmed. Fine.'
+  END                                      AS what_to_do
+FROM public.tenants t
+WHERE t.is_active
+ORDER BY t.professional_tax_enabled DESC, t.name;
+
+-- ─── 5. Has any feature flag lost its default? ──────────────────────────────
+--
+-- "ADD COLUMN IF NOT EXISTS x BOOLEAN NOT NULL DEFAULT false" is a no-op in
+-- its entirety when the column is already there — the NOT NULL and the DEFAULT
+-- go with it. Sixteen flags were added that way. Anything listed here is a
+-- column whose default was silently never applied, so new rows get NULL.
+-- Migration 20260923010000_repair_flag_defaults.sql repairs all of them.
+SELECT f.tbl AS table_name, f.col AS column_name,
+       CASE WHEN f.want THEN 'true' ELSE 'false' END AS should_default_to,
+       COALESCE(c.column_default, '(none)')          AS actually_defaults_to,
+       c.is_nullable                                  AS nullable
+FROM (VALUES
+  ('profiles','is_field_staff',false),             ('profiles','is_active',true),
+  ('profiles','photo_locked',false),               ('profiles','signature_locked',false),
+  ('attendance_records','is_mock_location',false), ('attendance_records','face_verified',false),
+  ('attendance_records','is_auto',false),          ('location_pings','is_mock_location',false),
+  ('shifts','is_active',true),                     ('shifts','late_alerts_enabled',true),
+  ('shifts','is_timetable_slot',false),            ('branches','is_active',true),
+  ('office_locations','is_active',true),           ('tenants','is_active',true),
+  ('tenants','late_alerts_enabled',true),          ('tenants','pf_enabled',false),
+  ('tenants','esi_enabled',false),                 ('tenants','live_tracking_enabled',false),
+  ('tenants','professional_tax_enabled',false),    ('tenants','staff_work_one_shift_per_day',false),
+  ('tenants','auto_checkout_enabled',false)
+) AS f(tbl, col, want)
+LEFT JOIN information_schema.columns c
+       ON c.table_schema='public' AND c.table_name=f.tbl AND c.column_name=f.col
+WHERE c.column_name IS NOT NULL   -- skip flags whose migration is not applied yet
+  AND (c.is_nullable <> 'NO'
+       OR c.column_default IS DISTINCT FROM CASE WHEN f.want THEN 'true' ELSE 'false' END);
+-- No rows here means nothing has drifted.

@@ -4,7 +4,7 @@ Everything here is **deliberately deferred**, not forgotten. The code is
 finished and merged-ready; these items are blocked on information or
 credentials that only the owner has.
 
-Last reviewed: 2026-09-23
+Last reviewed: 2026-09-23 (2)
 
 ---
 
@@ -426,6 +426,57 @@ is evicted and nobody stops punching — it only bites on the next addition or
 re-enable — but you want to find that out from the report, not from their phone
 call. The same file lists the junk "My Company" tenants and carries a
 commented-out cleanup to run **after** you have looked at the list.
+
+---
+
+## 5g. Two verifier findings — one real, one a lie — 2026-09-23
+
+A production verifier run came back 77 of 87. Reading it properly:
+
+**Nine ❌ rows were simply the missing-check-outs migration not applied yet.**
+Pushing to `main` deploys the frontend; SQL is applied by hand. That is why
+`/open-sessions` was 404-ing. Apply
+`20260918000000_missing_checkouts.sql` and they go green.
+
+**One ❌ was real and is not a bug:** `Prof. tax | defaults to OFF (no silent
+deductions)`. That check reads
+`NOT EXISTS(SELECT 1 FROM tenants WHERE professional_tax_enabled)` — it was
+never about a column default despite its name. It goes red because **a company
+has professional tax switched on.** A company is entitled to do that. What
+matters is whether the bands were checked against the state's actual
+notification first, so the check now asks *that* instead: PT enabled while the
+rates are unconfirmed. Section 4 of `check_before_seat_enforcement.sql` names
+the company and says what to do.
+
+**And two ✅ rows were lying.** "a punch is real unless proved otherwise" and
+"guessing is OFF until somebody asks for it" both reported OK for features that
+were **not installed at all**. They were written as
+`NOT EXISTS(… WHERE column_default IS DISTINCT FROM 'false')`, which is
+vacuously true when the column does not exist. A green tick for something that
+is not there is worse than a red one. Replaced with `flag_default_is()`, which
+answers false for a missing column, plus one check covering all 21 flags at
+once.
+
+### The latent trap underneath
+
+Sixteen flags were added with:
+
+```sql
+ALTER TABLE public.tenants
+  ADD COLUMN IF NOT EXISTS professional_tax_enabled BOOLEAN NOT NULL DEFAULT false;
+```
+
+`IF NOT EXISTS` makes the **whole clause** a no-op when the column already
+exists — the `NOT NULL` and the `DEFAULT` go with it. On any database where a
+column arrived by another route first, the flag ends up with no default, new
+rows get NULL, and `a OR b OR c` starts returning NULL where the code expects
+false. `20260923010000_repair_flag_defaults.sql` asserts all 21 back to what
+their own migration intended; it is idempotent and a no-op where nothing has
+drifted. Section 5 of the pre-flight file reports whether anything actually has.
+
+**Verified:** 10 assertions in `flag_defaults_test.sql`, including a fixture
+that reproduces the drift and proves the old check called it healthy while the
+new one does not. Suite now 185 assertions across 17 suites.
 
 ---
 

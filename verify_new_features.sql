@@ -189,8 +189,19 @@ WITH checks(ord, feature, object, ok) AS (VALUES
   (64, 'Prof. tax', 'duplicate bands impossible (PK on tenant+min)', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM pg_constraint
        WHERE conrelid=to_regclass('public.professional_tax_slabs') AND contype='p')$$)),
-  (65, 'Prof. tax', 'defaults to OFF (no silent deductions)', pg_temp.chk(
-     $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants WHERE professional_tax_enabled)$$)),
+  (65, 'Prof. tax', 'ships OFF: the column defaults to false', pg_temp.chk(
+     $$SELECT public.flag_default_is('tenants','professional_tax_enabled', false)$$)),
+  -- Not "is it off everywhere" -- a company is entitled to switch it on. What
+  -- must never happen is deducting money from wages against rates nobody has
+  -- checked against the state's actual notification. THAT is the thing worth
+  -- a red row.
+  (65.5, 'Prof. tax', 'nobody deducts PT against unconfirmed rates', pg_temp.chk(
+     $$SELECT NOT EXISTS(
+         SELECT 1 FROM public.tenants t
+         WHERE t.professional_tax_enabled
+           AND (t.statutory_confirmed_fingerprint IS NULL
+                OR t.statutory_confirmed_fingerprint
+                   IS DISTINCT FROM public.statutory_fingerprint(t.id)))$$)),
 
   -- ── 7. API KEYS ───────────────────────────────────────────────────────────
   (50, 'API keys', 'api_keys table', pg_temp.chk(
@@ -266,19 +277,14 @@ WITH checks(ord, feature, object, ok) AS (VALUES
        FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='cron_notify_late_arrivals'$$)),
   (82, 'Rota', 'defaults to OFF (nobody changes behaviour silently)', pg_temp.chk(
-     $$SELECT NOT EXISTS(SELECT 1 FROM information_schema.columns
-       WHERE table_schema='public' AND table_name='tenants'
-         AND column_name='staff_work_one_shift_per_day'
-         AND column_default IS DISTINCT FROM 'false')$$)),
+     $$SELECT public.flag_default_is('tenants','staff_work_one_shift_per_day', false)$$)),
 
   -- ── 11. MISSING CHECK-OUTS ────────────────────────────────────────────────
   (83, 'Check-outs', 'attendance_records.is_auto', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
        AND table_name='attendance_records' AND column_name='is_auto')$$)),
   (84, 'Check-outs', 'a punch is real unless proved otherwise (is_auto defaults false)', pg_temp.chk(
-     $$SELECT NOT EXISTS(SELECT 1 FROM information_schema.columns
-       WHERE table_schema='public' AND table_name='attendance_records'
-         AND column_name='is_auto' AND column_default IS DISTINCT FROM 'false')$$)),
+     $$SELECT public.flag_default_is('attendance_records','is_auto', false)$$)),
   (85, 'Check-outs', 'open_sessions() report', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='open_sessions')$$)),
@@ -291,10 +297,7 @@ WITH checks(ord, feature, object, ok) AS (VALUES
        AND table_name='tenants'
        AND column_name IN ('auto_checkout_enabled','auto_checkout_after_hours')$$)),
   (88, 'Check-outs', 'guessing is OFF until somebody asks for it', pg_temp.chk(
-     $$SELECT NOT EXISTS(SELECT 1 FROM information_schema.columns
-       WHERE table_schema='public' AND table_name='tenants'
-         AND column_name='auto_checkout_enabled'
-         AND column_default IS DISTINCT FROM 'false')$$)),
+     $$SELECT public.flag_default_is('tenants','auto_checkout_enabled', false)$$)),
   (89, 'Check-outs', 'cron_auto_checkout() job', pg_temp.chk(
      $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname='cron_auto_checkout')$$)),
@@ -351,6 +354,22 @@ WITH checks(ord, feature, object, ok) AS (VALUES
        FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
        WHERE n.nspname='public' AND p.proname IN ('tenants_over_limit','phantom_tenants')
        LIMIT 1$$)),
+
+  (105, 'Defaults', 'every feature flag has the default its migration intended', pg_temp.chk(
+     $$SELECT NOT EXISTS(SELECT 1 FROM (VALUES
+         ('profiles','is_field_staff',false),             ('profiles','is_active',true),
+         ('profiles','photo_locked',false),               ('profiles','signature_locked',false),
+         ('attendance_records','is_mock_location',false), ('attendance_records','face_verified',false),
+         ('attendance_records','is_auto',false),          ('location_pings','is_mock_location',false),
+         ('shifts','is_active',true),                     ('shifts','late_alerts_enabled',true),
+         ('shifts','is_timetable_slot',false),            ('branches','is_active',true),
+         ('office_locations','is_active',true),           ('tenants','is_active',true),
+         ('tenants','late_alerts_enabled',true),          ('tenants','pf_enabled',false),
+         ('tenants','esi_enabled',false),                 ('tenants','live_tracking_enabled',false),
+         ('tenants','professional_tax_enabled',false),    ('tenants','staff_work_one_shift_per_day',false),
+         ('tenants','auto_checkout_enabled',false)
+       ) AS f(tbl,col,want)
+       WHERE NOT public.flag_default_is(f.tbl, f.col, f.want))$$)),
 
   (44, 'Semantics', 'Late-alert threshold within 0-240 min', pg_temp.chk(
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants
