@@ -71,6 +71,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
         { to: "/branches", label: "Campuses", icon: Building2 },
         { to: "/team", label: "Teachers & staff", icon: Users },
         { to: "/classes", label: "Classes & students", icon: GraduationCap },
+        { to: "/check-in", label: "Check in / out", icon: MapPin },
         { to: "/mark-attendance", label: "Mark attendance", icon: ClipboardCheck },
         { to: "/leaves-admin", label: "Leave requests", icon: Calendar },
         { to: "/holidays", label: "Holidays", icon: CalendarOff },
@@ -89,6 +90,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/company", label: "Company profile", icon: Building2 },
       { to: "/branches", label: "Branches", icon: Building2 },
       { to: "/team", label: "Staff", icon: Users },
+      { to: "/check-in", label: "Check in / out", icon: MapPin },
       { to: "/shifts", label: "Shifts & locations", icon: Clock },
       { to: "/live-map", label: "Live map", icon: Map },
       { to: "/late-alerts", label: "Late alerts", icon: BellRing },
@@ -124,6 +126,7 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
       { to: "/payroll", label: "Payroll", icon: Wallet },
       { to: "/bank-approvals", label: "Bank approvals", icon: ShieldAlert },
       { to: "/announcements", label: "Announcements", icon: Megaphone },
+      { to: "/check-in", label: "Check in / out", icon: MapPin },
       { to: "/my-attendance", label: "My attendance", icon: Calendar },
       { to: "/my-leaves", label: "My leaves", icon: Calendar },
       { to: "/my-id-card", label: "My ID card", icon: IdCard },
@@ -134,7 +137,9 @@ function buildNav(role: AppRole, tenantType: "business" | "school" | null): NavI
   if (tenantType === "school") {
     return [
       { to: "/app", label: "Today", icon: LayoutDashboard },
+      { to: "/check-in", label: "Check in / out", icon: MapPin },
       { to: "/mark-attendance", label: "Mark class", icon: ClipboardCheck },
+      { to: "/my-attendance", label: "My attendance", icon: Calendar },
       { to: "/my-leaves", label: "Leaves", icon: Calendar },
       { to: "/announcements", label: "Announcements", icon: Megaphone },
       { to: "/my-id-card", label: "My ID card", icon: IdCard },
