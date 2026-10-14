@@ -421,22 +421,53 @@ WITH checks(ord, feature, object, ok) AS (VALUES
        WHERE late_alert_after_minutes < 0 OR late_alert_after_minutes > 240)$$))
 )
 
+-- Most checks ask whether a thing EXISTS, so "apply that migration" is the
+-- right advice when they fail. A few ask about the DATA instead, and for
+-- those that advice is actively wrong: no migration will fix a company that
+-- has switched something on. Those rows carry their own remedy, and the
+-- verdict line stops claiming a deploy is blocked when nothing is missing.
+, remedies(ord, remedy, is_data) AS (VALUES
+  (65.5,
+   'NOT a missing migration. A company has professional tax ON and has NEVER confirmed the rates. '
+   'Money comes out of wages at the next payroll against numbers nobody has checked. '
+   'Run section 4 of check_before_seat_enforcement.sql to see which company, check the bands '
+   'against your state notification, then press confirm in Company profile.', true),
+  (79.0,
+   'NOT a missing migration. A company confirmed its statutory rates and then changed them. '
+   'Re-confirm in Company profile before the next payroll.', true),
+  (116.0,
+   'NOT a missing migration. A payslip deducted absence in a month containing a declared holiday '
+   'without crediting it. Generate that month again so the holiday reaches the slip.', true),
+  (44.0,
+   'NOT a missing migration. A company has a late-alert threshold outside 0-240 minutes. '
+   'Correct it in Company profile.', true)
+)
+
 SELECT status, feature, object, note
 FROM (
-  SELECT 0 AS sk, ord,
-         CASE WHEN ok THEN '✅' ELSE '❌' END AS status,
-         feature, object,
-         CASE WHEN ok THEN 'OK' ELSE 'MISSING — apply that migration' END AS note
-  FROM checks
+  SELECT 0 AS sk, c.ord,
+         CASE WHEN c.ok THEN '✅' ELSE '❌' END AS status,
+         c.feature, c.object,
+         CASE WHEN c.ok THEN 'OK'
+              ELSE COALESCE(r.remedy, 'MISSING — apply that migration')
+         END AS note
+  FROM checks c
+  LEFT JOIN remedies r ON r.ord = c.ord
   UNION ALL
   SELECT 1, 0,
-         CASE WHEN bool_and(ok) THEN '🎉' ELSE '⚠️' END,
+         CASE WHEN bool_and(c.ok) THEN '🎉' ELSE '⚠️' END,
          'VERDICT',
-         count(*) FILTER (WHERE ok) || ' of ' || count(*) || ' checks passed',
-         CASE WHEN bool_and(ok)
-              THEN 'Every migration is live. Safe to deploy the app.'
-              ELSE 'DO NOT deploy the app yet — fix the rows marked above.'
+         count(*) FILTER (WHERE c.ok) || ' of ' || count(*) || ' checks passed',
+         CASE
+           WHEN bool_and(c.ok)
+             THEN 'Every migration is live and nothing needs attention.'
+           -- Only a genuinely MISSING object blocks a deploy. A data warning
+           -- is for somebody to act on, not a reason to hold the release.
+           WHEN bool_and(c.ok OR r.ord IS NOT NULL)
+             THEN 'Every migration is live. The red rows are things to act on, not missing code — read them.'
+           ELSE 'DO NOT deploy the app yet — something is missing. Apply the migrations named above.'
          END
-  FROM checks
+  FROM checks c
+  LEFT JOIN remedies r ON r.ord = c.ord
 ) x
 ORDER BY sk, ord;
