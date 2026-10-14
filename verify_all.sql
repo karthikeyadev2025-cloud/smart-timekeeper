@@ -132,6 +132,6 @@ WITH checks AS (
 )
 SELECT
   check_name,
-  CASE WHEN ok THEN '✅ OK' ELSE '❌ MISSING — tell Claude this one' END AS status
+  CASE WHEN ok THEN '✅ OK' ELSE '❌ MISSING — apply that migration' END AS status
 FROM checks
 ORDER BY (CASE WHEN ok THEN 1 ELSE 0 END), check_name;
