@@ -107,6 +107,29 @@ function Payroll() {
       if (effectiveEnd < monthStart) throw new Error("That month hasn't started yet");
       const lastCountedDay = Number(effectiveEnd.slice(8, 10));
 
+      // Declared holidays, read once for the whole run.
+      //
+      // Before this, a day management declared shut landed in `absent` — the
+      // shift says it is a working day, nobody punched because the school was
+      // closed, and no leave request exists because nobody applied for leave.
+      // Every member of faculty was then deducted a day's pay for a holiday
+      // management itself declared.
+      const { data: holidayRows, error: holidayError } = await supabase.rpc("tenant_holidays", {
+        _tenant_id: tenantId,
+        _from: monthStart,
+        _to: monthEnd,
+      });
+      if (holidayError) throw holidayError;
+
+      // Keyed by date. A whole-company holiday applies to everyone; a branch
+      // holiday only to that branch, so the value keeps the scope.
+      const holidaysByDate = new Map<string, { branch_id: string | null; is_paid: boolean }[]>();
+      for (const h of (holidayRows ?? []) as any[]) {
+        const arr = holidaysByDate.get(h.holiday_date) ?? [];
+        arr.push({ branch_id: h.branch_id ?? null, is_paid: h.is_paid !== false });
+        holidaysByDate.set(h.holiday_date, arr);
+      }
+
       // Statutory config is per tenant and identical for every payslip in this
       // run, so it is read once rather than per staff member.
       const { data: statutory, error: statutoryError } = await supabase
@@ -270,13 +293,37 @@ function Payroll() {
         // (otherwise the two definitions would disagree with each other).
         const countsAsWorkDay = (d: number) => (expectedDays ? true : isWorkingDay(d));
 
+        // Is this date a declared holiday for THIS person? A whole-company
+        // holiday covers everyone; a branch holiday covers only that campus,
+        // so closing one site does not pay the other site to stay home.
+        const holidayOn = (d: number) => {
+          const ds = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const hits = holidaysByDate.get(ds);
+          if (!hits) return null;
+          return hits.find((h) => h.branch_id === null || h.branch_id === s.branch_id) ?? null;
+        };
+
         let presentCredit = 0;   // fractional days actually earned
         let presentDays = 0;     // whole days with any attendance (for display)
         let partialDays = 0;
+        let holidayDays = 0;     // declared shut, credited rather than deducted
+        let unpaidHolidayDays = 0;
         for (let d = firstDay; d <= lastCountedDay; d++) {
           if (!countsAsWorkDay(d)) continue;
           const ds = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
           const dayIns = insByDate.get(ds) ?? [];
+
+          // A declared holiday is settled before attendance is considered.
+          // Somebody who came in anyway on a holiday is still credited one
+          // day and no more — the day cannot be counted twice, and this is
+          // not an overtime feature.
+          const hol = holidayOn(d);
+          if (hol) {
+            if (hol.is_paid) holidayDays++;
+            else unpaidHolidayDays++;
+            continue;
+          }
+
           if (dayIns.length === 0) continue;
           presentDays++;
 
@@ -338,6 +385,10 @@ function Payroll() {
           // unpaid leave deducts pay for a day they actually worked
           // (the staff member loses money). Either way it must count once.
           if ((insByDate.get(ds) ?? []).length > 0) continue;
+          // A holiday is not a leave day. Charging it against somebody's
+          // leave balance because their application happened to span a
+          // declared holiday would quietly cost them a day of leave.
+          if (holidayOn(d)) continue;
           const hit = (approvedLeaves ?? []).find((l: any) => l.start_date <= ds && l.end_date >= ds);
           if (!hit) continue;
           // Missing leave type → treat as paid (matches previous behaviour).
@@ -345,8 +396,13 @@ function Payroll() {
           else paidLeave++;
         }
 
-        const effective = presentCredit + paidLeave;
-        const absent = Math.max(0, workingDays - effective - unpaidLeave);
+        // A PAID holiday is earned, exactly like paid leave. An UNPAID one is
+        // a shutdown: it stops being a working day altogether, so it is
+        // neither credited nor deducted — which is why it comes off
+        // workingDays rather than being added to what was earned.
+        const effective = presentCredit + paidLeave + holidayDays;
+        const workingDaysAfterHolidays = Math.max(0, workingDays - unpaidHolidayDays);
+        const absent = Math.max(0, workingDaysAfterHolidays - effective - unpaidLeave);
         const perDay = base / fullMonthWorkingDays;
         // Unpaid leave is deducted just like absence — that's what makes it
         // unpaid.
@@ -443,7 +499,8 @@ function Payroll() {
           period_year: year, period_month: month,
           base_salary: base, present_days: presentDays,
           absent_days: Math.round(absent * 100) / 100,
-          paid_leave_days: paidLeave, unpaid_leave_days: unpaidLeave, working_days: workingDays,
+          paid_leave_days: paidLeave, unpaid_leave_days: unpaidLeave,
+          working_days: workingDaysAfterHolidays, holiday_days: holidayDays,
           overtime_hours: 0, deductions, net_pay: net,
           late_days: lateDaysCount, late_fine: lateFine,
           gross_earnings: grossEarnings, pf_deduction: pf, esi_deduction: esi,

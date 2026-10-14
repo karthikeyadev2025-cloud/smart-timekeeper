@@ -29,6 +29,7 @@ import { Route as AuthenticatedCheckInRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedClassesRouteImport } from './routes/_authenticated/classes'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedCompanyRouteImport } from './routes/_authenticated/company'
+import { Route as AuthenticatedHolidaysRouteImport } from './routes/_authenticated/holidays'
 import { Route as AuthenticatedKioskRouteImport } from './routes/_authenticated/kiosk'
 import { Route as AuthenticatedLateAlertsRouteImport } from './routes/_authenticated/late-alerts'
 import { Route as AuthenticatedLeaveTypesRouteImport } from './routes/_authenticated/leave-types'
@@ -160,6 +161,11 @@ const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
 const AuthenticatedCompanyRoute = AuthenticatedCompanyRouteImport.update({
   id: '/company',
   path: '/company',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedHolidaysRoute = AuthenticatedHolidaysRouteImport.update({
+  id: '/holidays',
+  path: '/holidays',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedKioskRoute = AuthenticatedKioskRouteImport.update({
@@ -341,6 +347,7 @@ export interface FileRoutesByFullPath {
   '/classes': typeof AuthenticatedClassesRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/company': typeof AuthenticatedCompanyRoute
+  '/holidays': typeof AuthenticatedHolidaysRoute
   '/kiosk': typeof AuthenticatedKioskRoute
   '/late-alerts': typeof AuthenticatedLateAlertsRoute
   '/leave-types': typeof AuthenticatedLeaveTypesRoute
@@ -392,6 +399,7 @@ export interface FileRoutesByTo {
   '/classes': typeof AuthenticatedClassesRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/company': typeof AuthenticatedCompanyRoute
+  '/holidays': typeof AuthenticatedHolidaysRoute
   '/kiosk': typeof AuthenticatedKioskRoute
   '/late-alerts': typeof AuthenticatedLateAlertsRoute
   '/leave-types': typeof AuthenticatedLeaveTypesRoute
@@ -445,6 +453,7 @@ export interface FileRoutesById {
   '/_authenticated/classes': typeof AuthenticatedClassesRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/company': typeof AuthenticatedCompanyRoute
+  '/_authenticated/holidays': typeof AuthenticatedHolidaysRoute
   '/_authenticated/kiosk': typeof AuthenticatedKioskRoute
   '/_authenticated/late-alerts': typeof AuthenticatedLateAlertsRoute
   '/_authenticated/leave-types': typeof AuthenticatedLeaveTypesRoute
@@ -498,6 +507,7 @@ export interface FileRouteTypes {
     | '/classes'
     | '/clients'
     | '/company'
+    | '/holidays'
     | '/kiosk'
     | '/late-alerts'
     | '/leave-types'
@@ -549,6 +559,7 @@ export interface FileRouteTypes {
     | '/classes'
     | '/clients'
     | '/company'
+    | '/holidays'
     | '/kiosk'
     | '/late-alerts'
     | '/leave-types'
@@ -601,6 +612,7 @@ export interface FileRouteTypes {
     | '/_authenticated/classes'
     | '/_authenticated/clients'
     | '/_authenticated/company'
+    | '/_authenticated/holidays'
     | '/_authenticated/kiosk'
     | '/_authenticated/late-alerts'
     | '/_authenticated/leave-types'
@@ -789,6 +801,13 @@ declare module '@tanstack/react-router' {
       path: '/company'
       fullPath: '/company'
       preLoaderRoute: typeof AuthenticatedCompanyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/holidays': {
+      id: '/_authenticated/holidays'
+      path: '/holidays'
+      fullPath: '/holidays'
+      preLoaderRoute: typeof AuthenticatedHolidaysRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/kiosk': {
@@ -1018,6 +1037,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClassesRoute: typeof AuthenticatedClassesRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedCompanyRoute: typeof AuthenticatedCompanyRoute
+  AuthenticatedHolidaysRoute: typeof AuthenticatedHolidaysRoute
   AuthenticatedKioskRoute: typeof AuthenticatedKioskRoute
   AuthenticatedLateAlertsRoute: typeof AuthenticatedLateAlertsRoute
   AuthenticatedLeaveTypesRoute: typeof AuthenticatedLeaveTypesRoute
@@ -1058,6 +1078,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedClassesRoute: AuthenticatedClassesRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedCompanyRoute: AuthenticatedCompanyRoute,
+  AuthenticatedHolidaysRoute: AuthenticatedHolidaysRoute,
   AuthenticatedKioskRoute: AuthenticatedKioskRoute,
   AuthenticatedLateAlertsRoute: AuthenticatedLateAlertsRoute,
   AuthenticatedLeaveTypesRoute: AuthenticatedLeaveTypesRoute,

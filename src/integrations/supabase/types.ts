@@ -530,6 +530,42 @@ export type Database = {
           },
         ]
       }
+      holidays: {
+        Row: {
+          id: string
+          tenant_id: string
+          holiday_date: string
+          name: string
+          branch_id: string | null
+          is_paid: boolean
+          note: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          holiday_date: string
+          name: string
+          branch_id?: string | null
+          is_paid?: boolean
+          note?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          holiday_date?: string
+          name?: string
+          branch_id?: string | null
+          is_paid?: boolean
+          note?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       leave_types: {
         Row: {
           annual_quota: number
@@ -832,6 +868,7 @@ export type Database = {
           id: string
           last_paid_at: string | null
           late_days: number
+          holiday_days?: number
           late_fine: number
           net_pay: number
           overtime_hours: number
@@ -859,6 +896,7 @@ export type Database = {
           id?: string
           last_paid_at?: string | null
           late_days?: number
+          holiday_days?: number
           late_fine?: number
           net_pay?: number
           overtime_hours?: number
@@ -886,6 +924,7 @@ export type Database = {
           id?: string
           last_paid_at?: string | null
           late_days?: number
+          holiday_days?: number
           late_fine?: number
           net_pay?: number
           overtime_hours?: number
@@ -2487,6 +2526,22 @@ export type Database = {
           punches: number
           verdict: string
         }[]
+      }
+      tenant_holidays: {
+        Args: { _tenant_id: string; _from: string; _to: string }
+        Returns: {
+          id: string
+          holiday_date: string
+          name: string
+          branch_id: string | null
+          branch_name: string | null
+          is_paid: boolean
+          whole_company: boolean
+        }[]
+      }
+      is_holiday_for: {
+        Args: { _user_id: string; _date: string }
+        Returns: boolean
       }
       open_sessions: {
         Args: { _tenant_id: string; _from?: string | null; _to?: string | null }
