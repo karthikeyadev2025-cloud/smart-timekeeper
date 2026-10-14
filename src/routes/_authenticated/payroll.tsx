@@ -119,7 +119,24 @@ function Payroll() {
         _from: monthStart,
         _to: monthEnd,
       });
-      if (holidayError) throw holidayError;
+      // The frontend deploys on push; the database migration is applied by
+      // hand, so for a while this function may not exist yet. Throwing here
+      // would take payroll — which works today — down with it until somebody
+      // runs the SQL. Degrade instead: carry on with no holidays, which is
+      // exactly the behaviour before this feature, and say so out loud rather
+      // than silently reinstating the deduction this was written to stop.
+      const holidaysUnavailable =
+        !!holidayError &&
+        (holidayError.code === "PGRST202" ||
+          /tenant_holidays|schema cache|does not exist/i.test(holidayError.message ?? ""));
+      if (holidayError && !holidaysUnavailable) throw holidayError;
+      if (holidaysUnavailable) {
+        toast.warning(
+          "Declared holidays could not be read, so this run does not credit any. " +
+            "Apply 20261014000000_holidays.sql, then generate this month again.",
+          { duration: 10000 },
+        );
+      }
 
       // Keyed by date. A whole-company holiday applies to everyone; a branch
       // holiday only to that branch, so the value keeps the scope.

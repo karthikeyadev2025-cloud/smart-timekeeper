@@ -4,7 +4,7 @@ Everything here is **deliberately deferred**, not forgotten. The code is
 finished and merged-ready; these items are blocked on information or
 credentials that only the owner has.
 
-Last reviewed: 2026-09-23 (2)
+Last reviewed: 2026-10-14
 
 ---
 
@@ -477,6 +477,49 @@ drifted. Section 5 of the pre-flight file reports whether anything actually has.
 **Verified:** 10 assertions in `flag_defaults_test.sql`, including a fixture
 that reproduces the drift and proves the old check called it healthy while the
 new one does not. Suite now 185 assertions across 17 suites.
+
+---
+
+## 5h. Declared holidays — BUILT 2026-10-14
+
+**The ask:** "when management declares a holiday for faculty, their attendance
+should be counted automatically." **Separately reported:** "error in counting
+days." They were the same bug.
+
+Payroll works out absence as `working_days − (present + paid_leave) −
+unpaid_leave`, then deducts. A declared holiday is a weekday the shift calls a
+working day; nobody punches because the school is shut; no leave request
+exists because nobody applied. So it landed in `absent` and **a day's pay came
+off every teacher, for a holiday management itself declared.** Twelve a year is
+about half a month's salary. The original payroll code already said so:
+*"doesn't account for company holidays yet."*
+
+**Built:** a `holidays` table scoped per company and optionally to one campus,
+paid by default, declared from a new **Holidays** page. Payroll reads the
+month's list once per run. A paid holiday is credited like paid leave; an
+unpaid one comes off `working_days` instead, so it is neither earned nor
+deducted. Holidays are settled *before* attendance (somebody who came in anyway
+gets one day, not two) and *before* leave (an application spanning a holiday no
+longer costs a day of balance). `payslips.holiday_days` explains the gap on the
+slip. The late-alert job stands down on a holiday, branch-aware — copied from
+its live definition rather than retyped, so the per-shift opt-out, dormant
+guard and rota rule survive untouched.
+
+**Deliberately not shipped:** a built-in Indian holiday list. They vary by
+state, religion and board, and a wrong default would silently pay people for
+days they worked.
+
+**Verified:** 14 assertions in `holidays_test.sql`, 11 checks in
+`verify_new_features.sql`. The negative assertions are each paired with a
+control — the late job is shown to alert *without* a holiday before being shown
+to stand down with one; the campus closure is shown not to cover the other
+campus. Check 116 ("nobody is sitting on a payslip that deducted a declared
+holiday") was itself tested both ways: `f` with a bad payslip, `t` once
+credited.
+
+**Note for deploys:** payroll degrades rather than breaking if the migration
+has not been applied — it warns and credits nothing, instead of taking payroll
+down with it.
 
 ---
 

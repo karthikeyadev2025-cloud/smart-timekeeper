@@ -371,6 +371,51 @@ WITH checks(ord, feature, object, ok) AS (VALUES
        ) AS f(tbl,col,want)
        WHERE NOT public.flag_default_is(f.tbl, f.col, f.want))$$)),
 
+  -- ── 13. DECLARED HOLIDAYS ────────────────────────────────────────────────
+  (106, 'Holidays', 'holidays table', pg_temp.chk(
+     $$SELECT to_regclass('public.holidays') IS NOT NULL$$)),
+  (107, 'Holidays', 'row-level security is on it', pg_temp.chk(
+     $$SELECT relrowsecurity FROM pg_class WHERE oid = 'public.holidays'::regclass$$)),
+  (108, 'Holidays', 'staff cannot declare their own day off', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
+       AND tablename='holidays' AND cmd='ALL' AND qual LIKE '%is_tenant_admin%')$$)),
+  (109, 'Holidays', 'paid by default (declaring one means paying for it)', pg_temp.chk(
+     $$SELECT public.flag_default_is('holidays','is_paid', true)$$)),
+  (110, 'Holidays', 'the same day cannot be declared twice for one scope', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+       AND tablename='holidays' AND indexdef ILIKE '%UNIQUE%')$$)),
+  (111, 'Holidays', 'tenant_holidays() list', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='tenant_holidays')$$)),
+  (112, 'Holidays', 'is_holiday_for() is branch-aware', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) LIKE '%branch_id%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='is_holiday_for'$$)),
+  (113, 'Holidays', 'the late-alert job stands down on a holiday', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) LIKE '%public.holidays%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='cron_notify_late_arrivals'$$)),
+  (114, 'Holidays', 'and still honours the rota rule it was spliced into', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) LIKE '%staff_work_one_shift_per_day%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='cron_notify_late_arrivals'$$)),
+  (115, 'Holidays', 'payslips can show the days they credited', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='payslips' AND column_name='holiday_days')$$)),
+  (116, 'Holidays', 'nobody is sitting on a payslip that deducted a declared holiday', pg_temp.chk(
+     $$SELECT NOT EXISTS(
+         SELECT 1 FROM public.payslips ps
+         JOIN public.profiles pr ON pr.id = ps.user_id
+         WHERE ps.absent_days > 0
+           AND EXISTS (
+             SELECT 1 FROM public.holidays h
+             WHERE h.tenant_id = ps.tenant_id
+               AND (h.branch_id IS NULL OR h.branch_id = pr.branch_id)
+               AND h.is_paid
+               AND EXTRACT(YEAR  FROM h.holiday_date) = ps.period_year
+               AND EXTRACT(MONTH FROM h.holiday_date) = ps.period_month)
+           AND COALESCE(ps.holiday_days, 0) = 0)$$)),
+
   (44, 'Semantics', 'Late-alert threshold within 0-240 min', pg_temp.chk(
      $$SELECT NOT EXISTS(SELECT 1 FROM public.tenants
        WHERE late_alert_after_minutes < 0 OR late_alert_after_minutes > 240)$$))
