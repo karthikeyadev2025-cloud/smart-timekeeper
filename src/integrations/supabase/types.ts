@@ -2527,6 +2527,23 @@ export type Database = {
           verdict: string
         }[]
       }
+      mark_holiday_present: {
+        Args: { _holiday_id: string }
+        Returns: {
+          marked: number
+          skipped_already_punched: number
+          holiday_name: string
+          holiday_date: string
+        }[]
+      }
+      unmark_holiday_present: {
+        Args: { _holiday_id: string }
+        Returns: number
+      }
+      holiday_present_count: {
+        Args: { _holiday_id: string }
+        Returns: number
+      }
       tenant_holidays: {
         Args: { _tenant_id: string; _from: string; _to: string }
         Returns: {

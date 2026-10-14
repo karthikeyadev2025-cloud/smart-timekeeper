@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
-import { CalendarOff, Trash2, Plus } from "lucide-react";
+import { CalendarOff, Trash2, Plus, UserCheck, Undo2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/holidays")({
   component: HolidaysPage,
@@ -68,6 +68,65 @@ function HolidaysPage() {
       return data ?? [];
     },
   });
+
+  // How many people each holiday has already been marked present for. Shown on
+  // the row, so the button says what it will do rather than being a mystery.
+  const { data: marked } = useQuery({
+    queryKey: ["holiday-present-counts", tenantId, year, (holidays ?? []).length],
+    enabled: !!tenantId && (holidays ?? []).length > 0,
+    queryFn: async () => {
+      const out: Record<string, number> = {};
+      for (const h of (holidays ?? []) as any[]) {
+        const { data } = await supabase.rpc("holiday_present_count", { _holiday_id: h.id });
+        out[h.id] = Number(data ?? 0);
+      }
+      return out;
+    },
+  });
+
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const markPresent = async (h: any) => {
+    if (!confirm(
+      `Mark everyone present for ${h.name} on ${h.holiday_date}?\n\n` +
+      "This writes attendance records for staff who did not punch that day. They are " +
+      "labelled as entered by an administrator, not as real punches, and anybody who " +
+      "did come in keeps their own record. You can undo it."
+    )) return;
+    setBusy(h.id);
+    try {
+      const { data, error } = await supabase.rpc("mark_holiday_present", { _holiday_id: h.id });
+      if (error) throw error;
+      const r = Array.isArray(data) ? data[0] : data;
+      const n = Number(r?.marked ?? 0);
+      const skipped = Number(r?.skipped_already_punched ?? 0);
+      toast.success(
+        n === 0
+          ? "Everybody was already accounted for — nothing to add."
+          : `${n} marked present` + (skipped > 0 ? `, ${skipped} left alone (they actually punched)` : ""),
+      );
+      qc.invalidateQueries({ queryKey: ["holiday-present-counts"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not mark present");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const undoPresent = async (h: any) => {
+    if (!confirm(`Remove the attendance entered for ${h.name}? Real punches on that day are kept.`)) return;
+    setBusy(h.id);
+    try {
+      const { data, error } = await supabase.rpc("unmark_holiday_present", { _holiday_id: h.id });
+      if (error) throw error;
+      toast.success(`${Number(data ?? 0)} entries removed`);
+      qc.invalidateQueries({ queryKey: ["holiday-present-counts"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not undo");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const add = async () => {
     if (!date) { toast.error("Pick a date"); return; }
@@ -191,6 +250,7 @@ function HolidaysPage() {
                 <TableHead>Holiday</TableHead>
                 <TableHead>Applies to</TableHead>
                 <TableHead>Paid</TableHead>
+                <TableHead>Attendance</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -207,6 +267,35 @@ function HolidaysPage() {
                       ? <Badge variant="outline" className="border-success/30 bg-success/10 text-success">Paid</Badge>
                       : <Badge variant="secondary">Unpaid</Badge>}
                   </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const count = marked?.[h.id] ?? 0;
+                      const future = h.holiday_date > new Date().toISOString().slice(0, 10);
+                      if (future) {
+                        return <span className="text-xs text-muted-foreground">after the day</span>;
+                      }
+                      if (count > 0) {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-700">
+                              {count} marked
+                            </Badge>
+                            <Button size="sm" variant="ghost" disabled={busy === h.id}
+                              onClick={() => undoPresent(h)} title="Undo — real punches are kept">
+                              <Undo2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      }
+                      return (
+                        <Button size="sm" variant="outline" className="gap-1" disabled={busy === h.id}
+                          onClick={() => markPresent(h)}>
+                          <UserCheck className="h-3.5 w-3.5" />
+                          {busy === h.id ? "Working…" : "Mark present"}
+                        </Button>
+                      );
+                    })()}
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="ghost" onClick={() => remove(h)} title="Remove">
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -216,7 +305,7 @@ function HolidaysPage() {
               ))}
               {!isLoading && rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
                     <CalendarOff className="mx-auto mb-2 h-6 w-6" />
                     No holidays declared for {year}.
                   </TableCell>
@@ -226,6 +315,13 @@ function HolidaysPage() {
           </Table>
         </Card>
 
+        <p className="text-xs text-muted-foreground">
+          <strong>Mark present</strong> writes attendance for staff who did not punch that
+          day, so the register reads as present instead of blank. Those entries are labelled
+          as entered by an administrator rather than as real punches — anybody who did come in
+          keeps their own record — and the button becomes an undo. Pay is unaffected either
+          way: the holiday is credited whether or not you press it.
+        </p>
         <p className="text-xs text-muted-foreground">
           Payroll reads this list <strong>when it runs</strong>. If you declare a holiday for a month
           whose payslips are already generated, generate that month again so the credit reaches them.

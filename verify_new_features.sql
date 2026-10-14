@@ -371,6 +371,25 @@ WITH checks(ord, feature, object, ok) AS (VALUES
        ) AS f(tbl,col,want)
        WHERE NOT public.flag_default_is(f.tbl, f.col, f.want))$$)),
 
+  (117, 'Holidays', 'mark_holiday_present() for the register', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='mark_holiday_present')$$)),
+  (118, 'Holidays', 'it is admin-only', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) LIKE '%42501%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='mark_holiday_present'$$)),
+  (119, 'Holidays', 'what it writes is flagged, never passed off as a punch', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) LIKE '%is_auto%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='mark_holiday_present'$$)),
+  (120, 'Holidays', 'it is reversible (unmark_holiday_present)', pg_temp.chk(
+     $$SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='unmark_holiday_present')$$)),
+  (121, 'Holidays', 'the undo cannot reach a real punch', pg_temp.chk(
+     $$SELECT pg_get_functiondef(p.oid) LIKE '%ar.is_auto%'
+       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='unmark_holiday_present'$$)),
+
   -- ── 13. DECLARED HOLIDAYS ────────────────────────────────────────────────
   (106, 'Holidays', 'holidays table', pg_temp.chk(
      $$SELECT to_regclass('public.holidays') IS NOT NULL$$)),
