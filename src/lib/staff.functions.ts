@@ -6,7 +6,7 @@ import { requireTenantPermission } from "@/lib/permissions";
 import { requireActiveSubscription } from "@/lib/subscription-gate";
 
 import { canonicalPhone } from "@/lib/phone-auth";
-import { STAFF_PIN_PATTERN, STAFF_PIN_MESSAGE, pinToPassword } from "@/lib/staff-pin";
+import { STAFF_PIN_PATTERN, STAFF_PIN_MESSAGE, pinToPassword, passwordCandidates } from "@/lib/staff-pin";
 
 export const STAFF_EMAIL_DOMAIN = "punchly.app";
 
@@ -584,4 +584,65 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
       failed: results.filter((r) => r.status === "failed").length,
       results,
     };
+  });
+
+/* ─────────────── CHANGE YOUR OWN PIN ───────────────
+   Staff had no way to change their own PIN. Every change meant asking an
+   administrator, who then knows the new PIN — so the one credential that
+   distinguishes one person's attendance from another's was never private.
+
+   The current PIN is required. Without it, an unattended phone left signed
+   in is enough for a colleague to lock the owner out and punch as them. It
+   is verified the way the kiosk verifies one: a real sign-in attempt on a
+   throwaway client, so nothing here compares PINs itself. */
+
+const changePinInput = z.object({
+  current_pin: z.string().trim().min(1, "Enter your current PIN"),
+  new_pin: staffPinSchema,
+});
+
+export const changeMyPin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => changePinInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles").select("phone, email").eq("id", userId).maybeSingle();
+    const email = profile?.email ?? null;
+    if (!email) throw new Error("This account has no sign-in address");
+
+    if (data.current_pin === data.new_pin) {
+      throw new Error("That is the PIN you already have");
+    }
+
+    // Verify the current PIN by signing in with it on a separate client, so
+    // the caller's own session is untouched either way.
+    const { createClient } = await import("@supabase/supabase-js");
+    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+    if (!url || !anon) throw new Error("Supabase env vars missing");
+    const probe = createClient(url, anon, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // Both forms, for the same reason sign-in tries both: accounts created
+    // before the suffix hold the bare PIN.
+    let ok = false;
+    for (const candidate of passwordCandidates(data.current_pin)) {
+      const { data: signIn, error } = await probe.auth.signInWithPassword({
+        email, password: candidate,
+      });
+      if (!error && signIn.user?.id === userId) { ok = true; break; }
+    }
+    await probe.auth.signOut().catch(() => {});
+    if (!ok) throw new Error("That is not your current PIN");
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password: pinToPassword(data.new_pin),
+    });
+    if (error) throw new Error(`Could not change the PIN. ${describeAuthPasswordError(error.message)}`);
+
+    return { ok: true };
   });

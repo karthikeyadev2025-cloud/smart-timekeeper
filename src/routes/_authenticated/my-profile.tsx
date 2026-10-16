@@ -12,12 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarHeart, IdCard, Landmark, Save, ShieldCheck, ShieldAlert, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { CalendarHeart, IdCard, Landmark, Save, ShieldCheck, ShieldAlert, Clock, CheckCircle2, XCircle, KeyRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
-import { updateMyProfile } from "@/lib/staff.functions";
+import { updateMyProfile, changeMyPin } from "@/lib/staff.functions";
+import { STAFF_PIN_LENGTH, staffPinProblem } from "@/lib/staff-pin";
 import { requestBankChange } from "@/lib/bank-change.functions";
 
 export const Route = createFileRoute("/_authenticated/my-profile")({
@@ -197,6 +198,7 @@ function MyProfile() {
           </Card>
 
           <MyBankCard tenantId={user?.tenant?.id} profile={profile as any} />
+          <MySecurityCard />
         </div>
 
         <Button onClick={save} disabled={saving} className="gap-2" size="lg">
@@ -204,6 +206,111 @@ function MyProfile() {
         </Button>
       </div>
     </AppShell>
+  );
+}
+
+/* ───────────────────────── CHANGING YOUR OWN CREDENTIAL ─────────────────────────
+   Nobody could change their own. Staff had to ask an administrator for a new
+   PIN, which meant the administrator then knew it — so the credential that
+   separates one person's attendance from another's was never actually
+   private. Administrators had no route at all.
+
+   The current PIN is required. An unattended phone left signed in should not
+   be enough for a colleague to lock the owner out and punch as them. */
+
+function MySecurityCard() {
+  const { data: user } = useCurrentUser();
+  const changePin = useServerFn(changeMyPin);
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Administrators sign in with an email and password; staff with a phone and
+  // a 4-digit PIN on a keypad. The two need different forms, and showing the
+  // wrong one is how somebody ends up setting a credential they cannot type.
+  const isEmailLogin = !(user?.profile?.email ?? "").endsWith("@punchly.app");
+
+  const submitPin = async () => {
+    const problem = staffPinProblem(newPin);
+    if (problem) { toast.error(problem); return; }
+    if (!currentPin) { toast.error("Enter your current PIN"); return; }
+    setSaving(true);
+    try {
+      await changePin({ data: { current_pin: currentPin, new_pin: newPin } });
+      toast.success("PIN changed. Use the new one next time you sign in.");
+      setCurrentPin(""); setNewPin("");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not change the PIN");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sendReset = async () => {
+    const email = user?.profile?.email;
+    if (!email) { toast.error("This account has no email address"); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/reset-password",
+      });
+      if (error) throw error;
+      toast.success("Check your email for a link to set a new password.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not send the email");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="space-y-4 p-5">
+      <div className="flex items-center gap-2">
+        <KeyRound className="h-5 w-5 text-primary" />
+        <h3 className="font-semibold">Sign-in</h3>
+      </div>
+
+      {isEmailLogin ? (
+        <>
+          <p className="text-sm text-muted-foreground">
+            You sign in with <span className="font-medium">{user?.profile?.email}</span>.
+          </p>
+          <Button variant="outline" onClick={sendReset} disabled={saving} className="gap-2">
+            <KeyRound className="h-4 w-4" />
+            {saving ? "Sending…" : "Email me a password reset link"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            The link expires shortly and can be used once. Open it on this device.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Change your 4-digit PIN. You will need the one you use now.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Current PIN</Label>
+              <Input type="password" inputMode="numeric" maxLength={STAFF_PIN_LENGTH}
+                value={currentPin} className="font-mono tracking-[0.4em]"
+                onChange={(e) => setCurrentPin(e.target.value.replace(/[^0-9]/g, "").slice(0, STAFF_PIN_LENGTH))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">New PIN</Label>
+              <Input inputMode="numeric" maxLength={STAFF_PIN_LENGTH} value={newPin}
+                className="font-mono tracking-[0.4em]" placeholder="4 digits"
+                onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, STAFF_PIN_LENGTH))} />
+            </div>
+          </div>
+          <Button onClick={submitPin} disabled={saving} className="gap-2">
+            <KeyRound className="h-4 w-4" /> {saving ? "Changing…" : "Change my PIN"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Forgotten it? You cannot change it here — ask your manager to reset it.
+          </p>
+        </>
+      )}
+    </Card>
   );
 }
 

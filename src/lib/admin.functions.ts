@@ -511,3 +511,62 @@ export const exportTenantStaff = createServerFn({ method: "GET" })
 
     return { staff: staff ?? [] };
   });
+
+/* ─────────────── SUPER ADMIN: RESET A CLIENT ADMIN'S PASSWORD ───────────────
+   The last resort when a company administrator is locked out: their reset
+   email bounces, the address is dead, or the person who set the account up
+   has left. Without this the only route back in was editing auth.users by
+   hand in the Supabase dashboard, which is not a thing to be doing under
+   pressure with a customer on the phone.
+
+   Super admin only, and it is recorded. Setting somebody else's password is
+   taking over their account, however good the reason — so it leaves a trail
+   in impersonation_audit, which already exists for exactly this class of
+   action. */
+
+export const resetUserPassword = createServerFn({ method: "POST" })
+  .inputValidator((data: { user_id: string; new_password: string; reason: string }) => data)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.supabase, context.userId);
+
+    if (!data.reason || data.reason.trim().length < 5) {
+      throw new Error("Give a reason — this is recorded against your account");
+    }
+    if (data.new_password.length < 8 || /^\d+$/.test(data.new_password)) {
+      throw new Error("Use at least 8 characters, not all digits");
+    }
+    if (data.user_id === context.userId) {
+      throw new Error("Change your own password from your profile, not here");
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Staff sign in on a 4-digit keypad; an 8-character password would lock
+    // them out rather than rescue them. This path is for the email side.
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles").select("role").eq("user_id", data.user_id);
+    const isEmailUser = (roles ?? []).some(
+      (r: any) => r.role === "client_admin" || r.role === "super_admin",
+    );
+    if (!isEmailUser) {
+      throw new Error(
+        "That account signs in with a phone and a 4-digit PIN. Reset it from the company's Team page instead.",
+      );
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
+      password: data.new_password,
+    });
+    if (error) throw new Error(`Password reset failed: ${error.message}`);
+
+    // Best effort: the reset has already happened, and failing to write the
+    // note must not make the caller think it has not.
+    await supabaseAdmin.from("impersonation_audit").insert({
+      super_admin_id: context.userId,
+      target_user_id: data.user_id,
+      reason: `Password reset: ${data.reason.trim()}`,
+    }).then(undefined, () => {});
+
+    return { ok: true };
+  });

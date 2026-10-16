@@ -197,6 +197,9 @@ function AuthPage() {
 
           <TabsContent value="admin" className="space-y-4 pt-4">
             <SignInForm loading={loading} onSubmit={(e, p) => handleEmailAuth("signin", e, p)} />
+            <div className="flex justify-center text-xs">
+              <ForgotPasswordDialog />
+            </div>
             <GoogleButton onClick={handleGoogle} loading={loading} />
           </TabsContent>
 
@@ -365,6 +368,83 @@ function SignUpForm({ loading, onSubmit }: { loading: boolean; onSubmit: (name: 
       </div>
       <Button type="submit" className="w-full" disabled={loading}>{loading ? "Creating…" : "Create account"}</Button>
     </form>
+  );
+}
+
+/**
+ * Forgot password, for the email side of the login.
+ *
+ * Staff have had "Forgot PIN" since the beginning; an administrator who
+ * forgot their password had nothing at all and was locked out of their own
+ * company permanently, with no self-service route back in.
+ *
+ * The result message is deliberately the same whether or not the address is
+ * registered. Saying "no such account" would turn this box into a way to
+ * find out which email addresses administer a company on Punchly.
+ */
+function ForgotPasswordDialog() {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const submit = async () => {
+    const parsed = emailSchema.safeParse(email);
+    if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
+    setSending(true);
+    try {
+      // An error here is a transport or rate-limit problem, not "unknown
+      // address" — Supabase does not disclose that, and neither should we.
+      const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
+        redirectTo: window.location.origin + "/reset-password",
+      });
+      if (error) throw error;
+      setSent(true);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not send the reset email");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSent(false); }}>
+      <button type="button" onClick={() => setOpen(true)}
+        className="font-medium text-primary underline-offset-2 hover:underline">
+        Forgot password?
+      </button>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Forgot your password?</DialogTitle>
+          <DialogDescription>
+            {sent
+              ? "If that address has an account, a reset link is on its way. It expires shortly and can be used once."
+              : "Enter the email you sign in with. We will send a link to set a new password."}
+          </DialogDescription>
+        </DialogHeader>
+        {sent ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Open the link on this device. Check the spam folder if it has not arrived in a
+              few minutes.
+            </p>
+            <Button className="w-full" onClick={() => setOpen(false)}>Close</Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <Input type="email" value={email} autoComplete="email" placeholder="you@company.com"
+              onChange={(e) => setEmail(e.target.value)} />
+            <Button className="w-full" onClick={submit} disabled={sending}>
+              {sending ? "Sending…" : "Send reset link"}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Staff sign in with a phone number and PIN — use the Staff tab and
+              &ldquo;Forgot PIN&rdquo; instead.
+            </p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
