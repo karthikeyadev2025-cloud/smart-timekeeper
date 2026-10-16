@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { BellRing, CheckCircle2, AlertTriangle, Siren, WifiOff } from "lucide-react";
+import { BellRing, CheckCircle2, AlertTriangle, Siren, WifiOff, UserMinus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/late-alerts")({
   component: LateAlertsPage,
@@ -212,6 +212,8 @@ function LateAlertsPage() {
           </Table>
         </Card>
 
+        <DormantStaffCard tenantId={tenantId} />
+
         <p className="text-xs text-muted-foreground">
           An alert counts as wrongly sent only when the punch had <em>reached the server</em> before
           the alert went out. A punch made earlier on a phone with no signal does not count: it
@@ -221,5 +223,68 @@ function LateAlertsPage() {
         </p>
       </div>
     </AppShell>
+  );
+}
+
+/* ───────────────────────── WHO THE JOB IS SKIPPING ─────────────────────────
+   The alert job deliberately leaves dormant staff alone: somebody with no
+   recent attendance is not chased every morning for a shift they were never
+   going to work. That is right, and it was also invisible — the people being
+   skipped simply stopped appearing anywhere, which is the same shape as the
+   bug the guard was added to fix.
+
+   dormant_staff() was written for exactly this and nothing displayed it. */
+
+function DormantStaffCard({ tenantId }: { tenantId: string | null }) {
+  const { data, error } = useQuery({
+    queryKey: ["dormant-staff", tenantId],
+    enabled: Boolean(tenantId),
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("dormant_staff", { _tenant_id: tenantId! });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const rows = (data ?? []) as any[];
+  if (error || rows.length === 0) return null;
+
+  return (
+    <Card className="space-y-3 p-4">
+      <div className="flex items-center gap-2">
+        <UserMinus className="h-5 w-5 text-muted-foreground" />
+        <h3 className="font-semibold">Not being chased ({rows.length})</h3>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        These people are on the roster but have no recent attendance, so the job leaves them
+        alone rather than raising the same alert every morning. If they have left, disable them
+        on the Team page — a disabled person also frees a seat on your plan.
+      </p>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Staff ID</TableHead>
+              <TableHead>Last punch</TableHead>
+              <TableHead>Why</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <TableRow key={r.user_id}>
+                <TableCell className="font-medium">{r.full_name ?? "—"}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{r.staff_id ?? "—"}</TableCell>
+                <TableCell className="whitespace-nowrap text-xs">
+                  {r.last_punch ?? <span className="text-muted-foreground">never</span>}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">{r.reason}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </Card>
   );
 }

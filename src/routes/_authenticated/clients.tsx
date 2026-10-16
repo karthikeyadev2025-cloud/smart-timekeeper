@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle, ShieldCheck, Trash2, BellRing, Download } from "lucide-react";
+import { Plus, MoreHorizontal, LogIn, Pause, Play, Clock, Repeat, Eye, Copy, AlertTriangle, ShieldCheck, Trash2, BellRing, Download, KeyRound } from "lucide-react";
 import * as XLSX from "xlsx";
 import { BroadcastForm } from "@/components/BroadcastForm";
 import { DeleteTenantDialog } from "@/components/DeleteTenantDialog";
@@ -25,7 +25,7 @@ import { planExpiresAt } from "@/lib/billing-period";
 import { toast } from "sonner";
 import {
   impersonateUser, setTenantActive, extendSubscription, changeTenantPlan, getTenantDetails,
-  exportTenantStaff,
+  exportTenantStaff, resetUserPassword,
 } from "@/lib/admin.functions";
 import { TenantPermissionsDialog } from "@/components/TenantPermissionsDialog";
 
@@ -336,9 +336,15 @@ function TenantDetailsDialog({ open, onOpenChange, tenantId }: { open: boolean; 
               <p className="mb-1 font-semibold">Admins</p>
               <div className="space-y-1">
                 {data.admins.map((a: any) => (
-                  <div key={a.user_id} className="flex justify-between rounded bg-muted px-2 py-1 text-xs">
+                  <div key={a.user_id} className="flex items-center justify-between gap-2 rounded bg-muted px-2 py-1 text-xs">
                     <span>{a.profiles?.full_name ?? "—"}</span>
-                    <span className="text-muted-foreground">{a.profiles?.email}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{a.profiles?.email}</span>
+                      <AdminPasswordReset
+                        userId={a.user_id}
+                        name={a.profiles?.full_name ?? a.profiles?.email ?? "this admin"}
+                      />
+                    </span>
                   </div>
                 ))}
                 {data.admins.length === 0 && <p className="text-xs text-muted-foreground">No admins assigned.</p>}
@@ -463,5 +469,112 @@ function TenantForm({ onDone }: { onDone: () => void }) {
       <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Creating…" : "Create client"}</Button></DialogFooter>
       <p className="text-xs text-muted-foreground">Note: creating an admin signs you in as them. Sign back into your super-admin account afterwards.</p>
     </form>
+  );
+}
+
+/* ───────────────────────── LAST-RESORT PASSWORD RESET ─────────────────────────
+   For when a company administrator is locked out and the self-service route
+   cannot help: the reset email bounces, the address is dead, or the person
+   who set the account up has left.
+
+   Setting somebody else's password is taking over their account, so this
+   asks for a reason, records it against the operator, and shows the new
+   password exactly once — it is never stored anywhere readable. */
+
+function AdminPasswordReset({ userId, name }: { userId: string; name: string }) {
+  const resetFn = useServerFn(resetUserPassword);
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [pwd, setPwd] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+
+  // Something they can read down a phone line without ambiguity, and long
+  // enough to clear the 8-character rule.
+  const suggest = () => {
+    const words = ["anchor", "basket", "candle", "dolphin", "ember", "falcon", "garden", "harbour"];
+    const w = words[Math.floor(Math.random() * words.length)];
+    setPwd(`${w}-${Math.floor(1000 + Math.random() * 9000)}`);
+  };
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      await resetFn({ data: { user_id: userId, new_password: pwd, reason } });
+      setDone(true);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not reset the password");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) { setDone(false); setReason(""); setPwd(""); }
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => { setOpen(true); suggest(); }}
+        title="Reset this admin's password"
+        className="text-muted-foreground hover:text-primary"
+      >
+        <KeyRound className="h-3.5 w-3.5" />
+      </button>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reset password for {name}</DialogTitle>
+        </DialogHeader>
+        {done ? (
+          <div className="space-y-3 text-sm">
+            <p className="font-medium text-success">Password changed.</p>
+            <p className="text-muted-foreground">
+              Give them this now — it is not stored anywhere and cannot be shown again.
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-base">{pwd}</code>
+              <Button size="sm" variant="outline" onClick={() => {
+                navigator.clipboard?.writeText(pwd); toast.success("Copied");
+              }}>
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Tell them to change it from My profile once they are back in.
+            </p>
+            <Button className="w-full" onClick={() => setOpen(false)}>Done</Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Try &ldquo;Forgot password&rdquo; on the sign-in page first — this is for when that
+              cannot work, and it is recorded against your account.
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs">Why</Label>
+              <Input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Email address no longer works; confirmed by phone"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">New password</Label>
+              <div className="flex gap-2">
+                <Input value={pwd} onChange={(e) => setPwd(e.target.value)} className="font-mono" />
+                <Button size="sm" variant="outline" onClick={suggest}>New</Button>
+              </div>
+            </div>
+            <Button className="w-full" onClick={submit} disabled={saving || reason.trim().length < 5}>
+              {saving ? "Resetting…" : "Reset password"}
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
