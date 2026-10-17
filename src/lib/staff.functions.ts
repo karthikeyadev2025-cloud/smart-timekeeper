@@ -59,22 +59,78 @@ export const createStaff = createServerFn({ method: "POST" })
 
     const email = `${data.phone}@${STAFF_EMAIL_DOMAIN}`;
 
-    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      // The PIN is 4 digits; Supabase will not store a password under 6. See
-      // pinToPassword — the employee still types the 4 digits.
-      password: pinToPassword(data.password),
-      email_confirm: true,
-      user_metadata: { full_name: data.full_name, phone: data.phone },
-    });
-    if (createErr || !created.user) {
+    // Does this phone already have an account? Ask BEFORE trying to create
+    // one, because Supabase's answer is "a user with this email address has
+    // already been registered" — and the admin never typed an email. They
+    // typed a phone number. That message sends them looking for a problem
+    // that does not exist, and says nothing about which of the real causes
+    // they have hit.
+    const { data: existing } = await supabaseAdmin
+      .from("profiles")
+      .select("id, tenant_id, full_name, is_active")
+      .eq("email", email)
+      .maybeSingle();
+
+    let newUserId: string;
+    let createdHere = false;
+
+    if (existing?.tenant_id === data.tenant_id) {
+      const who = existing.full_name?.trim() || "Somebody";
       throw new Error(
-        createErr
-          ? `Could not create staff account. ${describeAuthPasswordError(createErr.message)}`
-          : "Could not create staff account",
+        existing.is_active
+          ? `${who} already uses ${data.phone} in this company. A phone number identifies one person — give the new starter their own.`
+          : `${who} already uses ${data.phone} here but is disabled. Re-enable them on the Team page rather than adding them again: their attendance history and payslips are kept, and re-enabling uses the same seat.`,
       );
+    } else if (existing?.tenant_id) {
+      // Another company's staff member. Deliberately not named — which
+      // company somebody works for is not this admin's to learn by typing
+      // phone numbers into a form.
+      throw new Error(
+        `${data.phone} is already registered to a different company on Punchly. One phone number can only belong to one person.`,
+      );
+    } else if (existing) {
+      // An account with no company at all. This is the wreckage of an earlier
+      // half-finished attempt, and before this it bricked the phone number
+      // permanently: every retry hit "already registered" and there was no
+      // way through from the interface. Adopt it instead, and set the PIN the
+      // admin just chose.
+      newUserId = existing.id;
+      const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(newUserId, {
+        password: pinToPassword(data.password),
+      });
+      if (pwErr) throw new Error(`Could not reuse the dormant account for ${data.phone}. ${describeAuthPasswordError(pwErr.message)}`);
+    } else {
+      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        // The PIN is 4 digits; Supabase will not store a password under 6. See
+        // pinToPassword — the employee still types the 4 digits.
+        password: pinToPassword(data.password),
+        email_confirm: true,
+        user_metadata: { full_name: data.full_name, phone: data.phone },
+      });
+      if (createErr || !created.user) {
+        // The pre-check above catches this in every ordinary case; reaching
+        // here means two admins added the same number at once. Say it in
+        // terms of the phone either way.
+        if (createErr && /already been registered/i.test(createErr.message)) {
+          throw new Error(`${data.phone} was registered a moment ago by somebody else. Reload the Team page and check before trying again.`);
+        }
+        throw new Error(
+          createErr
+            ? `Could not create staff account. ${describeAuthPasswordError(createErr.message)}`
+            : "Could not create staff account",
+        );
+      }
+      newUserId = created.user.id;
+      createdHere = true;
     }
-    const newUserId = created.user.id;
+
+    // Anything that fails from here leaves an account with no company behind,
+    // which is exactly the wreckage the adopt branch above exists to clear up.
+    // Better not to make more of it.
+    const undoAccount = async () => {
+      if (createdHere) await supabaseAdmin.auth.admin.deleteUser(newUserId).catch(() => {});
+    };
 
     // The role goes in BEFORE the profile is attached to the company, not
     // after. handle_new_user() has just created a profile with no tenant; the
@@ -86,7 +142,7 @@ export const createStaff = createServerFn({ method: "POST" })
     const { error: roleErr } = await supabaseAdmin
       .from("user_roles")
       .insert({ user_id: newUserId, role: data.role, tenant_id: data.tenant_id });
-    if (roleErr) throw new Error(roleErr.message);
+    if (roleErr) { await undoAccount(); throw new Error(roleErr.message); }
 
     const { error: profErr } = await supabaseAdmin
       .from("profiles")
@@ -104,7 +160,7 @@ export const createStaff = createServerFn({ method: "POST" })
     // The account and its role already exist at this point, so leaving them
     // behind would strand an unattached user on every refused hire.
     if (profErr) {
-      await supabaseAdmin.auth.admin.deleteUser(newUserId);
+      await undoAccount();
       throw new Error(profErr.message);
     }
 
@@ -529,7 +585,16 @@ export const bulkImportStaff = createServerFn({ method: "POST" })
           email_confirm: true,
           user_metadata: { full_name: row.full_name, phone: row.phone },
         });
-        if (createErr || !created.user) throw new Error(createErr?.message ?? "Could not create account");
+        if (createErr || !created.user) {
+          // A spreadsheet of forty people should say WHICH row is the
+          // problem and why, in the admin's own terms. "A user with this
+          // email address has already been registered" names a field the
+          // import does not even have a column for.
+          if (createErr && /already been registered/i.test(createErr.message)) {
+            throw new Error(`${row.phone} already has an account. If they used to work here, re-enable them on the Team page instead; if the number is wrong, correct it in the sheet.`);
+          }
+          throw new Error(createErr?.message ?? "Could not create account");
+        }
         const newUserId = created.user.id;
 
         const branchId = row.branch_name ? branchByName.get(row.branch_name.trim().toLowerCase()) ?? null : null;
